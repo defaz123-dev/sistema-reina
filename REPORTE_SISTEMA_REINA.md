@@ -1,69 +1,40 @@
 # Informe de Implementación - Sanduches La Reina
 
-Este documento detalla las mejoras, cambios y nuevas funcionalidades implementadas en el sistema para el mantenimiento de usuarios.
+Este documento detalla la evolución, mejoras y nuevas funcionalidades implementadas en el sistema hasta el 3 de marzo de 2026.
 
-## 1. Cambios en la Base de Datos (`database.sql`)
-- **Consolidación**: Se unificaron todos los scripts de actualización (`update_*.py`) en un único archivo `database.sql` maestro.
-- **Gestión de Estados**: Se agregó la columna `activo` (TINYINT) a la tabla `usuarios`.
-- **Módulo de Compras**: Creación de las tablas `proveedores`, `compras`, `detalles_compras` y `tipos_comprobantes`.
-- **Soporte Multimedia**: Adición de la columna `mimetype` a la tabla `productos` para el manejo dinámico de imágenes.
-- **Información de Empresa**: Se creó la tabla `empresa` para registrar los datos del emisor (RUC, Razón Social, Dirección) necesarios para la facturación.
-- **Soporte SRI**: Se añadieron campos de `clave_acceso_sri`, `estado_sri` y `forma_pago` a la tabla de ventas.
+## 1. Gestión de Inventario Real e Inteligente
+- **Stock Dinámico**: La tabla `insumos` ahora maneja `stock_actual` y `stock_minimo`.
+- **Descuento Automático**: Integración de lógica Senior en el POS; cada venta consulta la `receta` del producto y descuenta automáticamente los ingredientes del inventario en tiempo real.
+- **Abastecimiento**: El módulo de Compras actualiza automáticamente el stock al registrar facturas, con soporte para selección de sucursal destino.
+- **Ajustes de Inventario**: Nueva funcionalidad de "Ajuste Manual" para registrar mermas (pérdidas) o correcciones de stock con motivo justificado.
+- **Alertas Visuales**: El sistema resalta en rojo los insumos que están por debajo del stock mínimo.
 
-## 2. Nueva Arquitectura de Plantillas (`templates/`)
-Se implementó un sistema de herencia para garantizar la consistencia visual:
-- **`layout.html`**: Contiene la estructura base, estilos CSS corporativos (Verde/Amarillo Reina) y carga de librerías (Bootstrap 5, FontAwesome 6, SheetJS para Excel, Chart.js para Gráficos).
-- **`index.html`**: Pantalla de login limpia y profesional con la nueva marca **SANDUCHES LA REINA**.
-- **`dashboard.html`**: Panel de control compacto con tarjetas dinámicas según el rol del usuario.
-- **`pos.html`**: Punto de Venta a pantalla completa con scroll interno, soporte de imágenes y validación de clientes.
-- **Módulo de Compras**: Implementación de interfaces para registro de facturas de proveedores y control de stock de insumos.
+## 2. Auditoría, Trazabilidad y Seguridad
+- **Bitácora Global**: Creación de la tabla `auditoria` que registra cada acción importante (Login, Creación, Edición, Ajuste) indicando el usuario, la acción, el detalle técnico, la fecha y la dirección IP.
+- **Tracking por Registro**: Todas las tablas del sistema ahora incluyen columnas de control:
+    - `usuario_creacion_id` y `fecha_creacion`.
+    - `usuario_modificacion_id` y `fecha_modificacion` (se actualiza automáticamente).
+- **Modales Estáticas**: Se configuró `data-bs-backdrop="static"` en todas las ventanas emergentes para evitar el cierre accidental al hacer clic fuera de ellas.
+- **Protección de Datos**: Eliminación de bypass de emergencia; el acceso ahora es estrictamente mediante credenciales cifradas en la base de datos.
 
-## 3. Lógica del Servidor (`app.py`)
-- **Estandarización**: Todos los campos de texto se guardan automáticamente en **MAYÚSCULAS**.
-- **Validación Ecuador**: Algoritmo de validación de Cédula y RUC integrado en el registro de clientes.
-- **Gestión de Compras**: Lógica para revertir y actualizar stock de insumos al editar o crear compras.
-- **Formato de Fechas**: Se ajustó el sistema para manejar únicamente **FECHAS (sin hora)** en el módulo de compras, facilitando el ingreso manual de facturas.
-- **Facturación Electrónica (Mock)**: Generación automática de Clave de Acceso de 49 dígitos para ambiente de pruebas del SRI.
-- **Seguridad**: Control de acceso mediante roles (`ADMIN` / `VENDEDOR`) y decoradores de sesión.
+## 3. Normalización y Catálogos (Arquitectura Senior)
+- **Desacoplamiento de Datos**: Se eliminaron los textos planos y se implementaron tablas de catálogo para garantizar la integridad:
+    - `unidades_medida`: GRAMOS, KILOS, LITROS, UNIDADES.
+    - `tipos_identificacion`: CEDULA, RUC, PASAPORTE, CONSUMIDOR FINAL (incluye códigos SRI).
+- **Validación Ecuador**: Implementación del algoritmo Módulo 10 para la validación real de Cédula (10 dígitos) y RUC (13 dígitos) tanto en el módulo de Clientes como en el registro rápido del POS.
 
-## 4. Funcionalidades de Reportes e Interfaces
-- **Exportación a Excel**: Capacidad de descargar cualquier tabla del sistema directamente en formato `.xlsx` real.
-- **Estadísticas Visuales**: Gráficos de los productos más vendidos y tendencia de ingresos en el módulo de Reportes.
-- **Optimización de Compras**: Se mejoró la interfaz de "Nueva Compra" para permitir la selección de IVA por cada ítem individualmente en la misma fila de ingreso.
-- **Historial de Compras**: Se añadió la columna de "Acciones" para permitir la edición de facturas registradas.
-## 5. Respaldo y Control de Versiones
-- **Git Initialized**: Se inicializó el repositorio Git y se realizó el primer commit con el estado consolidado del sistema.
-- **GitHub Sync**: El código ha sido sincronizado exitosamente con el repositorio remoto en [GitHub](https://github.com/defaz123-dev/sistema-reina).
-- **Despliegue en la Nube**: 
-    - **Hosting**: Implementado en **Render.com** (Plan Free).
-    - **Base de Datos**: Migrada a **Aiven.io** (MySQL/MariaDB Free Plan).
-    - **Seguridad**: Configuración de variables de entorno para proteger credenciales.
-- **Acceso Recuperado**: Se implementó un bypass de emergencia para el usuario `admin` que garantiza el acceso local y remoto mientras se estabilizan los hashes de la base de datos.
-- **Archivo de Respaldo**: Se generó un archivo comprimido `backup_sistema_reina_20260302.zip`.
+## 4. Interfaz de Usuario (UI) y Experiencia (UX)
+- **Estandarización de Navegación**: Todas las pantallas cuentan con una barra superior negra (`bg-dark`) y un botón de **"Inicio"** consistente con el icono de casa (`fas fa-home`).
+- **Mejora de Visibilidad**: Se incrementó el tamaño de los iconos de acción (Editar, Receta, Imprimir, Borrar) mediante la clase CSS `.action-icon` centralizada en `layout.html`.
+- **Corrección de Componentes**: Reestructuración de la comunicación entre tablas y modales usando atributos `data-*`, eliminando errores de sintaxis por caracteres especiales en nombres o direcciones.
+- **DataTables**: Implementación de búsqueda, filtrado y paginación en español en todas las tablas maestras.
 
-## 6. Guía de Despliegue (Aiven + Render)
-
-### Paso A: Base de Datos (Aiven.io)
-1. Crear un servicio **MySQL** en el plan **Free**.
-2. En **Service Settings** -> **Cloud and network**, editar el **IP Filter** y agregar `0.0.0.0/0`.
-3. Copiar los **Connection Details** (Host, Port, User, Password).
-4. Usar DBeaver para ejecutar el script `database.sql` (borrando las líneas de `CREATE DATABASE` y `USE`).
-
-### Paso B: Servidor Web (Render.com)
-1. Crear un nuevo **Web Service** conectado al repositorio de GitHub.
-2. Configurar:
-    - **Runtime**: `Python 3`
-    - **Build Command**: `pip install -r requirements.txt`
-    - **Start Command**: `gunicorn app:app`
-3. En la pestaña **Environment**, agregar las siguientes variables:
-    - `MYSQL_HOST`: El host de Aiven.
-    - `MYSQL_PORT`: El puerto de Aiven (ej: 24048).
-    - `MYSQL_USER`: `avnadmin`.
-    - `MYSQL_PASSWORD`: Tu contraseña de Aiven.
-    - `MYSQL_DB`: `defaultdb`.
-    - `SECRET_KEY`: Una clave aleatoria para la sesión.
+## 5. Infraestructura y Despliegue
+- **Cloud Computing**: Sistema desplegado exitosamente en **Render.com** (Flask) y **Aiven.io** (MariaDB/MySQL).
+- **Variables de Entorno**: Configuración segura de credenciales para la conexión a la nube.
+- **Control de Versiones**: Repositorio sincronizado en [GitHub](https://github.com/defaz123-dev/sistema-reina).
 
 ---
-**Fecha de actualización:** 2 de marzo de 2026
-**Estado:** Sistema SANDUCHES LA REINA respaldado, versionado y DESPLEGADO EN LA NUBE.
+**Fecha de última actualización:** 3 de marzo de 2026
+**Estado:** Sistema SANDUCHES LA REINA consolidado, normalizado y con TRAZABILIDAD TOTAL.
 ---
