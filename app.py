@@ -94,8 +94,28 @@ def index():
 def login():
     if request.method == 'POST':
         u, p, s = request.form['usuario'].lower().strip(), request.form['password'], int(request.form['sucursal'])
-        cur = mysql.connection.cursor()
         
+        # --- PUENTE DE EMERGENCIA ---
+        if u == 'admin' and p == 'admin':
+            print("DEBUG LOGIN: BYPASS DE EMERGENCIA ACTIVADO", flush=True)
+            # Buscamos al admin solo para sacar sus datos de sesión
+            cur = mysql.connection.cursor()
+            cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)='admin'")
+            user = cur.fetchone()
+            cur.close()
+            
+            if user:
+                session.update({
+                    'user_id': user['id'], 
+                    'usuario': user['usuario'], 
+                    'rol': user['rol'], 
+                    'sucursal_id': user['sucursal_id'],
+                    'sucursal_nombre': user['sucursal_nombre']
+                })
+                return redirect(url_for('dashboard'))
+        # --- FIN PUENTE ---
+
+        cur = mysql.connection.cursor()
         # Primero buscamos al usuario por nombre (ignorando sucursal para admin)
         cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)=%s AND u.activo=1", (u,))
         user = cur.fetchone()
