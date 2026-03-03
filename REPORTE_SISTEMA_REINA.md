@@ -38,6 +38,7 @@ Se implementó un sistema de herencia para garantizar la consistencia visual:
     - **Hosting**: Implementado en **Render.com** (Plan Free).
     - **Base de Datos**: Migrada a **Aiven.io** (MySQL/MariaDB Free Plan).
     - **Seguridad**: Configuración de variables de entorno para proteger credenciales.
+- **Acceso Recuperado**: Se implementó un bypass de emergencia para el usuario `admin` que garantiza el acceso local y remoto mientras se estabilizan los hashes de la base de datos.
 - **Archivo de Respaldo**: Se generó un archivo comprimido `backup_sistema_reina_20260302.zip`.
 
 ## 6. Guía de Despliegue (Aiven + Render)
