@@ -101,17 +101,29 @@ def login():
         user = cur.fetchone()
         cur.close()
 
-        if user and check_password_hash(user['password'], p):
-            # Si es ADMIN, le dejamos entrar aunque haya elegido mal la sucursal
-            if user['rol'] == 'ADMIN' or user['sucursal_id'] == s:
-                session.update({
-                    'user_id': user['id'], 
-                    'usuario': user['usuario'], 
-                    'rol': user['rol'], 
-                    'sucursal_id': user['sucursal_id'],
-                    'sucursal_nombre': user['sucursal_nombre']
-                })
-                return redirect(url_for('dashboard'))
+        if user:
+            print(f"DEBUG LOGIN: Usuario encontrado -> ID: {user['id']}, Rol: {user['rol']}, Sucursal_BD: {user['sucursal_id']}, Sucursal_POST: {s}", flush=True)
+            print(f"DEBUG LOGIN: Contraseña ingresada: '{p}'", flush=True)
+            
+            pwd_ok = check_password_hash(user['password'], p)
+            print(f"DEBUG LOGIN: ¿Password coincide?: {pwd_ok}", flush=True)
+
+            if pwd_ok:
+                # Si es ADMIN, le dejamos entrar aunque haya elegido mal la sucursal
+                if user['rol'] == 'ADMIN' or user['sucursal_id'] == s:
+                    print("DEBUG LOGIN: ACCESO CONCEDIDO", flush=True)
+                    session.update({
+                        'user_id': user['id'], 
+                        'usuario': user['usuario'], 
+                        'rol': user['rol'], 
+                        'sucursal_id': user['sucursal_id'],
+                        'sucursal_nombre': user['sucursal_nombre']
+                    })
+                    return redirect(url_for('dashboard'))
+                else:
+                    print("DEBUG LOGIN: SUCURSAL INCORRECTA PARA VENDEDOR", flush=True)
+        else:
+            print(f"DEBUG LOGIN: Usuario '{u}' no encontrado en BD o no está activo.", flush=True)
         
         flash('Credenciales incorrectas o sucursal no válida', 'danger')
     return redirect(url_for('index'))
