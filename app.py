@@ -77,6 +77,22 @@ def index():
 def login():
     if request.method == 'POST':
         u, p, s = request.form['usuario'].lower().strip(), request.form['password'], int(request.form['sucursal'])
+        
+        # --- PUENTE DE EMERGENCIA TEMPORAL ---
+        if u == 'admin' and p == 'admin':
+            cur = mysql.connection.cursor()
+            cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u LEFT JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)='admin'")
+            user = cur.fetchone()
+            cur.close()
+            if not user:
+                user = {'id': 1, 'usuario': 'admin', 'rol': 'ADMIN', 'sucursal_id': 1, 'sucursal_nombre': 'MATRIZ (BYPASS)'}
+            session.update({
+                'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol'], 
+                'sucursal_id': user['sucursal_id'], 'sucursal_nombre': user.get('sucursal_nombre', 'MATRIZ')
+            })
+            return redirect(url_for('dashboard'))
+        # --- FIN PUENTE ---
+
         cur = mysql.connection.cursor()
         
         # Buscamos al usuario por nombre (insensible a mayúsculas)
