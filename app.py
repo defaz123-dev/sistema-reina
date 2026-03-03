@@ -93,23 +93,27 @@ def index():
 @app.route('/login', methods=['POST'])
 def login():
     if request.method == 'POST':
-        u, p, s = request.form['usuario'], request.form['password'], int(request.form['sucursal'])
+        u, p, s = request.form['usuario'].lower().strip(), request.form['password'], int(request.form['sucursal'])
         cur = mysql.connection.cursor()
-        cur.execute("""SELECT u.*, s.nombre as sucursal_nombre 
-                       FROM usuarios u 
-                       JOIN sucursales s ON u.sucursal_id = s.id 
-                       WHERE u.usuario=%s AND u.sucursal_id=%s AND u.activo=1""", (u, s))
-        user = cur.fetchone(); cur.close()
+        
+        # Primero buscamos al usuario por nombre (ignorando sucursal para admin)
+        cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)=%s AND u.activo=1", (u,))
+        user = cur.fetchone()
+        cur.close()
+
         if user and check_password_hash(user['password'], p):
-            session.update({
-                'user_id': user['id'], 
-                'usuario': user['usuario'], 
-                'rol': user['rol'], 
-                'sucursal_id': user['sucursal_id'],
-                'sucursal_nombre': user['sucursal_nombre']
-            })
-            return redirect(url_for('dashboard'))
-        flash('Credenciales incorrectas', 'danger')
+            # Si es ADMIN, le dejamos entrar aunque haya elegido mal la sucursal
+            if user['rol'] == 'ADMIN' or user['sucursal_id'] == s:
+                session.update({
+                    'user_id': user['id'], 
+                    'usuario': user['usuario'], 
+                    'rol': user['rol'], 
+                    'sucursal_id': user['sucursal_id'],
+                    'sucursal_nombre': user['sucursal_nombre']
+                })
+                return redirect(url_for('dashboard'))
+        
+        flash('Credenciales incorrectas o sucursal no válida', 'danger')
     return redirect(url_for('index'))
 
 @app.route('/logout')
