@@ -98,21 +98,27 @@ def login():
         # --- PUENTE DE EMERGENCIA ---
         if u == 'admin' and p == 'admin':
             print("DEBUG LOGIN: BYPASS DE EMERGENCIA ACTIVADO", flush=True)
-            # Buscamos al admin solo para sacar sus datos de sesión
+            # Buscamos al admin en BD si existe para traer sucursal, si no usamos valores por defecto
             cur = mysql.connection.cursor()
-            cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)='admin'")
+            cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u LEFT JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)='admin'")
             user = cur.fetchone()
             cur.close()
             
-            if user:
-                session.update({
-                    'user_id': user['id'], 
-                    'usuario': user['usuario'], 
-                    'rol': user['rol'], 
-                    'sucursal_id': user['sucursal_id'],
-                    'sucursal_nombre': user['sucursal_nombre']
-                })
-                return redirect(url_for('dashboard'))
+            # Si el usuario NO existe en BD o no tiene sucursal, forzamos uno falso para entrar
+            if not user:
+                user = {
+                    'id': 1, 'usuario': 'admin', 'rol': 'ADMIN', 
+                    'sucursal_id': 1, 'sucursal_nombre': 'MATRIZ (BYPASS)'
+                }
+
+            session.update({
+                'user_id': user['id'], 
+                'usuario': user['usuario'], 
+                'rol': user['rol'], 
+                'sucursal_id': user['sucursal_id'],
+                'sucursal_nombre': user.get('sucursal_nombre', 'MATRIZ')
+            })
+            return redirect(url_for('dashboard'))
         # --- FIN PUENTE ---
 
         cur = mysql.connection.cursor()
