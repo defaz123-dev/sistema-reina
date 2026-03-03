@@ -67,27 +67,11 @@ def admin_required(f):
 @app.route('/')
 def index():
     if 'user_id' in session: return redirect(url_for('dashboard'))
-    
-    # Diagnóstico de variables
-    missing = [v for v in ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DB', 'MYSQL_PORT'] if v not in os.environ]
-    
-    res = get_db_cursor()
-    if isinstance(res, str):
-        msg = f"<h3>Error de Conexión</h3><p>{res}</p>"
-        if missing:
-            msg += f"<div style='background: #fff3cd; padding: 10px; border: 1px solid #ffeeba;'><b>Variables faltantes en Render:</b> {', '.join(missing)}</div>"
-        else:
-            msg += "<p>Todas las variables están presentes, pero la base de datos rechazó la conexión. Revisa el Host y la Contraseña.</p>"
-        return msg, 500
-    
-    cur = res
-    try:
-        cur.execute("SELECT * FROM sucursales")
-        s = cur.fetchall()
-        cur.close()
-        return render_template('index.html', sucursales=s)
-    except Exception as e:
-        return f"<h3>Error en Consulta</h3><p>{str(e)}</p>", 500
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM sucursales")
+    s = cur.fetchall()
+    cur.close()
+    return render_template('index.html', sucursales=s)
 
 @app.route('/login', methods=['POST'])
 def login():
