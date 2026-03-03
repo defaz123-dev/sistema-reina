@@ -19,8 +19,8 @@ app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 # Ajuste para evitar desconexiones en la nube
 if 'MYSQL_HOST' in os.environ and os.environ['MYSQL_HOST'] != 'localhost':
-    # En la nube (Aiven), forzamos SSL de forma compatible con mysqlclient
-    app.config['MYSQL_CUSTOM_OPTIONS'] = {"ssl": {"ca": None}} 
+    # En la nube (Aiven), forzamos SSL de forma robusta
+    app.config['MYSQL_CUSTOM_OPTIONS'] = {"ssl": {"ca": None}, "ssl_mode": "REQUIRED"} 
 else:
     app.config['MYSQL_CUSTOM_OPTIONS'] = {}
 
