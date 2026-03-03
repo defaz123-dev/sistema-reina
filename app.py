@@ -34,6 +34,35 @@ def get_db_cursor():
         print(f"ERROR DE CONEXION: {str(e)}")
         return None
 
+def identificar_tipo_doc(doc):
+    return 'RUC' if len(doc) == 13 else 'CEDULA'
+
+def generar_clave_acceso_sri(fecha, ruc_empresa, ambiente):
+    f = fecha.strftime('%d%m%Y')
+    clave = f"{f}01{ruc_empresa}{ambiente}001001{random.randint(1,999999):09d}123456781"
+    return clave[:49]
+
+def validar_ecuador_id(doc):
+    if doc == "9999999999": return True
+    if not doc or not doc.isdigit() or len(doc) not in [10, 13]: return False
+    return True
+
+# --- DECORADORES ---
+def login_required(f):
+    @wraps(f)
+    def dec(*args, **kwargs):
+        if 'user_id' not in session: return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return dec
+
+def admin_required(f):
+    @wraps(f)
+    def dec(*args, **kwargs):
+        if session.get('rol') != 'ADMIN':
+            flash('Acceso denegado', 'danger'); return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return dec
+
 # --- RUTAS BASE ---
 @app.route('/')
 def index():
