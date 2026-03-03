@@ -52,9 +52,9 @@ CREATE TABLE usuarios (
     usuario_modificacion_id INT, fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
 );
--- Clave: admin
 INSERT INTO usuarios (id, usuario, password, sucursal_id, rol, activo) VALUES 
-(1, 'admin', 'scrypt:32768:8:1$DXvK5GgRv6PghYpo$2cd3f172bafcbe4eda2c7007e74ce30be244b5f46c0907a1406cf7012e2492767f110e883edfef4a1084d4165383a572a8321b1c671880d7b0d705ece6e2ca3c', 1, 'ADMIN', 1);
+(1, 'admin', 'scrypt:32768:8:1$OSyt2StROGDDPy4f$7a2ff17725e547c97110d2560d400e6126d2172d277fd22c61b7342b7a34b0bc07a7cd6e57a997202b3887261e6da9f79e933d46a33f239c4613891a95d0825b', 1, 'ADMIN', 1),
+(2, 'liliana', 'scrypt:32768:8:1$0KzrMh3tnG7kEoxZ$ded6e5fc4aad675c0debb2af7caa2338dd6e51c3f04fc412a06a3d8104424c2a65bd938701ed0ec0701e49b2961037ad276cc5a9a6c684f2ef014d0c77b862f5', 1, 'ADMIN', 1);
 
 -- 5. Categorías
 CREATE TABLE categorias (
