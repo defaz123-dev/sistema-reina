@@ -17,6 +17,7 @@ app.config['MYSQL_PASSWORD'] = os.environ.get('MYSQL_PASSWORD', '')
 app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB', 'sistema_reina')
 app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
+
 # Ajuste para evitar desconexiones en la nube
 if 'MYSQL_HOST' in os.environ and os.environ['MYSQL_HOST'] != 'localhost':
     # En la nube (Aiven), forzamos SSL de forma robusta
@@ -31,8 +32,7 @@ def get_db_cursor():
     try:
         return mysql.connection.cursor()
     except Exception as e:
-        print(f"ERROR DE CONEXION: {str(e)}")
-        return None
+        return str(e)
 
 def identificar_tipo_doc(doc):
     return 'RUC' if len(doc) == 13 else 'CEDULA'
@@ -67,10 +67,12 @@ def admin_required(f):
 @app.route('/')
 def index():
     if 'user_id' in session: return redirect(url_for('dashboard'))
-    cur = get_db_cursor()
-    if cur is None:
-        return f"<h3>Error de Conexión a Base de Datos</h3><p>El sistema no pudo conectarse a la base de datos en la nube. Verifica las variables de entorno en Render y que la IP 0.0.0.0/0 esté permitida en Aiven.</p>", 500
     
+    res = get_db_cursor()
+    if isinstance(res, str):
+        return f"<h3>Error de Conexión</h3><p>{res}</p><hr><p>Verifica MYSQL_HOST, MYSQL_PORT, MYSQL_USER y MYSQL_PASSWORD en Render.</p>", 500
+    
+    cur = res
     try:
         cur.execute("SELECT * FROM sucursales")
         s = cur.fetchall()
@@ -125,13 +127,11 @@ def compras():
 @admin_required
 def nueva_compra():
     cur = mysql.connection.cursor()
-    # Obtenemos proveedores con el nombre de su tipo de comprobante
     cur.execute("""SELECT p.*, t.nombre as tipo_comprobante_nombre 
                    FROM proveedores p 
                    JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id""")
     provs = cur.fetchall()
     cur.execute("SELECT * FROM insumos WHERE sucursal_id = %s", (session['sucursal_id'],)); ins = cur.fetchall(); cur.close()
-    # Enviamos fecha actual por defecto para el input
     hoy = datetime.now().strftime('%Y-%m-%d')
     return render_template('nueva_compra.html', proveedores=provs, insumos=ins, fecha_hoy=hoy)
 
@@ -146,7 +146,6 @@ def editar_compra(id):
                    FROM detalles_compras dc JOIN insumos i ON dc.insumo_id = i.id 
                    WHERE dc.compra_id = %s""", (id,))
     detalles = cur.fetchall()
-    # Obtenemos proveedores con el nombre de su tipo de comprobante
     cur.execute("""SELECT p.*, t.nombre as tipo_comprobante_nombre 
                    FROM proveedores p 
                    JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id""")
@@ -164,33 +163,24 @@ def guardar_compra():
         id_compra = data.get('compra_id')
         fecha = data['fecha']
         clave = data.get('clave_acceso')
-        
         if id_compra:
-            # 1. Revertir stock anterior antes de actualizar
             cur.execute("SELECT insumo_id, cantidad FROM detalles_compras WHERE compra_id = %s", (id_compra,))
             items_viejos = cur.fetchall()
             for iv in items_viejos:
                 cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (iv['cantidad'], iv['insumo_id']))
-            
-            # 2. Actualizar Cabecera
             cur.execute("UPDATE compras SET proveedor_id=%s, numero_comprobante=%s, total=%s, fecha=%s, clave_acceso=%s WHERE id=%s",
                         (data['proveedor_id'], data['numero_comprobante'].upper(), data['total'], fecha, clave, id_compra))
-            # 3. Borrar detalles para reinsertar
             cur.execute("DELETE FROM detalles_compras WHERE compra_id = %s", (id_compra,))
             comp_id_final = id_compra
         else:
-            # Insertar Nueva
             cur.execute("INSERT INTO compras (proveedor_id, sucursal_id, numero_comprobante, total, fecha, clave_acceso) VALUES (%s, %s, %s, %s, %s, %s)",
                         (data['proveedor_id'], session['sucursal_id'], data['numero_comprobante'].upper(), data['total'], fecha, clave))
             comp_id_final = cur.lastrowid
-
-        # 4. Insertar Detalles y sumar stock
         for i in data['items']:
             cur.execute("""INSERT INTO detalles_compras (compra_id, insumo_id, cantidad, costo_unitario, subtotal, iva_valor) 
                            VALUES (%s, %s, %s, %s, %s, %s)""", 
                         (comp_id_final, i['insumo_id'], i['cantidad'], i['costo'], i['subtotal'], i['iva_valor']))
             cur.execute("UPDATE insumos SET stock_actual = stock_actual + %s WHERE id = %s", (i['cantidad'], i['insumo_id']))
-            
         mysql.connection.commit(); cur.close()
         return jsonify({'success': True})
     except Exception as e:
@@ -230,7 +220,7 @@ def guardar_cliente_json():
     try:
         nom, ape, dir = data['nombres'].upper(), data['apellidos'].upper(), data.get('direccion','').upper()
         tel, eml = data.get('telefono','').upper(), data.get('email','').upper()
-        cur.execute("INSERT INTO clientes (cedula_ruc, tipo_documento, nombres, apellidos, direccion, telefono, email) VALUES (%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE nombres=%s, apellidos=%s, direccion=%s, telefono=%s, email=%s", 
+        cur.execute("""INSERT INTO clientes (cedula_ruc, tipo_documento, nombres, apellidos, direccion, telefono, email) VALUES (%s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE nombres=%s, apellidos=%s, direccion=%s, telefono=%s, email=%s""", 
                     (data['cedula_ruc'], identificar_tipo_doc(data['cedula_ruc']), nom, ape, dir, tel, eml, nom, ape, dir, tel, eml))
         mysql.connection.commit(); cur.execute("SELECT id FROM clientes WHERE cedula_ruc=%s", (data['cedula_ruc'],)); c_id = cur.fetchone()['id']; cur.close()
         return jsonify({'success': True, 'id': c_id})
@@ -298,7 +288,7 @@ def ver_ticket(id):
     cur.execute("SELECT * FROM clientes WHERE id=%s", (v['cliente_id'],)); c = cur.fetchone()
     cur.execute("SELECT * FROM sucursales WHERE id=%s", (v['sucursal_id'],)); s = cur.fetchone()
     cur.execute("SELECT usuario FROM usuarios WHERE id=%s", (v['usuario_id'],)); u = cur.fetchone()
-    cur.execute("SELECT dv.*, p.nombre FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id WHERE dv.venta_id=%s", (id,))
+    cur.execute("""SELECT dv.*, p.nombre FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id WHERE dv.venta_id=%s""", (id,))
     det = cur.fetchall()
     cur.execute("SELECT * FROM empresa LIMIT 1"); emp = cur.fetchone()
     cur.close()
@@ -310,8 +300,8 @@ def ver_ticket(id):
 @admin_required
 def reportes():
     cur = mysql.connection.cursor()
-    cur.execute("SELECT v.*, c.nombres, c.apellidos, u.usuario FROM ventas v JOIN clientes c ON v.cliente_id=c.id JOIN usuarios u ON v.usuario_id=u.id ORDER BY v.fecha DESC"); v = cur.fetchall()
-    cur.execute("SELECT p.nombre, SUM(dv.cantidad) as total_vendido FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id GROUP BY p.id ORDER BY total_vendido DESC LIMIT 5"); t = cur.fetchall(); cur.close()
+    cur.execute("""SELECT v.*, c.nombres, c.apellidos, u.usuario FROM ventas v JOIN clientes c ON v.cliente_id=c.id JOIN usuarios u ON v.usuario_id=u.id ORDER BY v.fecha DESC"""); v = cur.fetchall()
+    cur.execute("""SELECT p.nombre, SUM(dv.cantidad) as total_vendido FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id GROUP BY p.id ORDER BY total_vendido DESC LIMIT 5"""); t = cur.fetchall(); cur.close()
     return render_template('reportes.html', ventas=v, top_productos=t)
 
 # --- MANTENIMIENTOS ---
@@ -357,7 +347,7 @@ def guardar_insumo():
 @login_required
 @admin_required
 def productos():
-    cur = mysql.connection.cursor(); cur.execute("SELECT p.*, c.nombre as categoria_nombre FROM productos p JOIN categorias c ON p.categoria_id = c.id"); p = cur.fetchall(); cur.execute("SELECT * FROM categorias"); cats = cur.fetchall(); cur.close(); return render_template('productos.html', productos=p, categorias=cats)
+    cur = mysql.connection.cursor(); cur.execute("""SELECT p.*, c.nombre as categoria_nombre FROM productos p JOIN categorias c ON p.categoria_id = c.id"""); p = cur.fetchall(); cur.execute("SELECT * FROM categorias"); cats = cur.fetchall(); cur.close(); return render_template('productos.html', productos=p, categorias=cats)
 
 @app.route('/productos/guardar', methods=['POST'])
 @login_required
@@ -380,7 +370,7 @@ def guardar_producto():
 @login_required
 @admin_required
 def ver_receta(producto_id):
-    cur = mysql.connection.cursor(); cur.execute("SELECT * FROM productos WHERE id=%s", (producto_id,)); p = cur.fetchone(); cur.execute("SELECT r.*, i.nombre, i.unidad_medida FROM recetas r JOIN insumos i ON r.insumo_id=i.id WHERE r.producto_id=%s", (producto_id,)); r = cur.fetchall(); cur.execute("SELECT * FROM insumos WHERE sucursal_id=%s", (session['sucursal_id'],)); i = cur.fetchall(); cur.close(); return render_template('recetas.html', producto=p, receta=r, insumos=i)
+    cur = mysql.connection.cursor(); cur.execute("SELECT * FROM productos WHERE id=%s", (producto_id,)); p = cur.fetchone(); cur.execute("""SELECT r.*, i.nombre, i.unidad_medida FROM recetas r JOIN insumos i ON r.insumo_id=i.id WHERE r.producto_id=%s""", (producto_id,)); r = cur.fetchall(); cur.execute("SELECT * FROM insumos WHERE sucursal_id=%s", (session['sucursal_id'],)); i = cur.fetchall(); cur.close(); return render_template('recetas.html', producto=p, receta=r, insumos=i)
 
 @app.route('/productos/receta/agregar', methods=['POST'])
 @login_required
@@ -398,7 +388,7 @@ def eliminar_insumo_receta(id, p_id):
 @login_required
 @admin_required
 def proveedores():
-    cur = mysql.connection.cursor(); cur.execute("SELECT p.*, t.nombre as tipo_comprobante FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id"); p = cur.fetchall(); cur.execute("SELECT * FROM tipos_comprobantes"); t = cur.fetchall(); cur.close(); return render_template('proveedores.html', proveedores=p, tipos=t)
+    cur = mysql.connection.cursor(); cur.execute("""SELECT p.*, t.nombre as tipo_comprobante FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id"""); p = cur.fetchall(); cur.execute("SELECT * FROM tipos_comprobantes"); t = cur.fetchall(); cur.close(); return render_template('proveedores.html', proveedores=p, tipos=t)
 
 @app.route('/proveedores/guardar', methods=['POST'])
 @login_required
