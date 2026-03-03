@@ -1,0 +1,159 @@
+{% extends "layout.html" %}
+{% block title %}Proveedores - Sanduches La Reina{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3">
+            <i class="fas fa-home me-1"></i> Inicio
+        </a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold">Gestión de Proveedores</h2>
+            <button class="btn btn-reina px-4" data-bs-toggle="modal" data-bs-target="#modalProv">
+                <i class="fas fa-truck me-2"></i> Nuevo Proveedor
+            </button>
+        </div>
+        <div class="card shadow-sm border-0 rounded-4 p-3">
+            <table class="table table-hover align-middle mb-0" id="tablaProveedores">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">RUC</th>
+                        <th>Razón Social</th>
+                        <th>Teléfono / Email</th>
+                        <th>Comprobante</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in proveedores %}
+                    <tr>
+                        <td class="ps-4 text-muted">{{ p.ruc }}</td>
+                        <td class="fw-bold">{{ p.razon_social }}</td>
+                        <td>
+                            <div class="small"><i class="fas fa-phone me-1 text-muted"></i> {{ p.telefono }}</div>
+                            <div class="extra-small text-muted"><i class="fas fa-envelope me-1"></i> {{ p.email }}</div>
+                        </td>
+                        <td><span class="badge bg-secondary">{{ p.tipo_comprobante_nombre }}</span></td>
+                        <td class="text-end pe-4">
+                            <button class="btn btn-sm btn-light rounded-pill px-3 btn-edit" 
+                                    data-bs-toggle="modal" data-bs-target="#modalProv"
+                                    data-id="{{ p.id }}" data-ruc="{{ p.ruc }}" 
+                                    data-rs="{{ p.razon_social }}" data-nc="{{ p.nombre_comercial }}"
+                                    data-dir="{{ p.direccion }}" data-tel="{{ p.telefono }}"
+                                    data-eml="{{ p.email }}" data-tipo="{{ p.tipo_comprobante_id }}">
+                                <i class="fas fa-edit text-primary"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalProv" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 rounded-4 shadow-lg">
+            <form action="{{ url_for('guardar_proveedor') }}" method="POST">
+                <input type="hidden" name="id" id="provId">
+                <div class="modal-header border-0 pb-3 bg-success text-white rounded-top-4" style="background: linear-gradient(45deg, #008938, #2ecc71) !important;">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-truck me-2"></i> Datos del Proveedor</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">RUC</label>
+                            <input type="text" name="ruc" id="inputRuc" class="form-control" maxlength="13" required>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold">Razón Social</label>
+                            <input type="text" name="razon_social" id="inputRS" class="form-control force-upper" required>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label small fw-bold">Nombre Comercial</label>
+                            <input type="text" name="nombre_comercial" id="inputNC" class="form-control force-upper">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label small fw-bold">Dirección</label>
+                            <input type="text" name="direccion" id="inputDir" class="form-control force-upper">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Teléfono</label>
+                            <input type="text" name="telefono" id="inputTel" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Email</label>
+                            <input type="email" name="email" id="inputEml" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Tipo Comprobante</label>
+                            <select name="tipo_comprobante_id" id="inputTipo" class="form-select" required>
+                                {% for t in tipos %}
+                                <option value="{{ t.id }}">{{ t.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 p-4">
+                    <div class="d-flex gap-2 w-100">
+                        <button type="button" class="btn btn-light w-50 py-2 rounded-pill" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-2"></i> Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-reina w-50 py-2 rounded-pill shadow-sm">
+                            <i class="fas fa-save me-2"></i> Guardar Proveedor
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('#tablaProveedores').DataTable({
+        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
+        "pageLength": 10,
+        "order": [[1, "asc"]],
+        "columnDefs": [ { "orderable": false, "targets": [4] } ]
+    });
+});
+
+// Manejar clics en botones de editar (Delegación de eventos para DataTables)
+$('#tablaProveedores tbody').on('click', '.btn-edit', function() {
+    const d = this.dataset;
+    document.getElementById('provId').value = d.id;
+    document.getElementById('inputRuc').value = d.ruc;
+    document.getElementById('inputRS').value = d.rs;
+    document.getElementById('inputNC').value = d.nc;
+    document.getElementById('inputDir').value = d.dir;
+    document.getElementById('inputTel').value = d.tel;
+    document.getElementById('inputEml').value = d.eml;
+    document.getElementById('inputTipo').value = d.tipo;
+    document.querySelector('.modal-title').innerHTML = '<i class="fas fa-edit me-2"></i> Editar Proveedor';
+});
+
+const modalProv = document.getElementById('modalProv');
+if(modalProv) {
+    modalProv.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('provId').value = '';
+        const f = modalProv.querySelector('form');
+        if(f) f.reset();
+        document.querySelector('.modal-title').innerHTML = '<i class="fas fa-truck me-2"></i> Datos del Proveedor';
+    });
+}
+</script>
+{% endblock %}

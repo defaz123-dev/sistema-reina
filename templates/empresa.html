@@ -1,0 +1,80 @@
+{% extends "layout.html" %}
+{% block title %}Datos de Empresa - Sistema Reina{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">REINA</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3">Volver al Inicio</a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0">Configuración de Empresa (SRI)</h2>
+                <p class="text-muted small mb-0">Datos para la facturación electrónica.</p>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 rounded-4 p-4">
+            <form action="{{ url_for('guardar_empresa') }}" method="POST">
+                {% if empresa %}
+                    <input type="hidden" name="id" value="{{ empresa.id }}">
+                {% endif %}
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">RUC de la Empresa *</label>
+                        <input type="text" name="ruc" class="form-control bg-light border-0" value="{{ empresa.ruc if empresa else '' }}" required maxlength="13">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Ambiente SRI *</label>
+                        <select name="ambiente" class="form-select bg-light border-0" required>
+                            <option value="1" {% if empresa and empresa.ambiente == 1 %}selected{% endif %}>Pruebas</option>
+                            <option value="2" {% if empresa and empresa.ambiente == 2 %}selected{% endif %}>Producción</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-12">
+                        <label class="form-label small fw-bold">Razón Social *</label>
+                        <input type="text" name="razon_social" class="form-control bg-light border-0" value="{{ empresa.razon_social if empresa else '' }}" required>
+                    </div>
+                    
+                    <div class="col-md-12">
+                        <label class="form-label small fw-bold">Nombre Comercial</label>
+                        <input type="text" name="nombre_comercial" class="form-control bg-light border-0" value="{{ empresa.nombre_comercial if empresa else '' }}">
+                    </div>
+                    
+                    <div class="col-md-12">
+                        <label class="form-label small fw-bold">Dirección Matriz *</label>
+                        <input type="text" name="direccion_matriz" class="form-control bg-light border-0" value="{{ empresa.direccion_matriz if empresa else '' }}" required>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Obligado a llevar Contabilidad</label>
+                        <select name="obligado_contabilidad" class="form-select bg-light border-0">
+                            <option value="SI" {% if empresa and empresa.obligado_contabilidad == 'SI' %}selected{% endif %}>SI</option>
+                            <option value="NO" {% if empresa and empresa.obligado_contabilidad == 'NO' %}selected{% endif %}>NO</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mt-4 text-end">
+                    <button type="submit" class="btn btn-reina px-4 rounded-pill">
+                        <i class="fas fa-save me-1"></i> Guardar Configuración
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="alert alert-info mt-4 rounded-4 border-0">
+            <i class="fas fa-info-circle me-2"></i> <strong>Información sobre Facturación Electrónica:</strong><br>
+            Actualmente el sistema está configurado para generar la <em>Clave de Acceso</em> y simular la autorización en el ambiente seleccionado. Para una integración real con el SRI que envíe los XML y los firme, se requiere instalar certificados electrónicos (.p12) en el servidor.
+        </div>
+    </div>
+</div>
+{% endblock %}

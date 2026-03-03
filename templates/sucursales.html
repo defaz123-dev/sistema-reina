@@ -1,0 +1,114 @@
+{% extends "layout.html" %}
+{% block title %}Sucursales - Sistema Reina{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3">
+            <i class="fas fa-home me-1"></i> Inicio
+        </a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold">Sucursales</h2>
+            <button class="btn btn-reina px-4" data-bs-toggle="modal" data-bs-target="#modalSucursal">
+                <i class="fas fa-plus-circle me-2"></i> Nueva Sucursal
+            </button>
+        </div>
+        <div class="card shadow-sm border-0 rounded-4 p-3">
+            <table class="table table-hover align-middle mb-0" id="tablaSucursales">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">ID</th>
+                        <th>Nombre</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sucursales %}
+                    <tr>
+                        <td class="ps-4 text-muted">#{{ s.id }}</td>
+                        <td class="fw-bold">{{ s.nombre }}</td>
+                        <td class="text-end pe-4">
+                            <button class="btn btn-sm btn-light rounded-pill px-3 btn-edit" 
+                                    data-bs-toggle="modal" data-bs-target="#modalSucursal" 
+                                    data-id="{{ s.id }}" data-nombre="{{ s.nombre }}">
+                                <i class="fas fa-edit text-primary me-1"></i> Editar
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalSucursal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg">
+            <form action="{{ url_for('guardar_sucursal') }}" method="POST">
+                <input type="hidden" name="id" id="sucursalId">
+                <div class="modal-header border-0 pb-3 bg-success text-white rounded-top-4" style="background: linear-gradient(45deg, #008938, #2ecc71) !important;">
+                    <h5 class="modal-title fw-bold" id="modalLabel"><i class="fas fa-store me-2"></i> Datos de Sucursal</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Nombre del Local</label>
+                        <input type="text" name="nombre" id="inputNombre" class="form-control" placeholder="Ej: REINA VICTORIA" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 p-4">
+                    <div class="d-flex gap-2 w-100">
+                        <button type="button" class="btn btn-light w-50 py-2 rounded-pill" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-2"></i> Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-reina w-50 py-2 rounded-pill shadow-sm" id="btnGuardarSuc">
+                            <i class="fas fa-save me-2"></i> Guardar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('#tablaSucursales').DataTable({
+        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
+        "pageLength": 10,
+        "order": [[1, "asc"]],
+        "columnDefs": [ { "orderable": false, "targets": [2] } ]
+    });
+});
+
+// Manejar clics en botones de editar (Delegación de eventos para DataTables)
+$('#tablaSucursales tbody').on('click', '.btn-edit', function() {
+    document.getElementById('sucursalId').value = this.dataset.id;
+    document.getElementById('inputNombre').value = this.dataset.nombre;
+    document.getElementById('modalLabel').innerHTML = '<i class="fas fa-edit me-2"></i> Editar Sucursal';
+    document.getElementById('btnGuardarSuc').innerHTML = '<i class="fas fa-sync me-2"></i> Actualizar';
+});
+
+const modalSucursal = document.getElementById('modalSucursal');
+if(modalSucursal) {
+    modalSucursal.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('sucursalId').value = '';
+        const f = modalSucursal.querySelector('form');
+        if(f) f.reset();
+        document.getElementById('modalLabel').innerHTML = '<i class="fas fa-store me-2"></i> Datos de Sucursal';
+        document.getElementById('btnGuardarSuc').innerHTML = '<i class="fas fa-save me-2"></i> Guardar';
+    });
+}
+</script>
+{% endblock %}

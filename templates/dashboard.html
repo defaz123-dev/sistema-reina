@@ -1,0 +1,245 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard - Sanduches La Reina{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA</a>
+        <div class="d-flex align-items-center">
+            <span class="me-3 small text-white-50"><i class="fas fa-store me-1 text-warning"></i> {{ session['sucursal_nombre'] }}</span>
+            <span class="me-3 small text-white-50"><i class="fas fa-user-circle me-1 text-success"></i> {{ session['usuario'] }}</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm rounded-pill px-3">Salir</a>
+        </div>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4 mt-2">
+    <div class="col-12 text-center">
+        <h2 class="fw-bold text-dark">Panel de Control</h2>
+        <p class="text-muted small">Bienvenido a Sanduches La Reina</p>
+    </div>
+</div>
+
+<div class="row g-4 justify-content-center">
+    <!-- --- SECCIÓN OPERATIVA --- -->
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('pos') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-success text-success mb-3">
+                        <i class="fas fa-cash-register"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Nueva Orden</h6>
+                    <p class="text-muted extra-small mb-0">Punto de Venta</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('historial_ventas') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-primary text-primary mb-3">
+                        <i class="fas fa-receipt"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Ventas</h6>
+                    <p class="text-muted extra-small mb-0">Historial Diario</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('clientes') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-warning text-warning mb-3">
+                        <i class="fas fa-address-book"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Clientes</h6>
+                    <p class="text-muted extra-small mb-0">Maestro</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    {% if session['rol'] == 'ADMIN' %}
+    <!-- --- SECCIÓN ABASTECIMIENTO --- -->
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('compras') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-primary text-primary mb-3">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Compras</h6>
+                    <p class="text-muted extra-small mb-0">Insumos</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('proveedores') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-dark text-dark mb-3">
+                        <i class="fas fa-truck"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Proveedores</h6>
+                    <p class="text-muted extra-small mb-0">Gestión</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- --- SECCIÓN ADMINISTRATIVA --- -->
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('usuarios') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-info text-info mb-3">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Usuarios</h6>
+                    <p class="text-muted extra-small mb-0">Personal</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('inventario') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-secondary text-secondary mb-3">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Inventario</h6>
+                    <p class="text-muted extra-small mb-0">Stock Real</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('productos') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-danger text-danger mb-3">
+                        <i class="fas fa-hamburger"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Menú</h6>
+                    <p class="text-muted extra-small mb-0">Recetas</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('sucursales') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-warning text-warning mb-3">
+                        <i class="fas fa-store"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Sucursales</h6>
+                    <p class="text-muted extra-small mb-0">Locales</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('categorias') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-primary text-primary mb-3">
+                        <i class="fas fa-list"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Categorías</h6>
+                    <p class="text-muted extra-small mb-0">Filtros</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('configuracion_empresa') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-info text-info mb-3">
+                        <i class="fas fa-building"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Empresa</h6>
+                    <p class="text-muted extra-small mb-0">Configuración</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('reportes') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card bg-dark">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-success text-success mb-3 shadow-sm" style="background: rgba(255,255,255,0.1);">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <h6 class="fw-bold text-white mb-1">Reportes</h6>
+                    <p class="text-white-50 extra-small mb-0">Estadísticas</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .main-card { 
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1); 
+        border-radius: 20px !important;
+        overflow: hidden;
+        border-bottom: 4px solid rgba(0,0,0,0.1) !important;
+    }
+    
+    .main-card:hover { 
+        transform: translateY(-8px); 
+        box-shadow: 0 14px 28px rgba(0,0,0,0.15), 0 10px 10px rgba(0,0,0,0.12) !important;
+        border-bottom: 4px solid var(--reina-green) !important;
+    }
+
+    .icon-box {
+        width: 60px;
+        height: 60px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        border-radius: 18px;
+        border: 2px solid;
+        background: #ffffff;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.1);
+        transition: all 0.3s;
+    }
+
+    .main-card:hover .icon-box {
+        transform: scale(1.1) rotate(5deg);
+        box-shadow: 0 7px 14px rgba(0,0,0,0.1);
+    }
+
+    .extra-small { font-size: 0.7rem; }
+    
+    /* Colores de bordes de iconos */
+    .border-success { border-color: #2ecc71 !important; }
+    .border-primary { border-color: #3498db !important; }
+    .border-warning { border-color: #f1c40f !important; }
+    .border-danger { border-color: #e74c3c !important; }
+    .border-info { border-color: #17a2b8 !important; }
+    .border-secondary { border-color: #6c757d !important; }
+    .border-dark { border-color: #343a40 !important; }
+</style>
+{% endblock %}

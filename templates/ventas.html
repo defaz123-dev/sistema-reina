@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+{% block title %}Historial de Ventas - Sistema Reina{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3">Inicio</a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0">Historial de Ventas</h2>
+                <p class="text-muted small mb-0">Consulta todas las facturas generadas.</p>
+            </div>
+            <button class="btn btn-outline-success px-4 rounded-pill fw-bold" onclick="exportTableToExcel('tableVentasHistorial', 'Historial_Ventas_Reina')">
+                <i class="fas fa-file-excel me-2"></i> Exportar a Excel
+            </button>
+        </div>
+        <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="tableVentasHistorial">
+                    <thead class="bg-light">
+                        <tr><th class="ps-4">ID</th><th>Fecha</th><th>Cliente</th><th>Cajero</th><th>Total</th><th class="text-end pe-4 no-export">Ticket</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for v in ventas %}
+                        <tr>
+                            <td class="ps-4 text-muted">#{{ v.id }}</td>
+                            <td>{{ v.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="fw-bold">{{ v.nombres }} {{ v.apellidos }}</td>
+                            <td><span class="badge bg-light text-dark">{{ v.usuario }}</span></td>
+                            <td class="fw-bold text-success">$ {{ v.total }}</td>
+                            <td class="text-end pe-4 no-export">
+                                <a href="{{ url_for('ver_ticket', id=v.id) }}" target="_blank" class="btn btn-sm btn-reina rounded-pill px-3"><i class="fas fa-print"></i> Ver</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Opcional: ocultar la columna de acciones en el Excel si SheetJS lo soporta por clase, 
+       aunque por defecto exportará todo el texto de la tabla. */
+    @media print { .no-print { display: none; } }
+</style>
+{% endblock %}
