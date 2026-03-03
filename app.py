@@ -18,7 +18,8 @@ app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB', 'sistema_reina')
 app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 # Ajuste para evitar desconexiones en la nube
-app.config['MYSQL_CUSTOM_OPTIONS'] = {"ssl": {"ca": "/etc/ssl/certs/ca-certificates.crt"}} if 'MYSQL_HOST' in os.environ and os.environ['MYSQL_HOST'] != 'localhost' else {}
+# Render/Aiven ya manejan SSL internamente en el host, simplificamos la conexión
+app.config['MYSQL_CUSTOM_OPTIONS'] = {"ssl": True} if 'MYSQL_HOST' in os.environ and os.environ['MYSQL_HOST'] != 'localhost' else {}
 
 mysql = MySQL(app)
 
