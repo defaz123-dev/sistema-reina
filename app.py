@@ -64,23 +64,6 @@ def admin_required(f):
     return dec
 
 # --- RUTAS BASE ---
-@app.route('/reset_admin')
-def reset_admin_emergency():
-    try:
-        cur = mysql.connection.cursor()
-        # 1. Asegurar sucursal
-        cur.execute("INSERT IGNORE INTO sucursales (id, nombre) VALUES (1, 'MATRIZ - LA REINA')")
-        # 2. Asegurar admin (borramos y creamos con el hash del servidor)
-        hp = generate_password_hash('admin')
-        cur.execute("DELETE FROM usuarios WHERE usuario = 'admin'")
-        cur.execute("INSERT INTO usuarios (usuario, password, sucursal_id, rol, activo) VALUES (%s, %s, %s, %s, %s)",
-                    ('admin', hp, 1, 'ADMIN', 1))
-        mysql.connection.commit()
-        cur.close()
-        return "<h3>Acceso Restaurado</h3><p>Usuario: <b>admin</b><br>Clave: <b>admin</b><br>Sucursal: <b>MATRIZ - LA REINA</b></p><a href='/'>Ir al Login</a>"
-    except Exception as e:
-        return f"Error: {str(e)}"
-
 @app.route('/')
 def index():
     if 'user_id' in session: return redirect(url_for('dashboard'))
@@ -94,62 +77,24 @@ def index():
 def login():
     if request.method == 'POST':
         u, p, s = request.form['usuario'].lower().strip(), request.form['password'], int(request.form['sucursal'])
-        
-        # --- PUENTE DE EMERGENCIA ---
-        if u == 'admin' and p == 'admin':
-            print("DEBUG LOGIN: BYPASS DE EMERGENCIA ACTIVADO", flush=True)
-            # Buscamos al admin en BD si existe para traer sucursal, si no usamos valores por defecto
-            cur = mysql.connection.cursor()
-            cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u LEFT JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)='admin'")
-            user = cur.fetchone()
-            cur.close()
-            
-            # Si el usuario NO existe en BD o no tiene sucursal, forzamos uno falso para entrar
-            if not user:
-                user = {
-                    'id': 1, 'usuario': 'admin', 'rol': 'ADMIN', 
-                    'sucursal_id': 1, 'sucursal_nombre': 'MATRIZ (BYPASS)'
-                }
-
-            session.update({
-                'user_id': user['id'], 
-                'usuario': user['usuario'], 
-                'rol': user['rol'], 
-                'sucursal_id': user['sucursal_id'],
-                'sucursal_nombre': user.get('sucursal_nombre', 'MATRIZ')
-            })
-            return redirect(url_for('dashboard'))
-        # --- FIN PUENTE ---
-
         cur = mysql.connection.cursor()
-        # Primero buscamos al usuario por nombre (ignorando sucursal para admin)
+        
+        # Buscamos al usuario por nombre (insensible a mayúsculas)
         cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)=%s AND u.activo=1", (u,))
         user = cur.fetchone()
         cur.close()
 
-        if user:
-            print(f"DEBUG LOGIN: Usuario encontrado -> ID: {user['id']}, Rol: {user['rol']}, Sucursal_BD: {user['sucursal_id']}, Sucursal_POST: {s}", flush=True)
-            print(f"DEBUG LOGIN: Contraseña ingresada: '{p}'", flush=True)
-            
-            pwd_ok = check_password_hash(user['password'], p)
-            print(f"DEBUG LOGIN: ¿Password coincide?: {pwd_ok}", flush=True)
-
-            if pwd_ok:
-                # Si es ADMIN, le dejamos entrar aunque haya elegido mal la sucursal
-                if user['rol'] == 'ADMIN' or user['sucursal_id'] == s:
-                    print("DEBUG LOGIN: ACCESO CONCEDIDO", flush=True)
-                    session.update({
-                        'user_id': user['id'], 
-                        'usuario': user['usuario'], 
-                        'rol': user['rol'], 
-                        'sucursal_id': user['sucursal_id'],
-                        'sucursal_nombre': user['sucursal_nombre']
-                    })
-                    return redirect(url_for('dashboard'))
-                else:
-                    print("DEBUG LOGIN: SUCURSAL INCORRECTA PARA VENDEDOR", flush=True)
-        else:
-            print(f"DEBUG LOGIN: Usuario '{u}' no encontrado en BD o no está activo.", flush=True)
+        if user and check_password_hash(user['password'], p):
+            # Validamos que pertenezca a la sucursal elegida (o sea ADMIN)
+            if user['rol'] == 'ADMIN' or user['sucursal_id'] == s:
+                session.update({
+                    'user_id': user['id'], 
+                    'usuario': user['usuario'], 
+                    'rol': user['rol'], 
+                    'sucursal_id': user['sucursal_id'],
+                    'sucursal_nombre': user['sucursal_nombre']
+                })
+                return redirect(url_for('dashboard'))
         
         flash('Credenciales incorrectas o sucursal no válida', 'danger')
     return redirect(url_for('index'))
