@@ -77,23 +77,27 @@ def index():
 def login():
     if request.method == 'POST':
         u, p, s = request.form['usuario'].lower().strip(), request.form['password'], int(request.form['sucursal'])
-        
-        # --- PUENTE DE EMERGENCIA TEMPORAL ---
-        if u == 'admin' and p == 'admin':
-            cur = mysql.connection.cursor()
-            cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u LEFT JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)='admin'")
-            user = cur.fetchone()
-            cur.close()
-            if not user:
-                user = {'id': 1, 'usuario': 'admin', 'rol': 'ADMIN', 'sucursal_id': 1, 'sucursal_nombre': 'MATRIZ (BYPASS)'}
-            session.update({
-                'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol'], 
-                'sucursal_id': user['sucursal_id'], 'sucursal_nombre': user.get('sucursal_nombre', 'MATRIZ')
-            })
-            return redirect(url_for('dashboard'))
-        # --- FIN PUENTE ---
-
         cur = mysql.connection.cursor()
+        
+        # Buscamos al usuario por nombre (insensible a mayúsculas)
+        cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)=%s AND u.activo=1", (u,))
+        user = cur.fetchone()
+        cur.close()
+
+        if user and check_password_hash(user['password'], p):
+            # Validamos que pertenezca a la sucursal elegida (o sea ADMIN)
+            if user['rol'] == 'ADMIN' or user['sucursal_id'] == s:
+                session.update({
+                    'user_id': user['id'], 
+                    'usuario': user['usuario'], 
+                    'rol': user['rol'], 
+                    'sucursal_id': user['sucursal_id'],
+                    'sucursal_nombre': user['sucursal_nombre']
+                })
+                return redirect(url_for('dashboard'))
+        
+        flash('Credenciales incorrectas o sucursal no válida', 'danger')
+    return redirect(url_for('index'))
         
         # Buscamos al usuario por nombre (insensible a mayúsculas)
         cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)=%s AND u.activo=1", (u,))
