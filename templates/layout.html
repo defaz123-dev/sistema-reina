@@ -19,7 +19,7 @@
         .btn-reina-secondary { background-color: var(--reina-yellow); border: none; color: var(--reina-dark); border-radius: 10px; font-weight: 600; }
         .form-control, .form-select { 
             border-radius: 8px !important; 
-            border: 1px solid #adb5bd !important; /* Suave pero visible */
+            border: 1px solid #adb5bd !important;
             padding: 8px 12px !important;
             background-color: #ffffff !important;
             color: #212529 !important;
@@ -37,7 +37,17 @@
         .force-upper { text-transform: uppercase; }
         input::placeholder { text-transform: none; }
         
-        /* Ajustes para DataTables para que se vea profesional y compacto */
+        /* Contenedor de mensajes flotante */
+        .flash-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            width: 350px;
+            max-width: 90vw;
+        }
+
+        /* Ajustes para DataTables */
         .dataTables_wrapper .dataTables_length select {
             width: auto !important;
             display: inline-block !important;
@@ -64,16 +74,20 @@
 
 {% block navbar %}{% endblock %}
 
-<div class="container py-4">
+<div class="flash-container">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm border-0" role="alert">
-            {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="alert alert-{{ category }} alert-dismissible fade show shadow-lg border-0 mb-2" role="alert">
+            <i class="fas fa-info-circle me-2"></i> {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         {% endfor %}
       {% endif %}
     {% endwith %}
+</div>
+
+<div class="container py-4">
     {% block content %}{% endblock %}
 </div>
 
