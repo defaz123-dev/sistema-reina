@@ -64,6 +64,23 @@ def admin_required(f):
     return dec
 
 # --- RUTAS BASE ---
+@app.route('/reset_admin')
+def reset_admin_emergency():
+    try:
+        cur = mysql.connection.cursor()
+        # 1. Asegurar sucursal
+        cur.execute("INSERT IGNORE INTO sucursales (id, nombre) VALUES (1, 'MATRIZ - LA REINA')")
+        # 2. Asegurar admin (borramos y creamos con el hash del servidor)
+        hp = generate_password_hash('admin')
+        cur.execute("DELETE FROM usuarios WHERE usuario = 'admin'")
+        cur.execute("INSERT INTO usuarios (usuario, password, sucursal_id, rol, activo) VALUES (%s, %s, %s, %s, %s)",
+                    ('admin', hp, 1, 'ADMIN', 1))
+        mysql.connection.commit()
+        cur.close()
+        return "<h3>Acceso Restaurado</h3><p>Usuario: <b>admin</b><br>Clave: <b>admin</b><br>Sucursal: <b>MATRIZ - LA REINA</b></p><a href='/'>Ir al Login</a>"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 @app.route('/')
 def index():
     if 'user_id' in session: return redirect(url_for('dashboard'))
