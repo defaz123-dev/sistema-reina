@@ -5,7 +5,7 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
         <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA</a>
-        <a href="{{ url_for('compras') }}" class="btn btn-success btn-sm rounded-pill px-3">Regresar</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3"><i class="fas fa-home me-1"></i> Inicio</a>
     </div>
 </nav>
 {% endblock %}
@@ -19,7 +19,19 @@
             
             <div class="row g-3 mb-4">
                 <input type="hidden" id="compraId" value="{{ compra.id if compra else '' }}">
-                <div class="col-md-3">
+                
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted text-primary">Sucursal Destino</label>
+                    <select id="compraSucursal" class="form-select bg-light border-primary-subtle fw-bold">
+                        {% for s in sucursales %}
+                        <option value="{{ s.id }}" {{ 'selected' if (compra and compra.sucursal_id == s.id) or (not compra and session['sucursal_id'] == s.id) else '' }}>
+                            {{ s.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-4">
                     <label class="small fw-bold text-muted">Proveedor</label>
                     <select id="compraProveedor" class="form-select bg-light border-0" onchange="toggleClaveAcceso()">
                         <option value="" disabled selected>Seleccione el proveedor...</option>
@@ -32,66 +44,67 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="small fw-bold text-muted">Número de Factura / Nota</label>
                     <input type="text" id="compraNumero" class="form-control bg-light border-0 force-upper" placeholder="001-001-000000001" value="{{ compra.numero_comprobante if compra else '' }}">
                 </div>
-                <div class="col-md-4" id="divClaveAcceso" style="display: none;">
+                <div class="col-md-8" id="divClaveAcceso" style="display: none;">
                     <label class="small fw-bold text-muted text-success">Clave de Acceso (49 dígitos)</label>
                     <input type="text" id="compraClave" class="form-control bg-light border-0" maxlength="49" placeholder="010120240117900000000012001001000000001123456781" value="{{ compra.clave_acceso if compra else '' }}">
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-4">
                     <label class="small fw-bold text-muted">Fecha Emisión</label>
                     <input type="date" id="compraFecha" class="form-control bg-light border-0" value="{{ compra.fecha.strftime('%Y-%m-%d') if (compra and compra.fecha and not compra.fecha is string) else (compra.fecha if (compra and compra.fecha is string) else fecha_hoy) }}">
                 </div>
             </div>
 
             <!-- Panel de Entrada de Items -->
-            <div class="bg-dark text-white p-4 rounded-4 mb-4">
-                <h6 class="fw-bold mb-3">Añadir Insumo a la Factura</h6>
+            <div class="bg-dark text-white p-4 rounded-4 mb-4 shadow">
+                <h6 class="fw-bold mb-3"><i class="fas fa-cart-plus me-2 text-warning"></i>Añadir Insumo a la Factura</h6>
                 <div class="row g-2 align-items-end">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label class="extra-small">Insumo</label>
                         <select id="selectInsumo" class="form-select border-0">
                             <option value="" disabled selected>Seleccionar...</option>
                             {% for i in insumos %}
-                            <option value="{{ i.id }}" data-nombre="{{ i.nombre }}" data-unidad="{{ i.unidad_medida }}">{{ i.nombre }} ({{ i.unidad_medida }})</option>
+                            <option value="{{ i.id }}" data-nombre="{{ i.nombre }}" data-unidad="{{ i.unidad_medida }}" data-sucursal="{{ i.sucursal_id }}">
+                                {{ i.nombre }} ({{ i.unidad_medida }})
+                            </option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="col-md-2">
                         <label class="extra-small">Cantidad</label>
-                        <input type="number" id="cantInsumo" class="form-control border-0" placeholder="0.00" oninput="calcCostoUnitario()">
+                        <input type="number" step="0.01" id="cantInsumo" class="form-control border-0" placeholder="0.00">
                     </div>
                     <div class="col-md-2">
                         <label class="extra-small">Total Línea ($)</label>
-                        <input type="number" step="0.01" id="totalLinea" class="form-control border-0" placeholder="0.00" oninput="calcCostoUnitario()">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="extra-small">Costo Unit.</label>
-                        <input type="text" id="costoUnitario" class="form-control border-0 bg-secondary text-white" readonly value="0.00">
+                        <input type="number" step="0.01" id="totalLinea" class="form-control border-0" placeholder="0.00">
                     </div>
                     <div class="col-md-2 text-center">
                         <label class="extra-small d-block mb-2">¿Paga IVA?</label>
                         <div class="form-check form-switch d-inline-block">
-                            <input class="form-check-input" type="checkbox" id="checkIVA" style="width: 3em; height: 1.5em;">
+                            <input class="form-check-input" type="checkbox" id="checkIVA" style="width: 2.5em; height: 1.25em;">
                         </div>
                     </div>
-                    <div class="col-md-1">
-                        <button class="btn btn-reina w-100 py-2" onclick="addItemCompra()"><i class="fas fa-plus"></i></button>
+                    <div class="col-md-2">
+                        <button class="btn btn-warning w-100 py-2 fw-bold" onclick="addItemCompra()">AGREGAR</button>
                     </div>
+                </div>
+                <div class="mt-2 text-warning extra-small" id="avisoSucursal" style="display:none;">
+                    <i class="fas fa-exclamation-triangle me-1"></i> El insumo seleccionado pertenece a otra sucursal.
                 </div>
             </div>
 
             <div class="table-responsive">
                 <table class="table table-hover align-middle" id="tableDetalleCompra">
                     <thead>
-                        <tr class="small text-muted">
-                            <th>DESCRIPCIÓN</th>
-                            <th>CANT.</th>
-                            <th>UNIT.</th>
-                            <th>IVA</th>
-                            <th class="text-end">SUBTOTAL</th>
+                        <tr class="small text-muted text-uppercase">
+                            <th>Descripción</th>
+                            <th class="text-center">Cant.</th>
+                            <th class="text-center">Unit. (Base)</th>
+                            <th class="text-center">IVA</th>
+                            <th class="text-end">Subtotal</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -116,7 +129,7 @@
             </div>
             <div class="d-flex justify-content-between mb-2">
                 <span class="text-muted">IVA (15%):</span>
-                <span id="ivaVal" class="fw-bold">$ 0.00</span>
+                <span id="ivaVal" class="fw-bold text-primary">$ 0.00</span>
             </div>
             <hr>
             <div class="d-flex justify-content-between mb-4">
@@ -125,7 +138,7 @@
             </div>
             
             <button class="btn btn-reina w-100 py-3 rounded-pill fw-bold shadow-sm" onclick="finalizarCompra()">
-                <i class="fas fa-save me-2"></i> GUARDAR EN SISTEMA
+                <i class="fas fa-save me-2"></i> GUARDAR COMPRA
             </button>
         </div>
     </div>
@@ -134,12 +147,13 @@
 <script>
 let itemsCompra = [];
 
-function calcCostoUnitario() {
-    const cant = parseFloat(document.getElementById('cantInsumo').value) || 0;
-    const total = parseFloat(document.getElementById('totalLinea').value) || 0;
-    const unitario = cant > 0 ? (total / cant) : 0;
-    document.getElementById('costoUnitario').value = unitario.toFixed(4);
-}
+// Validar que el insumo coincida con la sucursal destino
+document.getElementById('selectInsumo').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    const sucDestino = document.getElementById('compraSucursal').value;
+    const aviso = document.getElementById('avisoSucursal');
+    if (opt.dataset.sucursal != sucDestino) { aviso.style.display = 'block'; } else { aviso.style.display = 'none'; }
+});
 
 function addItemCompra() {
     const sel = document.getElementById('selectInsumo');
@@ -148,15 +162,14 @@ function addItemCompra() {
     const totalLine = parseFloat(document.getElementById('totalLinea').value);
     const hasIVA = document.getElementById('checkIVA').checked;
 
-    if(!opt.value || !cant || !totalLine) return reinaAlert('Aviso', 'Complete los datos', 'warning');
+    if(!opt.value || !cant || !totalLine) {
+        alert('Por favor complete Insumo, Cantidad y Total de la Línea.');
+        return;
+    }
 
     let base = totalLine;
     let iva = 0;
-    
     if(hasIVA) {
-        // En Ecuador el total ya incluye IVA en muchas facturas, 
-        // pero aquí asumiremos que el totalLine es el BASE para calcular el IVA arriba
-        // o si el totalLine es el final de la factura para ese item:
         base = totalLine / 1.15;
         iva = totalLine - base;
     }
@@ -166,17 +179,15 @@ function addItemCompra() {
         nombre: opt.dataset.nombre,
         unidad: opt.dataset.unidad,
         cantidad: cant,
-        costo: base / cant, // Costo unitario sin IVA
+        costo: base / cant,
         subtotal: base,
         iva_valor: iva,
         paga_iva: hasIVA
     });
 
     renderCompra();
-    // Limpiar entrada
     document.getElementById('cantInsumo').value = '';
     document.getElementById('totalLinea').value = '';
-    document.getElementById('costoUnitario').value = '0.00';
 }
 
 function renderCompra() {
@@ -190,11 +201,11 @@ function renderCompra() {
 
         body.innerHTML += `<tr>
             <td><div class="fw-bold">${item.nombre}</div><small class="text-muted">${item.unidad}</small></td>
-            <td>${item.cantidad}</td>
-            <td>$${item.costo.toFixed(4)}</td>
-            <td><span class="badge ${item.paga_iva ? 'bg-success':'bg-light text-dark'}">${item.paga_iva ? 'SI':'NO'}</span></td>
+            <td class="text-center">${item.cantidad}</td>
+            <td class="text-center">$${item.costo.toFixed(4)}</td>
+            <td class="text-center"><span class="badge ${item.paga_iva ? 'bg-primary':'bg-light text-dark'}">${item.paga_iva ? '15%':'0%'}</span></td>
             <td class="text-end fw-bold">$${(item.subtotal + item.iva_valor).toFixed(2)}</td>
-            <td class="text-end"><button class="btn btn-link text-danger p-0" onclick="itemsCompra.splice(${idx},1); renderCompra()"><i class="fas fa-times"></i></button></td>
+            <td class="text-end"><button class="btn btn-link text-danger p-0" onclick="itemsCompra.splice(${idx},1); renderCompra()"><i class="fas fa-trash"></i></button></td>
         </tr>`;
     });
 
@@ -206,13 +217,17 @@ function renderCompra() {
 }
 
 async function finalizarCompra() {
+    const sucId = document.getElementById('compraSucursal').value;
     const provId = document.getElementById('compraProveedor').value;
     const num = document.getElementById('compraNumero').value;
     const fecha = document.getElementById('compraFecha').value;
     const clave = document.getElementById('compraClave').value;
     const compraId = document.getElementById('compraId').value;
     
-    if(!provId || !num || !fecha || itemsCompra.length === 0) return reinaAlert('Aviso', 'Datos incompletos', 'warning');
+    if(!provId || !num || !fecha || itemsCompra.length === 0) {
+        alert('Complete todos los campos de la factura.');
+        return;
+    }
 
     const total = itemsCompra.reduce((s, i) => s + i.subtotal + i.iva_valor, 0);
 
@@ -221,6 +236,7 @@ async function finalizarCompra() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ 
             compra_id: compraId || null,
+            sucursal_id: sucId,
             proveedor_id: provId, 
             numero_comprobante: num, 
             clave_acceso: clave,
@@ -231,10 +247,10 @@ async function finalizarCompra() {
     });
     const data = await res.json();
     if(data.success) {
-        await reinaAlert('Éxito', 'Compra guardada. El stock ha sido actualizado.');
+        alert('¡Factura guardada! El inventario ha sido actualizado correctamente.');
         window.location.href = "{{ url_for('compras') }}";
     } else {
-        reinaAlert('Error', data.message, 'error');
+        alert('Error: ' + data.message);
     }
 }
 

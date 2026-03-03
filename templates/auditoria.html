@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+
+{% block title %}Bitácora de Auditoría - Sanduches La Reina{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3"><i class="fas fa-home me-1"></i> Inicio</a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+    <h2 class="brand-logo"><i class="fas fa-history me-2"></i>Auditoría del Sistema</h2>
+    <div class="text-muted small">Historial de seguridad y movimientos</div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="tablaAuditoria">
+                <thead class="table-light">
+                    <tr class="small text-muted text-uppercase">
+                        <th>Fecha y Hora</th>
+                        <th>Usuario</th>
+                        <th>Acción</th>
+                        <th>Detalle</th>
+                        <th>IP Origen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="small text-muted">{{ log.fecha.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="bg-light rounded-circle p-2 me-2 text-primary">
+                                    <i class="fas fa-user-circle"></i>
+                                </div>
+                                <span class="fw-bold">{{ log.usuario or 'SISTEMA' }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            {% if 'ERROR' in log.accion %}
+                                <span class="badge bg-danger rounded-pill px-3">{{ log.accion }}</span>
+                            {% elif 'LOGIN' in log.accion %}
+                                <span class="badge bg-success rounded-pill px-3">{{ log.accion }}</span>
+                            {% elif 'CREAR' in log.accion %}
+                                <span class="badge bg-primary rounded-pill px-3">{{ log.accion }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary rounded-pill px-3">{{ log.accion }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="small text-dark">{{ log.detalle }}</td>
+                        <td class="text-muted extra-small font-monospace">{{ log.ip }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        $('#tablaAuditoria').DataTable({
+            "order": [[ 0, "desc" ]],
+            "language": {
+                "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json"
+            },
+            "pageLength": 50
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,50 +1,74 @@
 {% extends "layout.html" %}
-{% block title %}Inventario - Sistema Reina{% endblock %}
+
+{% block title %}Inventario de Insumos - Sanduches La Reina{% endblock %}
 
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
         <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA</a>
-        <div class="d-flex">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3">
-                <i class="fas fa-home me-1"></i> Inicio
-            </a>
-        </div>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3"><i class="fas fa-home me-1"></i> Inicio</a>
     </div>
 </nav>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold">Gestión de Insumos</h2>
-            <button class="btn btn-reina px-4" data-bs-toggle="modal" data-bs-target="#modalInsumo">
-                <i class="fas fa-plus me-2"></i> Nuevo Insumo
-            </button>
-        </div>
-        <div class="card shadow-sm border-0 rounded-4 p-3">
-            <table class="table table-hover align-middle mb-0" id="tablaInventario">
-                <thead class="bg-light">
-                    <tr>
-                        <th class="ps-4">Nombre</th>
-                        <th>Stock Actual</th>
-                        <th>Medida</th>
-                        <th class="text-end pe-4">Acciones</th>
+<div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+    <h2 class="brand-logo"><i class="fas fa-boxes-stacked me-2"></i>Control de Inventario</h2>
+    <div>
+        <button class="btn btn-warning btn-sm me-2 rounded-pill px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalAjuste">
+            <i class="fas fa-adjust me-2"></i>Ajuste Manual
+        </button>
+        <button class="btn btn-reina btn-sm rounded-pill px-3 fw-bold shadow-sm" onclick="nuevoInsumo()">
+            <i class="fas fa-plus me-2"></i>Nuevo Insumo
+        </button>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="tablaInventario">
+                <thead class="table-light">
+                    <tr class="small text-muted text-uppercase">
+                        <th>Insumo</th>
+                        <th>Sucursal</th>
+                        <th class="text-center">Stock Actual</th>
+                        <th class="text-center">Stock Mínimo</th>
+                        <th>U. Medida</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for i in insumos %}
-                    <tr>
-                        <td class="ps-4 fw-bold">{{ i.nombre }}</td>
-                        <td>{{ i.stock_actual }}</td>
-                        <td><span class="badge bg-info text-dark">{{ i.unidad_medida }}</span></td>
-                        <td class="text-end pe-4">
-                            <button class="btn btn-sm btn-light rounded-pill px-3 btn-edit" 
-                                    data-bs-toggle="modal" data-bs-target="#modalInsumo"
-                                    data-id="{{ i.id }}" data-nombre="{{ i.nombre }}" 
-                                    data-stock="{{ i.stock_actual }}" data-unidad="{{ i.unidad_medida }}">
-                                <i class="fas fa-edit text-primary me-1"></i> Editar
+                    <tr class="{% if i.stock_actual < i.stock_minimo %}table-danger{% endif %}">
+                        <td>
+                            <div class="fw-bold text-dark">{{ i.nombre }}</div>
+                            <small class="text-muted">ID: {{ i.id }}</small>
+                        </td>
+                        <td><span class="badge bg-light text-dark border">{{ i.sucursal_nombre }}</span></td>
+                        <td class="text-center fw-bold {% if i.stock_actual < i.stock_minimo %}text-danger{% else %}text-success{% endif %}">
+                            {{ i.stock_actual }}
+                        </td>
+                        <td class="text-center text-muted small">{{ i.stock_minimo }}</td>
+                        <td class="small">{{ i.unidad_medida }}</td>
+                        <td>
+                            {% if i.stock_actual < i.stock_minimo %}
+                                <span class="badge bg-danger rounded-pill"><i class="fas fa-exclamation-triangle me-1"></i> Stock Bajo</span>
+                            {% else %}
+                                <span class="badge bg-success rounded-pill">Normal</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary border-0 btn-edit" 
+                                    data-id="{{ i.id }}"
+                                    data-nombre="{{ i.nombre }}"
+                                    data-stock="{{ i.stock_actual }}"
+                                    data-minimo="{{ i.stock_minimo }}"
+                                    data-unidad-id="{{ i.unidad_medida_id }}"
+                                    data-sucursal-id="{{ i.sucursal_id }}"
+                                    onclick="prepararEdicion(this)">
+                                <i class="fas fa-edit action-icon"></i>
                             </button>
                         </td>
                     </tr>
@@ -55,82 +79,138 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalInsumo" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+<!-- Modal Nuevo/Editar Insumo -->
+<div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="modalInsumo" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 rounded-4 shadow-lg">
+        <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
             <form action="{{ url_for('guardar_insumo') }}" method="POST">
-                <input type="hidden" name="id" id="insumoId">
-                <div class="modal-header border-0 pb-3 bg-success text-white rounded-top-4" style="background: linear-gradient(45deg, #008938, #2ecc71) !important;">
-                    <h5 class="fw-bold modal-title"><i class="fas fa-box me-2"></i> Datos del Insumo</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-header bg-success text-white border-0">
+                    <h5 class="fw-bold mb-0" id="modalInsumoTitle">Gestionar Insumo</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
+                    <input type="hidden" name="id" id="insumo_id">
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Nombre del Insumo</label>
-                        <input type="text" name="nombre" id="inputNombre" class="form-control" required>
+                        <label class="small fw-bold text-muted">Nombre del Insumo</label>
+                        <input type="text" name="nombre" id="insumo_nombre" class="form-control bg-light border-0 force-upper" required>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label small fw-bold">Stock Inicial</label>
-                            <input type="number" step="0.01" name="stock" id="inputStock" class="form-control" required>
+                            <label class="small fw-bold text-muted">Stock Actual</label>
+                            <input type="number" step="0.01" name="stock" id="insumo_stock" class="form-control bg-light border-0" required>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label small fw-bold">Unidad de Medida</label>
-                            <select name="unidad" id="inputUnidad" class="form-select" required>
-                                <option value="gramos">Gramos (g)</option>
-                                <option value="unidades">Unidades (und)</option>
-                                <option value="mililitros">Mililitros (ml)</option>
-                                <option value="litros">Litros (L)</option>
-                                <option value="kilos">Kilogramos (kg)</option>
-                            </select>
+                            <label class="small fw-bold text-muted">Stock Mínimo</label>
+                            <input type="number" step="0.01" name="stock_minimo" id="insumo_minimo" class="form-control bg-light border-0" value="0">
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer border-0 pt-0 p-4">
-                    <div class="d-flex gap-2 w-100">
-                        <button type="button" class="btn btn-light w-50 py-2 rounded-pill" data-bs-dismiss="modal">
-                            <i class="fas fa-times me-2"></i> Cancelar
-                        </button>
-                        <button type="submit" class="btn btn-reina w-50 py-2 rounded-pill shadow-sm">
-                            <i class="fas fa-save me-2"></i> Guardar Insumo
-                        </button>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Unidad de Medida (Catálogo)</label>
+                        <select name="unidad_medida_id" id="insumo_unidad_id" class="form-select bg-light border-0" required>
+                            <option value="" disabled selected>Seleccione...</option>
+                            {% for u in unidades %}
+                            <option value="{{ u.id }}">{{ u.nombre }} ({{ u.abreviatura }})</option>
+                            {% endfor %}
+                        </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Sucursal</label>
+                        <select name="sucursal_id" id="insumo_sucursal" class="form-select bg-light border-0" required>
+                            {% for s in sucursales %}
+                            <option value="{{ s.id }}">{{ s.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-4 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-reina rounded-pill px-4">Guardar Cambios</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-{% endblock %}
+
+<!-- Modal Ajuste Manual -->
+<div class="modal fade" id="modalAjuste" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
+            <form action="{{ url_for('ajustar_inventario') }}" method="POST">
+                <div class="modal-header bg-warning border-0">
+                    <h5 class="fw-bold mb-0 text-dark">Ajuste de Stock</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Seleccionar Insumo</label>
+                        <select name="insumo_id" class="form-select bg-light border-0" required>
+                            {% for i in insumos %}
+                            <option value="{{ i.id }}">{{ i.nombre }} ({{ i.sucursal_nombre }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="small fw-bold text-muted">Tipo</label>
+                            <select name="tipo" class="form-select bg-light border-0" required>
+                                <option value="EGRESO">MERMA/PÉRDIDA</option>
+                                <option value="INGRESO">CORRECCIÓN (+)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="small fw-bold text-muted">Cantidad</label>
+                            <input type="number" step="0.01" name="cantidad" class="form-control bg-light border-0" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Motivo</label>
+                        <input type="text" name="motivo" class="form-control bg-light border-0 force-upper" placeholder="EJ: CADUCADO" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-4 pt-0">
+                    <button type="submit" class="btn btn-warning w-100 fw-bold rounded-pill py-2">APLICAR AJUSTE</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 {% block scripts %}
 <script>
+var miModalInsumo;
+
 $(document).ready(function() {
-    $('#tablaInventario').DataTable({
-        "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
-        "pageLength": 10,
-        "order": [[0, "asc"]],
-        "columnDefs": [ { "orderable": false, "targets": [3] } ]
-    });
+    if (!$.fn.DataTable.isDataTable('#tablaInventario')) {
+        $('#tablaInventario').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
+            "pageLength": 25,
+            "order": [[ 0, "asc" ]]
+        });
+    }
+    miModalInsumo = new bootstrap.Modal(document.getElementById('modalInsumo'));
 });
 
-// Manejar clics en botones de editar (Delegación de eventos para DataTables)
-$('#tablaInventario tbody').on('click', '.btn-edit', function() {
-    const d = this.dataset;
-    document.getElementById('insumoId').value = d.id;
-    document.getElementById('inputNombre').value = d.nombre;
-    document.getElementById('inputStock').value = d.stock;
-    document.getElementById('inputUnidad').value = d.unidad;
-    document.querySelector('.modal-title').innerHTML = '<i class="fas fa-edit me-2"></i> Editar Insumo';
-});
+function nuevoInsumo() {
+    document.getElementById('insumo_id').value = '';
+    document.getElementById('insumo_nombre').value = '';
+    document.getElementById('insumo_stock').value = '0';
+    document.getElementById('insumo_minimo').value = '0';
+    document.getElementById('insumo_unidad_id').value = '';
+    document.getElementById('modalInsumoTitle').innerText = 'Nuevo Insumo';
+    miModalInsumo.show();
+}
 
-const modalInsumo = document.getElementById('modalInsumo');
-if(modalInsumo) {
-    modalInsumo.addEventListener('hidden.bs.modal', function() {
-        document.getElementById('insumoId').value = '';
-        const f = modalInsumo.querySelector('form');
-        if(f) f.reset();
-        document.querySelector('.modal-title').innerHTML = '<i class="fas fa-box me-2"></i> Datos del Insumo';
-    });
+function prepararEdicion(btn) {
+    document.getElementById('insumo_id').value = btn.getAttribute('data-id');
+    document.getElementById('insumo_nombre').value = btn.getAttribute('data-nombre');
+    document.getElementById('insumo_stock').value = btn.getAttribute('data-stock');
+    document.getElementById('insumo_minimo').value = btn.getAttribute('data-minimo');
+    document.getElementById('insumo_unidad_id').value = btn.getAttribute('data-unidad-id');
+    document.getElementById('insumo_sucursal').value = btn.getAttribute('data-sucursal-id');
+    
+    document.getElementById('modalInsumoTitle').innerText = 'Editar Insumo';
+    miModalInsumo.show();
 }
 </script>
+{% endblock %}
 {% endblock %}

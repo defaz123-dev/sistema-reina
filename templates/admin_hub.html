@@ -5,84 +5,95 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
         <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">REINA</a>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3">Volver al Inicio</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3"><i class="fas fa-home me-1"></i> Inicio</a>
     </div>
 </nav>
 {% endblock %}
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-12">
+    <div class="col-12 text-center mt-2">
         <h2 class="fw-bold">Centro de Administración</h2>
-        <p class="text-muted">Gestiona todos los parámetros base del sistema.</p>
+        <p class="text-muted small">Gestiona todos los parámetros base del sistema.</p>
     </div>
 </div>
 
-<div class="row g-3">
+<div class="row g-3 justify-content-center">
     <!-- Usuarios -->
-    <div class="col-md-4">
+    <div class="col-md-4 col-lg-3">
         <a href="{{ url_for('usuarios') }}" class="text-decoration-none">
             <div class="card h-100 border-0 shadow-sm p-4 text-center admin-card">
                 <div class="display-5 text-primary mb-3"><i class="fas fa-user-shield"></i></div>
                 <h5 class="fw-bold text-dark">Usuarios</h5>
-                <p class="text-muted small mb-0">Gestionar accesos y roles de personal.</p>
+                <p class="text-muted extra-small mb-0">Accesos y roles.</p>
             </div>
         </a>
     </div>
     <!-- Sucursales -->
-    <div class="col-md-4">
+    <div class="col-md-4 col-lg-3">
         <a href="{{ url_for('sucursales') }}" class="text-decoration-none">
             <div class="card h-100 border-0 shadow-sm p-4 text-center admin-card">
                 <div class="display-5 text-success mb-3"><i class="fas fa-store"></i></div>
                 <h5 class="fw-bold text-dark">Sucursales</h5>
-                <p class="text-muted small mb-0">Administrar locales y puntos de venta.</p>
+                <p class="text-muted extra-small mb-0">Locales y PDV.</p>
             </div>
         </a>
     </div>
     <!-- Categorías -->
-    <div class="col-md-4">
+    <div class="col-md-4 col-lg-3">
         <a href="{{ url_for('categorias') }}" class="text-decoration-none">
             <div class="card h-100 border-0 shadow-sm p-4 text-center admin-card">
                 <div class="display-5 text-warning mb-3"><i class="fas fa-tags"></i></div>
                 <h5 class="fw-bold text-dark">Categorías</h5>
-                <p class="text-muted small mb-0">Organizar productos del menú.</p>
+                <p class="text-muted extra-small mb-0">Organización menú.</p>
             </div>
         </a>
     </div>
     <!-- Productos -->
-    <div class="col-md-4">
+    <div class="col-md-4 col-lg-3">
         <a href="{{ url_for('productos') }}" class="text-decoration-none">
             <div class="card h-100 border-0 shadow-sm p-4 text-center admin-card">
                 <div class="display-5 text-danger mb-3"><i class="fas fa-hamburger"></i></div>
-                <h5 class="fw-bold text-dark">Productos y Recetas</h5>
-                <p class="text-muted small mb-0">Configurar menú y costos de producción.</p>
+                <h5 class="fw-bold text-dark">Menú</h5>
+                <p class="text-muted extra-small mb-0">Recetas y costos.</p>
             </div>
         </a>
     </div>
     <!-- Insumos -->
-    <div class="col-md-4">
+    <div class="col-md-4 col-lg-3">
         <a href="{{ url_for('inventario') }}" class="text-decoration-none">
             <div class="card h-100 border-0 shadow-sm p-4 text-center admin-card">
                 <div class="display-5 text-info mb-3"><i class="fas fa-boxes"></i></div>
-                <h5 class="fw-bold text-dark">Materia Prima</h5>
-                <p class="text-muted small mb-0">Control de stock de ingredientes.</p>
+                <h5 class="fw-bold text-dark">Inventario</h5>
+                <p class="text-muted extra-small mb-0">Stock ingredientes.</p>
             </div>
         </a>
     </div>
     <!-- Empresa / SRI -->
-    <div class="col-md-4">
+    <div class="col-md-4 col-lg-3">
         <a href="{{ url_for('configuracion_empresa') }}" class="text-decoration-none">
-            <div class="card h-100 border-0 shadow-sm p-4 text-center admin-card" style="border: 2px solid #008938 !important;">
+            <div class="card h-100 border-0 shadow-sm p-4 text-center admin-card">
                 <div class="display-5 text-dark mb-3"><i class="fas fa-building"></i></div>
-                <h5 class="fw-bold text-dark">Datos de Empresa</h5>
-                <p class="text-muted small mb-0">Configuración Facturación y SRI.</p>
+                <h5 class="fw-bold text-dark">Empresa</h5>
+                <p class="text-muted extra-small mb-0">Facturación SRI.</p>
+            </div>
+        </a>
+    </div>
+    <!-- Auditoría -->
+    <div class="col-md-4 col-lg-3">
+        <a href="{{ url_for('ver_auditoria') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow-sm p-4 text-center admin-card" style="border: 2px solid #008938 !important;">
+                <div class="display-5 text-secondary mb-3"><i class="fas fa-history"></i></div>
+                <h5 class="fw-bold text-dark">Auditoría</h5>
+                <p class="text-muted extra-small mb-0">Logs de sistema.</p>
             </div>
         </a>
     </div>
 </div>
 
 <style>
-    .admin-card { transition: all 0.3s; }
+    .admin-card { transition: all 0.3s; border-radius: 20px !important; }
     .admin-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; background-color: #f8fff9; }
+    .extra-small { font-size: 0.75rem; }
 </style>
 {% endblock %}

@@ -47,9 +47,23 @@ CREATE TABLE insumos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     stock_actual DECIMAL(10,2) DEFAULT 0,
+    stock_minimo DECIMAL(10,2) DEFAULT 0,
     unidad_medida VARCHAR(20) NOT NULL,
     sucursal_id INT,
     FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
+);
+
+-- 4.1 Ajustes de Inventario
+CREATE TABLE ajustes_inventario (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    insumo_id INT,
+    cantidad DECIMAL(10,2),
+    tipo ENUM('INGRESO', 'EGRESO'),
+    motivo VARCHAR(255),
+    usuario_id INT,
+    FOREIGN KEY (insumo_id) REFERENCES insumos(id),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 );
 
 -- 5. Productos
@@ -168,6 +182,17 @@ CREATE TABLE empresa (
     direccion_matriz VARCHAR(255) NOT NULL,
     obligado_contabilidad VARCHAR(2) DEFAULT 'NO',
     ambiente INT DEFAULT 1
+);
+
+-- 15. Auditoría Global
+CREATE TABLE auditoria (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    usuario_id INT,
+    accion VARCHAR(100),
+    detalle TEXT,
+    ip VARCHAR(45),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 );
 
 -- INSERTS INICIALES --

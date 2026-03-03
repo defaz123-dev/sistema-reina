@@ -13,7 +13,7 @@
     <div class="container-fluid px-4">
         <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA <span class="text-white">POS</span></a>
         <div class="d-flex align-items-center text-white small">
-            <span class="me-3 d-none d-md-inline"><i class="fas fa-store me-1 text-warning"></i> {{ session['sucursal_nombre'] }}</span>
+            <span class="me-3 d-none d-md-inline"><i class="fas fa-store me-1 text-warning"></i> {{ session['sucursal_nombre'] }}</span>    
             <span class="me-3"><i class="fas fa-user me-1 text-success"></i> {{ session['usuario'] }}</span>
             <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3">
                 <i class="fas fa-home me-1"></i> Inicio
@@ -29,54 +29,22 @@
     .pos-layout { display: flex; height: 100%; gap: 10px; min-height: 0; }
     .panel-productos { flex: 1; display: flex; flex-direction: column; height: 100%; min-width: 0; }
     .panel-facturacion { width: 400px; display: flex; flex-direction: column; height: 100%; min-height: 0; }
-    
-    /* Scrollbars Anchos y Visibles */
-    .order-scroll-container, .card-body-scroll, .categories-bar {
-        scrollbar-width: thick;
-        scrollbar-color: #888 #f1f1f1;
-    }
-    
-    .order-scroll-container::-webkit-scrollbar, 
-    .card-body-scroll::-webkit-scrollbar,
-    .categories-bar::-webkit-scrollbar { 
-        width: 16px; 
-        height: 14px;
-    }
-    .order-scroll-container::-webkit-scrollbar-track, 
-    .card-body-scroll::-webkit-scrollbar-track,
-    .categories-bar::-webkit-scrollbar-track { 
-        background: #f1f1f1; 
-        border-radius: 10px;
-    }
-    .order-scroll-container::-webkit-scrollbar-thumb, 
-    .card-body-scroll::-webkit-scrollbar-thumb,
-    .categories-bar::-webkit-scrollbar-thumb { 
-        background: #666; 
-        border-radius: 10px;
-        border: 3px solid #f1f1f1;
-    }
-    .order-scroll-container::-webkit-scrollbar-thumb:hover, 
-    .card-body-scroll::-webkit-scrollbar-thumb:hover,
-    .categories-bar::-webkit-scrollbar-thumb:hover { 
-        background: var(--reina-green); 
-    }
 
     .order-scroll-container { flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 5px; }
     .card-body-scroll { flex: 1; overflow-y: auto; min-height: 0; padding-right: 5px; }
-    
-    .product-card { cursor: pointer; transition: all 0.2s; border: 1px solid transparent; overflow: hidden; height: 100%; }
+
+    .product-card { cursor: pointer; transition: all 0.2s; border: 1px solid transparent; overflow: hidden; height: 100%; position: relative; }
     .product-card:hover { transform: translateY(-2px); border-color: var(--reina-green); box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important; }
     .img-container { width: 100%; height: 80px; display: flex; align-items: center; justify-content: center; background-color: #f8f9fa; overflow: hidden; }
     .product-img { width: 100%; height: 100%; object-fit: cover; }
-    .product-icon { font-size: 2rem; opacity: 0.7; }
     .item-carrito { border-bottom: 1px solid #f0f0f0; padding: 8px 0; }
     .btn-cantidad { width: 24px; height: 24px; padding: 0; font-size: 12px; border-radius: 6px; }
-    .border-dashed { border: 1px dashed #dee2e6 !important; }
-    .extra-small { font-size: 0.75rem; }
+    .out-of-stock { opacity: 0.5; filter: grayscale(1); cursor: not-allowed !important; }
+    .stock-badge { position: absolute; top: 5px; right: 5px; padding: 2px 6px; border-radius: 6px; font-size: 0.6rem; font-weight: 800; z-index: 5; }
 </style>
 
 <div class="pos-layout">
-    <!-- PRODUCTOS (IZQUIERDA) -->
+    <!-- PRODUCTOS -->
     <div class="panel-productos">
         <div class="card border-0 shadow-sm rounded-4 h-100 d-flex flex-column">
             <div class="card-body p-3 d-flex flex-column h-100">
@@ -96,20 +64,16 @@
                     <div class="row g-2" id="gridProductos">
                         {% for p in productos %}
                         <div class="col-6 col-md-4 col-xl-3 item-producto mb-2" data-categoria="{{ p.categoria_id }}">
-                            <div class="card border-0 shadow-sm rounded-3 product-card" onclick="agregarAlCarrito({{ p.id }}, '{{ p.nombre }}', {{ p.precio }}, '{{ p.codigo }}')">
+                            <div class="card border-0 shadow-sm rounded-3 product-card {{ 'out-of-stock' if p.stock_disponible <= 0 else '' }}" 
+                                 onclick='agregarAlCarrito({{ p | tojson | safe }})'>
+                                {% if p.stock_disponible <= 0 %}<div class="stock-badge bg-danger text-white">AGOTADO</div>
+                                {% elif p.stock_disponible < 10 %}<div class="stock-badge bg-warning text-dark">Quedan {{ p.stock_disponible|int }}</div>{% endif %}
                                 <div class="img-container">
-                                    {% if p.tiene_foto %}<img src="{{ url_for('producto_imagen', id=p.id) }}" class="product-img">
-                                    {% else %}
-                                        {% if p.categoria_id in [1, 2] %}<i class="fas fa-bread-slice product-icon text-success"></i>
-                                        {% elif p.categoria_id == 4 %}<i class="fas fa-glass-whiskey product-icon text-primary"></i>
-                                        {% elif p.categoria_id == 5 %}<i class="fas fa-plus-circle product-icon text-warning"></i>
-                                        {% else %}<i class="fas fa-hamburger product-icon text-muted"></i>{% endif %}
-                                    {% endif %}
+                                    <img src="{{ url_for('producto_imagen', id=p.id) }}" class="product-img">
                                 </div>
                                 <div class="card-body text-center p-2">
-                                    <h6 class="fw-bold mb-0 small text-truncate" style="font-size: 0.8rem;">{{ p.nombre }}</h6>
+                                    <h6 class="fw-bold mb-0 small text-truncate">{{ p.nombre }}</h6>
                                     <div class="text-success fw-bold small">$ {{ p.precio }}</div>
-                                    <div class="text-muted" style="font-size: 0.65rem;">Cód: {{ p.codigo }}</div>
                                 </div>
                             </div>
                         </div>
@@ -120,205 +84,180 @@
         </div>
     </div>
 
-    <!-- ORDEN (DERECHA) -->
+    <!-- ORDEN -->
     <div class="panel-facturacion">
         <div class="card border-0 shadow-sm rounded-4 h-100 d-flex flex-column">
             <div class="card-header bg-white border-0 py-3 text-center flex-shrink-0">
                 <h5 class="fw-bold mb-0 text-success"><i class="fas fa-receipt me-2"></i> Orden de Venta</h5>
             </div>
-            
-            <div class="card-body p-3 d-flex flex-column min-height-0" style="overflow: hidden;">
+            <div class="card-body p-3 d-flex flex-column min-height-0">
                 <div class="order-scroll-container">
                     <!-- CLIENTE -->
                     <div class="bg-light p-3 rounded-3 mb-3 border border-dashed">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="form-label small fw-bold mb-0">Identificación (Cédula/RUC)</label>
+                            <label class="small fw-bold text-muted">Cédula/RUC</label>
                             <button class="btn btn-link btn-sm text-success p-0 text-decoration-none fw-bold" onclick="setConsumidorFinal()">Final</button>
                         </div>
                         <div class="input-group mb-2">
-                            <input type="text" id="clienteCedula" class="form-control border-0 shadow-none bg-white" placeholder="Ej: 1712345678">
-                            <button class="btn btn-dark" type="button" onclick="buscarCliente()"><i class="fas fa-search me-1"></i> Buscar</button>
+                            <input type="text" id="clienteCedula" class="form-control border-0 bg-white" placeholder="Identificación...">
+                            <button class="btn btn-dark" onclick="buscarCliente()"><i class="fas fa-search"></i></button>
                         </div>
                         <div id="clienteInfo" class="p-2 bg-white rounded border shadow-sm">
-                            <div class="text-muted extra-small mb-0">Cliente Seleccionado:</div>
                             <div id="clienteNombre" class="fw-bold text-dark small">CONSUMIDOR FINAL</div>
-                            <input type="hidden" id="clienteId" value="1"> 
+                            <input type="hidden" id="clienteId" value="1">
                         </div>
                     </div>
-                    
-                    <h6 class="small fw-bold text-muted mb-2"><i class="fas fa-shopping-basket me-1"></i> Detalle de la Orden</h6>
                     <div id="carritoItems" class="border-top border-bottom py-2 mb-3">
                         <div class="text-center text-muted py-4 small">Carrito Vacío</div>
                     </div>
-
-                    <!-- FORMA DE PAGO -->
                     <div class="bg-light p-3 rounded-3 border mb-3">
-                        <label class="form-label small fw-bold mb-2"><i class="fas fa-wallet me-1"></i> Forma de Pago</label>
-                        <select id="formaPago" class="form-select border-0 shadow-none bg-white fw-bold">
+                        <label class="small fw-bold mb-2">Forma de Pago</label>
+                        <select id="formaPago" class="form-select border-0 fw-bold">
                             <option value="EFECTIVO" selected>💵 EFECTIVO</option>
-                            <option value="TARJETA CREDITO">💳 TARJETA CRÉDITO</option>
-                            <option value="TARJETA DEBITO">💳 TARJETA DÉBITO</option>
                             <option value="TRANSFERENCIA">🏦 TRANSFERENCIA</option>
+                            <option value="TARJETA">💳 TARJETA</option>
                         </select>
                     </div>
                 </div>
             </div>
-            
-            <div class="card-footer bg-white border-0 p-3 mt-auto flex-shrink-0 shadow-lg" style="z-index: 10;">
+            <div class="card-footer bg-white border-0 p-3 mt-auto shadow-lg">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span class="fw-bold">TOTAL:</span>
                     <h4 class="fw-bold text-success mb-0" id="totalLabel">$ 0.00</h4>
                 </div>
-                <button class="btn btn-reina w-100 py-2 rounded-4 fw-bold shadow-sm mb-2" onclick="finalizarVenta(event)">
-                    <i class="fas fa-check-circle me-2"></i> REGISTRAR VENTA
-                </button>
-                <button class="btn btn-light w-100 py-1 rounded-pill extra-small text-muted" onclick="vaciarCarrito()">
-                    <i class="fas fa-trash-alt me-1"></i> Limpiar Orden
-                </button>
+                <button class="btn btn-reina w-100 py-2 rounded-4 fw-bold shadow-sm" onclick="finalizarVenta(event)">REGISTRAR VENTA</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Cliente -->
-<div class="modal fade" id="modalCliente" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+<!-- Modal Cliente Unificada -->
+<div class="modal fade" id="modalCliente" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow">
-            <div class="modal-header bg-success text-white rounded-top-4">
-                <h5 class="fw-bold mb-0"><i class="fas fa-user-plus me-2"></i> Nuevo Cliente (<span id="tipoDocBadge"></span>)</h5>
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="fw-bold mb-0">Nuevo Cliente</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                <p class="text-muted small mb-4">El cliente con identificación <strong id="spanCedula"></strong> no existe. Regístrelo ahora:</p>
-                <div class="row g-3">
-                    <div class="col-6">
-                        <label class="small fw-bold">Nombres *</label>
-                        <input type="text" id="nuevoNombres" class="form-control bg-light border-0 force-upper">
+                <div class="mb-3">
+                    <label class="small fw-bold text-muted">Tipo de Identificación</label>
+                    <select id="new_tipo_id" class="form-select bg-light border-0">
+                        {% for t in tipos_id %}
+                        <option value="{{ t.id }}">{{ t.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="small fw-bold text-muted">Número de Identificación</label>
+                    <input type="text" id="new_cedula" class="form-control bg-light border-0" required>
+                </div>
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="small fw-bold text-muted">Nombres</label>
+                        <input type="text" id="new_nombres" class="form-control bg-light border-0 force-upper">
                     </div>
-                    <div class="col-6">
-                        <label class="small fw-bold">Apellidos *</label>
-                        <input type="text" id="nuevoApellidos" class="form-control bg-light border-0 force-upper">
+                    <div class="col-6 mb-3">
+                        <label class="small fw-bold text-muted">Apellidos</label>
+                        <input type="text" id="new_apellidos" class="form-control bg-light border-0 force-upper">
                     </div>
-                    <div class="col-12">
-                        <label class="small fw-bold">Dirección *</label>
-                        <input type="text" id="nuevoDireccion" class="form-control bg-light border-0 force-upper">
+                </div>
+                <div class="mb-3">
+                    <label class="small fw-bold text-muted">Dirección</label>
+                    <input type="text" id="new_direccion" class="form-control bg-light border-0 force-upper">
+                </div>
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label class="small fw-bold text-muted">Teléfono</label>
+                        <input type="text" id="new_telefono" class="form-control bg-light border-0">
                     </div>
-                    <div class="col-6">
-                        <label class="small fw-bold">Teléfono *</label>
-                        <input type="text" id="nuevoTelefono" class="form-control bg-light border-0">
-                    </div>
-                    <div class="col-6">
-                        <label class="small fw-bold">Email *</label>
-                        <input type="email" id="nuevoEmail" class="form-control bg-light border-0">
+                    <div class="col-6 mb-3">
+                        <label class="small fw-bold text-muted">Email</label>
+                        <input type="email" id="new_email" class="form-control bg-light border-0">
                     </div>
                 </div>
             </div>
             <div class="modal-footer border-0 p-4 pt-0">
-                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-reina rounded-pill px-4" onclick="guardarCliente()">
-                    <i class="fas fa-save me-1"></i> Guardar y Seleccionar
-                </button>
+                <button class="btn btn-reina w-100 py-2 rounded-pill fw-bold" onclick="guardarClienteRapido()">GUARDAR Y SELECCIONAR</button>
             </div>
         </div>
     </div>
 </div>
 
+{% block scripts %}
 <script>
 let carrito = [];
 let modalClienteInstance;
+const productosData = {{ productos | tojson | safe }};
+
+function validarIdEcuador(numero, tipo) {
+    if (tipo == "4" || tipo == "3") return true; 
+    if (!/^\d+$/.test(numero)) return false;
+    if (tipo == "1" && numero.length !== 10) return false;
+    if (tipo == "2" && numero.length !== 13) return false;
+    const cedula = numero.substring(0, 10);
+    const provincia = parseInt(cedula.substring(0, 2));
+    if (provincia < 1 || provincia > 24) return false;
+    if (parseInt(cedula[2]) >= 6) return true;
+    let suma = 0;
+    for (let i = 0; i < 9; i++) {
+        let res = parseInt(cedula[i]) * ((i % 2 === 0) ? 2 : 1);
+        suma += (res > 9) ? res - 9 : res;
+    }
+    let val = 10 - (suma % 10);
+    if (val === 10) val = 0;
+    return val === parseInt(cedula[9]);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     modalClienteInstance = new bootstrap.Modal(document.getElementById('modalCliente'));
-    
-    // Soporte para códigos de barras
-    document.getElementById('codigoEntrada').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            const codigo = this.value.trim();
-            if (codigo) {
-                const prod = productosData.find(p => p.codigo === codigo);
-                if (prod) {
-                    agregarAlCarrito(prod.id, prod.nombre, prod.precio, prod.codigo);
-                    this.value = '';
-                } else {
-                    reinaAlert('Aviso', 'Producto no encontrado', 'warning');
-                }
-            }
-        }
-    });
-
     renderizarCarrito();
 });
 
-const productosData = {{ productos | tojson }};
-
 function buscarCliente() {
-    const cedula = document.getElementById('clienteCedula').value.trim();
-    if (!cedula) return reinaAlert('Aviso', 'Ingrese una identificación', 'warning');
-    
-    fetch(`/clientes/buscar/${cedula}`)
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('clienteNombre').textContent = data.cliente.nombres + ' ' + data.cliente.apellidos;
-                document.getElementById('clienteId').value = data.cliente.id;
-                reinaAlert('Éxito', 'Cliente encontrado y seleccionado');
-            } else {
-                const tipo = (cedula.length === 13) ? 'RUC' : 'CEDULA';
-                document.getElementById('tipoDocBadge').textContent = tipo;
-                document.getElementById('spanCedula').textContent = cedula;
-                
-                // Limpiar campos del modal
-                document.getElementById('nuevoNombres').value = '';
-                document.getElementById('nuevoApellidos').value = '';
-                document.getElementById('nuevoDireccion').value = '';
-                document.getElementById('nuevoTelefono').value = '';
-                document.getElementById('nuevoEmail').value = '';
-                
-                modalClienteInstance.show();
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            reinaAlert('Error', 'No se pudo conectar con el servidor', 'danger');
-        });
+    const doc = document.getElementById('clienteCedula').value.trim();
+    if (!doc) return;
+    fetch(`/clientes/buscar/${doc}`).then(res => res.json()).then(data => {
+        if (data.success) {
+            document.getElementById('clienteNombre').textContent = `${data.cliente.nombres} ${data.cliente.apellidos}`;
+            document.getElementById('clienteId').value = data.cliente.id;
+            reinaAlert('Éxito', 'Cliente seleccionado');
+        } else {
+            document.getElementById('new_cedula').value = doc;
+            document.getElementById('new_tipo_id').value = (doc.length === 13) ? "2" : "1";
+            modalClienteInstance.show();
+        }
+    });
 }
 
-function guardarCliente() {
-    const cedula = document.getElementById('spanCedula').textContent;
-    const nombres = document.getElementById('nuevoNombres').value.trim();
-    const apellidos = document.getElementById('nuevoApellidos').value.trim();
-    const direccion = document.getElementById('nuevoDireccion').value.trim();
-    const telefono = document.getElementById('nuevoTelefono').value.trim();
-    const email = document.getElementById('nuevoEmail').value.trim();
+async function guardarClienteRapido() {
+    const tipo = document.getElementById('new_tipo_id').value;
+    const doc = document.getElementById('new_cedula').value.trim();
+    const nom = document.getElementById('new_nombres').value.trim();
+    const ape = document.getElementById('new_apellidos').value.trim();
     
-    if (!nombres || !apellidos || !direccion || !telefono || !email) {
-        return reinaAlert('Aviso', 'Complete todos los campos obligatorios', 'warning');
-    }
-    
-    fetch('/clientes/guardar_json', {
+    if (!doc || !nom || !ape) return reinaAlert('Aviso', 'Faltan datos', 'warning');
+    if (!validarIdEcuador(doc, tipo)) return reinaAlert('Error', 'Identificación no válida', 'danger');
+
+    const res = await fetch('/clientes/guardar_json', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            cedula_ruc: cedula,
-            nombres: nombres,
-            apellidos: apellidos,
-            direccion: direccion,
-            telefono: telefono,
-            email: email
+            cedula_ruc: doc, tipo_identificacion_id: tipo,
+            nombres: nom, apellidos: ape,
+            direccion: document.getElementById('new_direccion').value,
+            telefono: document.getElementById('new_telefono').value,
+            email: document.getElementById('new_email').value
         })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            document.getElementById('clienteNombre').textContent = nombres + ' ' + apellidos;
-            document.getElementById('clienteId').value = data.id;
-            document.getElementById('clienteCedula').value = cedula;
-            modalClienteInstance.hide();
-            reinaAlert('Éxito', 'Cliente registrado y seleccionado');
-        } else {
-            reinaAlert('Error', data.message || 'No se pudo guardar el cliente', 'danger');
-        }
     });
+    const data = await res.json();
+    if(data.success) {
+        document.getElementById('clienteId').value = data.id;
+        document.getElementById('clienteNombre').textContent = `${nom} ${ape}`;
+        document.getElementById('clienteCedula').value = doc;
+        modalClienteInstance.hide();
+        reinaAlert('Éxito', 'Cliente registrado');
+    }
 }
 
 function setConsumidorFinal() {
@@ -327,31 +266,14 @@ function setConsumidorFinal() {
     document.getElementById('clienteId').value = '1';
 }
 
-function agregarAlCarrito(id, nombre, precio, codigo) {
-    const pId = String(id);
-    const idx = carrito.findIndex(i => String(i.id) === pId);
-    if (idx !== -1) {
-        carrito[idx].cantidad++;
+function agregarAlCarrito(p) {
+    if (p.stock_disponible <= 0) return reinaAlert('Sin Stock', 'No hay ingredientes.', 'danger');
+    const exist = carrito.find(i => String(i.id) === String(p.id));
+    if(exist) {
+        if (exist.cantidad + 1 > p.stock_disponible) return reinaAlert('Límite', 'No hay más stock.', 'warning');
+        exist.cantidad++;
     } else {
-        carrito.push({
-            id: pId,
-            nombre: nombre,
-            precio: parseFloat(precio),
-            codigo: codigo,
-            cantidad: 1
-        });
-    }
-    renderizarCarrito();
-}
-
-function actualizarCantidad(id, c) {
-    const pId = String(id);
-    const idx = carrito.findIndex(i => String(i.id) === pId);
-    if (idx !== -1) {
-        carrito[idx].cantidad += c;
-        if (carrito[idx].cantidad <= 0) {
-            carrito.splice(idx, 1);
-        }
+        carrito.push({ id: String(p.id), nombre: p.nombre, precio: parseFloat(p.precio), cantidad: 1, stock_max: p.stock_disponible });
     }
     renderizarCarrito();
 }
@@ -363,118 +285,59 @@ function renderizarCarrito() {
         document.getElementById('totalLabel').textContent = '$ 0.00';
         return;
     }
-    
-    let html = '';
-    let total = 0;
-    
+    let html = ''; let total = 0;
     carrito.forEach(item => {
-        const subtotal = item.precio * item.cantidad;
-        total += subtotal;
-        html += `
-            <div class="item-carrito d-flex justify-content-between align-items-center">
-                <div style="max-width: 60%;">
-                    <div class="fw-bold small">${item.nombre}</div>
-                    <div class="text-muted extra-small">$${item.precio.toFixed(2)} c/u</div>
-                </div>
-                <div class="d-flex align-items-center">
-                    <button class="btn btn-outline-secondary btn-cantidad" onclick="actualizarCantidad('${item.id}', -1)">-</button>
-                    <span class="mx-2 small fw-bold">${item.cantidad}</span>
-                    <button class="btn btn-reina btn-cantidad" onclick="actualizarCantidad('${item.id}', 1)">+</button>
-                    <div class="ms-2 small fw-bold text-end" style="min-width:70px">$${subtotal.toFixed(2)}</div>
-                </div>
-            </div>`;
+        const sub = item.precio * item.cantidad; total += sub;
+        html += `<div class="item-carrito d-flex justify-content-between align-items-center">
+            <div style="max-width: 60%;"><div class="fw-bold small">${item.nombre}</div><div class="text-muted extra-small">$${item.precio.toFixed(2)}</div></div>
+            <div class="d-flex align-items-center">
+                <button class="btn btn-outline-secondary btn-cantidad" onclick="actualizarCantidad('${item.id}', -1)">-</button>        
+                <span class="mx-2 small fw-bold">${item.cantidad}</span>
+                <button class="btn btn-reina btn-cantidad" onclick="actualizarCantidad('${item.id}', 1)">+</button>
+                <div class="ms-2 small fw-bold text-end" style="min-width:70px">$${sub.toFixed(2)}</div>
+            </div></div>`;
     });
-    
     cont.innerHTML = html;
     document.getElementById('totalLabel').textContent = `$ ${total.toFixed(2)}`;
 }
 
-async function finalizarVenta(event) {
-    if (carrito.length === 0) return reinaAlert('Aviso', 'Agregue productos a la orden', 'warning');
-    
-    const clienteId = document.getElementById('clienteId').value;
-    const formaPago = document.getElementById('formaPago').value;
-    
-    // Si es Consumidor Final, pedimos confirmación
-    if (clienteId == "1") {
-        const confirmar = await reinaConfirm('Consumidor Final', '¿Registrar venta a nombre de CONSUMIDOR FINAL?');
-        if (!confirmar) return;
-        // Esperamos un momento para que la modal se cierre físicamente antes del fetch
-        await new Promise(r => setTimeout(r, 400));
-    }
-
-    const total = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-    const btn = document.querySelector('button[onclick="finalizarVenta(event)"]');
-    
-    btn.disabled = true;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> PROCESANDO...';
-
-    try {
-        const res = await fetch('/pos/venta', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                items: carrito,
-                total: total,
-                cliente_id: clienteId,
-                forma_pago: formaPago
-            })
-        });
-        
-        const data = await res.json();
-        
-        if (data.success) {
-            await reinaAlert('¡Venta Exitosa!', `Venta #${data.venta_id} guardada.<br><br><a href="/venta/ticket/${data.venta_id}" target="_blank" class="btn btn-primary w-100"><i class="fas fa-print me-2"></i>Imprimir Ticket</a>`);
-            vaciarCarrito(true); 
-        } else {
-            await reinaAlert('Error', data.message || 'No se pudo completar la venta', 'danger');
-        }
-    } catch (err) {
-        console.error("Error en fetch venta:", err);
-        await reinaAlert('Error de Conexión', 'No se pudo conectar con el servidor', 'danger');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-    }
-}
-
-function vaciarCarrito(silencioso = false) {
-    if (silencioso) {
-        carrito = [];
-        setConsumidorFinal();
+function actualizarCantidad(id, c) {
+    const item = carrito.find(i => String(i.id) === String(id));
+    if (item) {
+        if (c > 0 && item.cantidad + c > item.stock_max) return reinaAlert('Límite', 'Sin stock.', 'warning');
+        item.cantidad += c;
+        if (item.cantidad <= 0) carrito = carrito.filter(i => String(i.id) !== String(id));
         renderizarCarrito();
-        return;
     }
-    
-    reinaConfirm('Vaciar Orden', '¿Está seguro de que desea borrar todos los productos de la orden?').then(confirmo => {
-        if (confirmo) {
-            carrito = [];
-            setConsumidorFinal();
-            renderizarCarrito();
-        }
-    });
 }
 
-// Filtros de categorías
-document.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.filter-btn').forEach(b => {
-            b.classList.remove('active', 'btn-reina');
-            b.classList.add('btn-outline-secondary');
-        });
-        this.classList.remove('btn-outline-secondary');
-        this.classList.add('active', 'btn-reina');
-        
-        const catId = this.dataset.cat;
-        document.querySelectorAll('.item-producto').forEach(item => {
-            if (catId === 'all' || item.dataset.categoria === catId) {
-                item.style.display = 'block';
-            } else {
-                item.style.display = 'none';
-            }
-        });
+async function finalizarVenta() {
+    if (carrito.length === 0) return;
+    const res = await fetch('/pos/venta', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            items: carrito, total: carrito.reduce((s, i) => s + (i.precio * i.cantidad), 0),
+            cliente_id: document.getElementById('clienteId').value,
+            forma_pago: document.getElementById('formaPago').value
+        })
+    });
+    const data = await res.json();
+    if (data.success) {
+        reinaAlert('Venta OK', `<a href="/venta/ticket/${data.venta_id}" target="_blank" class="btn btn-primary w-100">Ticket</a>`).then(() => window.location.reload());
+    }
+}
+
+function vaciarCarrito() { carrito=[]; renderizarCarrito(); }
+
+$('.filter-btn').click(function() {
+    $('.filter-btn').removeClass('active btn-reina').addClass('btn-outline-secondary');
+    $(this).removeClass('btn-outline-secondary').addClass('active btn-reina');
+    const catId = $(this).data('cat');
+    $('.item-producto').each(function() {
+        if (catId === 'all' || $(this).data('categoria') == catId) $(this).show(); else $(this).hide();
     });
 });
 </script>
+{% endblock %}
 {% endblock %}
