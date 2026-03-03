@@ -31,7 +31,13 @@ Se implementó un sistema de herencia para garantizar la consistencia visual:
 - **Estadísticas Visuales**: Gráficos de los productos más vendidos y tendencia de ingresos en el módulo de Reportes.
 - **Optimización de Compras**: Se mejoró la interfaz de "Nueva Compra" para permitir la selección de IVA por cada ítem individualmente en la misma fila de ingreso.
 - **Historial de Compras**: Se añadió la columna de "Acciones" para permitir la edición de facturas registradas.
+## 5. Respaldo y Control de Versiones
+- **Git Initialized**: Se inicializó el repositorio Git y se realizó el primer commit con el estado consolidado del sistema.
+- **GitHub Sync**: El código ha sido sincronizado exitosamente con el repositorio remoto en [GitHub](https://github.com/defaz123-dev/sistema-reina).
+- **Archivo de Respaldo**: Se generó un archivo comprimido `backup_sistema_reina_20260302.zip` que contiene el código fuente completo, base de datos y plantillas.
+- **`.gitignore`**: Implementación de exclusiones para entornos virtuales (`venv`), configuraciones de IDE (`.idea`) y caché de Python (`__pycache__`).
 
 ---
-**Fecha de actualización:** 1 de marzo de 2026
-**Estado:** Sistema SANDUCHES LA REINA consolidado y 100% Funcional con módulo de Compras e Inventario.
+**Fecha de actualización:** 2 de marzo de 2026
+**Estado:** Sistema SANDUCHES LA REINA respaldado, versionado y 100% Funcional.
+---
