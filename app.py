@@ -4,16 +4,21 @@ from flask_mysqldb import MySQL
 from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
 from datetime import datetime
+import os
 import random, csv, io
 
 app = Flask(__name__)
-app.secret_key = 'clave_secreta_reina_2024'
+app.secret_key = os.environ.get('SECRET_KEY', 'clave_secreta_reina_2024')
 
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = ''
-app.config['MYSQL_DB'] = 'sistema_reina'
+# Configuración de Base de Datos (Prioriza variables de entorno para la nube)
+app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST', 'localhost')
+app.config['MYSQL_USER'] = os.environ.get('MYSQL_USER', 'root')
+app.config['MYSQL_PASSWORD'] = os.environ.get('MYSQL_PASSWORD', '')
+app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB', 'sistema_reina')
+app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
+# Ajuste para evitar desconexiones en la nube
+app.config['MYSQL_CUSTOM_OPTIONS'] = {"ssl": {"ca": "/etc/ssl/certs/ca-certificates.crt"}} if 'MYSQL_HOST' in os.environ and os.environ['MYSQL_HOST'] != 'localhost' else {}
 
 mysql = MySQL(app)
 
