@@ -38,8 +38,29 @@ Se implementó un sistema de herencia para garantizar la consistencia visual:
     - **Hosting**: Implementado en **Render.com** (Plan Free).
     - **Base de Datos**: Migrada a **Aiven.io** (MySQL/MariaDB Free Plan).
     - **Seguridad**: Configuración de variables de entorno para proteger credenciales.
-- **Archivo de Respaldo**: Se generó un archivo comprimido `backup_sistema_reina_20260302.zip` que contiene el código fuente completo, base de datos y plantillas.
-- **`.gitignore`**: Implementación de exclusiones para entornos virtuales (`venv`), configuraciones de IDE (`.idea`) y caché de Python (`__pycache__`).
+- **Archivo de Respaldo**: Se generó un archivo comprimido `backup_sistema_reina_20260302.zip`.
+
+## 6. Guía de Despliegue (Aiven + Render)
+
+### Paso A: Base de Datos (Aiven.io)
+1. Crear un servicio **MySQL** en el plan **Free**.
+2. En **Service Settings** -> **Cloud and network**, editar el **IP Filter** y agregar `0.0.0.0/0`.
+3. Copiar los **Connection Details** (Host, Port, User, Password).
+4. Usar DBeaver para ejecutar el script `database.sql` (borrando las líneas de `CREATE DATABASE` y `USE`).
+
+### Paso B: Servidor Web (Render.com)
+1. Crear un nuevo **Web Service** conectado al repositorio de GitHub.
+2. Configurar:
+    - **Runtime**: `Python 3`
+    - **Build Command**: `pip install -r requirements.txt`
+    - **Start Command**: `gunicorn app:app`
+3. En la pestaña **Environment**, agregar las siguientes variables:
+    - `MYSQL_HOST`: El host de Aiven.
+    - `MYSQL_PORT`: El puerto de Aiven (ej: 24048).
+    - `MYSQL_USER`: `avnadmin`.
+    - `MYSQL_PASSWORD`: Tu contraseña de Aiven.
+    - `MYSQL_DB`: `defaultdb`.
+    - `SECRET_KEY`: Una clave aleatoria para la sesión.
 
 ---
 **Fecha de actualización:** 2 de marzo de 2026
