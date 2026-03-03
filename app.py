@@ -18,47 +18,37 @@ app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB', 'sistema_reina')
 app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 # Ajuste para evitar desconexiones en la nube
-# Render/Aiven ya manejan SSL internamente en el host, simplificamos la conexión
-app.config['MYSQL_CUSTOM_OPTIONS'] = {"ssl": True} if 'MYSQL_HOST' in os.environ and os.environ['MYSQL_HOST'] != 'localhost' else {}
+if 'MYSQL_HOST' in os.environ and os.environ['MYSQL_HOST'] != 'localhost':
+    # En la nube (Aiven), forzamos SSL de forma compatible con mysqlclient
+    app.config['MYSQL_CUSTOM_OPTIONS'] = {"ssl": {"ca": None}} 
+else:
+    app.config['MYSQL_CUSTOM_OPTIONS'] = {}
 
 mysql = MySQL(app)
 
 # --- AYUDANTES ---
-def identificar_tipo_doc(doc):
-    return 'RUC' if len(doc) == 13 else 'CEDULA'
-
-def generar_clave_acceso_sri(fecha, ruc_empresa, ambiente):
-    f = fecha.strftime('%d%m%Y')
-    clave = f"{f}01{ruc_empresa}{ambiente}001001{random.randint(1,999999):09d}123456781"
-    return clave[:49]
-
-def validar_ecuador_id(doc):
-    if doc == "9999999999": return True
-    if not doc or not doc.isdigit() or len(doc) not in [10, 13]: return False
-    return True
-
-# --- DECORADORES ---
-def login_required(f):
-    @wraps(f)
-    def dec(*args, **kwargs):
-        if 'user_id' not in session: return redirect(url_for('index'))
-        return f(*args, **kwargs)
-    return dec
-
-def admin_required(f):
-    @wraps(f)
-    def dec(*args, **kwargs):
-        if session.get('rol') != 'ADMIN':
-            flash('Acceso denegado', 'danger'); return redirect(url_for('dashboard'))
-        return f(*args, **kwargs)
-    return dec
+def get_db_cursor():
+    try:
+        return mysql.connection.cursor()
+    except Exception as e:
+        print(f"ERROR DE CONEXION: {str(e)}")
+        return None
 
 # --- RUTAS BASE ---
 @app.route('/')
 def index():
     if 'user_id' in session: return redirect(url_for('dashboard'))
-    cur = mysql.connection.cursor(); cur.execute("SELECT * FROM sucursales"); s = cur.fetchall(); cur.close()
-    return render_template('index.html', sucursales=s)
+    cur = get_db_cursor()
+    if cur is None:
+        return f"<h3>Error de Conexión a Base de Datos</h3><p>El sistema no pudo conectarse a la base de datos en la nube. Verifica las variables de entorno en Render y que la IP 0.0.0.0/0 esté permitida en Aiven.</p>", 500
+    
+    try:
+        cur.execute("SELECT * FROM sucursales")
+        s = cur.fetchall()
+        cur.close()
+        return render_template('index.html', sucursales=s)
+    except Exception as e:
+        return f"<h3>Error en Consulta</h3><p>{str(e)}</p>", 500
 
 @app.route('/login', methods=['POST'])
 def login():
