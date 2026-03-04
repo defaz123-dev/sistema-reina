@@ -88,7 +88,6 @@
                         {% endfor %}
                     </div>
                 </div>
-                <!-- Scroll de productos restaurado -->
                 <div class="card-body-scroll">
                     <div class="row g-2" id="gridProductos">
                         {% for p in productos %}
@@ -134,7 +133,6 @@
                     <i class="fas fa-trash-alt"></i>
                 </button>
             </div>
-            <!-- Scroll de productos seleccionados implementado -->
             <div class="carrito-scroll-container">
                 <div id="carritoItems">
                     <div class="text-center text-muted py-5">
@@ -143,7 +141,6 @@
                     </div>
                 </div>
             </div>
-            <!-- Footer fijo abajo -->
             <div class="card-footer bg-white border-0 p-3 mt-auto shadow-lg">
                 <div class="summary-item mb-1">
                     <span class="text-muted extra-small">SUBTOTAL (BASE {{ iva_porcentaje|int }}%):</span>
@@ -165,7 +162,7 @@
     </div>
 </div>
 
-<!-- MODALES (IGUALES) -->
+<!-- MODALES (CON CLASE FADE RESTAURADA) -->
 <div class="modal fade" id="modalFinalizar" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg">
@@ -261,6 +258,12 @@ let modalClienteInstance;
 const productosData = {{ productos | tojson | safe }};
 const IVA_P = {{ iva_porcentaje or 15.0 }};
 
+// FUNCIÓN DE LIMPIEZA TOTAL (Previene bloqueos de pantalla gris)
+function cleanupModals() {
+    $('.modal-backdrop').remove();
+    $('body').removeClass('modal-open').css('overflow', '').css('padding-right', '');
+}
+
 function validarIdEcuador(numero, tipo) {
     if (tipo == "4" || tipo == "3") return true; 
     if (!/^\d+$/.test(numero)) return false;
@@ -285,19 +288,14 @@ document.addEventListener('DOMContentLoaded', () => {
     modalClienteInstance = new bootstrap.Modal(document.getElementById('modalCliente'));
     renderizarCarrito();
 
-    // Lógica de filtrado corregida
     $('.filter-btn').on('click', function() {
         $('.filter-btn').removeClass('active btn-reina').addClass('btn-outline-secondary');
         $(this).removeClass('btn-outline-secondary').addClass('active btn-reina');
         const catId = $(this).data('cat');
-        
         $('.item-producto').each(function() {
             const itemCat = $(this).data('categoria');
-            if (catId === 'all' || String(itemCat) === String(catId)) {
-                $(this).show();
-            } else {
-                $(this).hide();
-            }
+            if (catId === 'all' || String(itemCat) === String(catId)) $(this).show();
+            else $(this).hide();
         });
     });
 });
@@ -332,6 +330,8 @@ async function guardarClienteRapido() {
     const ape = document.getElementById('new_apellidos').value.trim();
     if (!doc || !nom || !ape) return reinaAlert('Aviso', 'Faltan datos', 'warning');
     if (!validarIdEcuador(doc, tipo)) return reinaAlert('Error', 'Identificación no válida', 'danger');
+    
+    showLoading();
     const res = await fetch('/clientes/guardar_json', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -343,11 +343,22 @@ async function guardarClienteRapido() {
         })
     });
     const data = await res.json();
+    hideLoading();
+
     if(data.success) {
         document.getElementById('clienteId').value = data.id;
         document.getElementById('clienteNombre').textContent = `${nom} ${ape}`;
         document.getElementById('clienteCedula').value = doc;
+        
+        // Cierre y limpieza total para evitar pantalla gris
         modalClienteInstance.hide();
+        cleanupModals();
+        
+        setTimeout(() => {
+            reinaAlert('¡Éxito!', `Cliente registrado y seleccionado.`);
+        }, 300);
+    } else {
+        reinaAlert('Error', data.message || 'No se pudo guardar el cliente', 'danger');
     }
 }
 
@@ -358,7 +369,7 @@ function setConsumidorFinal() {
 }
 
 function agregarAlCarrito(p) {
-    if (p.stock_disponible == 999) return reinaAlert('Falta Receta', 'Este producto no tiene ingredientes asociados y no puede venderse.', 'warning');
+    if (p.stock_disponible == 999) return reinaAlert('Falta Receta', 'Este producto no tiene ingredientes asociados.', 'warning');
     if (p.stock_disponible <= 0) return reinaAlert('Sin Stock', 'No hay ingredientes.', 'danger');
     const exist = carrito.find(i => String(i.id) === String(p.id));
     if(exist) {
@@ -395,7 +406,6 @@ function renderizarCarrito() {
             </div></div>`;
     });
     
-    // Cálculo de IVA incluido dinámico
     const divisorIVA = 1 + (IVA_P / 100);
     const baseIVA = total / divisorIVA;
     const ivaVal = total - baseIVA;
@@ -418,8 +428,6 @@ function actualizarCantidad(id, c) {
 
 function abrirModalFinalizar() {
     if (carrito.length === 0) return;
-    
-    // Resetear datos del cliente al abrir
     document.getElementById('clienteCedula').value = '';
     document.getElementById('clienteNombre').textContent = 'CONSUMIDOR FINAL';
     document.getElementById('clienteId').value = '1';
@@ -451,42 +459,30 @@ async function confirmarOrden() {
     const ivaVal = total - base15;
 
     if (!c_id) return reinaAlert('Aviso', 'Seleccione un cliente', 'warning');
-
-    // Restauración de lógica: Validación legal de Consumidor Final ($50.00 límite)
-    if (c_id == '1' && total > 50) {
-        return reinaAlert('Límite Excedido', 'Ventas superiores a $50.00 requieren obligatoriamente datos del cliente (Nombre y Cédula/RUC).', 'warning');
-    }
+    if (c_id == '1' && total > 50) return reinaAlert('Límite Excedido', 'Ventas superiores a $50.00 requieren datos del cliente.', 'warning');
     
-    // Confirmación preventiva para Consumidor Final usando el sistema Reina
     if (c_id == '1') {
-        const ok = await reinaConfirm('¿Facturar como Consumidor Final?', 'No podrá cambiar los datos del cliente después de generar la orden.');
+        const ok = await reinaConfirm('¿Facturar como Consumidor Final?', 'No podrá cambiar los datos después.');
         if (!ok) return;
     }
 
-    showLoading(); // Mostrar cargando antes de la petición AJAX
-
+    showLoading();
     const res = await fetch('/pos/venta', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            items: carrito, 
-            subtotal_0: 0,
-            subtotal_15: base15,
-            iva_valor: ivaVal,
-            total: total,
-            cliente_id: c_id, 
-            forma_pago: f_pago
+            items: carrito, subtotal_0: 0, subtotal_15: base15, iva_valor: ivaVal, total: total, cliente_id: c_id, forma_pago: f_pago
         })
     });
     const data = await res.json();
     if (data.success) {
-        hideLoading(); // Ocultar cargando al terminar éxito
-        modalFinalizarInstance.hide();
+        hideLoading();
+        cleanupModals();
         reinaAlert('Orden Generada', `<p class="mb-3">La venta se registró correctamente.</p><a href="/venta/ticket/${data.venta_id}" target="_blank" class="btn btn-reina w-100 py-3"><i class="fas fa-print me-2"></i> IMPRIMIR TICKET</a>`).then(() => {
-            vaciarCarrito(); window.location.reload();
+            window.location.reload();
         });
     } else { 
-        hideLoading(); // Ocultar cargando al terminar error
+        hideLoading();
         reinaAlert('Error', data.message, 'danger'); 
     }
 }

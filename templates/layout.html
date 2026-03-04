@@ -168,14 +168,15 @@
         }, 3000);
     });
 
-    // Auto-mostrar loading en formularios estándar
+    // Auto-mostrar loading en formularios estándar (Solo si no han sido cancelados)
     document.addEventListener('submit', function(e) {
-        if (!e.target.classList.contains('no-loading')) {
+        if (!e.defaultPrevented && !e.target.classList.contains('no-loading')) {
             showLoading();
         }
     });
 
     function reinaAlert(titulo, mensaje, tipo = 'success') {
+        hideLoading(); // SEGURIDAD: Ocultar cualquier loader si hay una alerta
         return new Promise((resolve) => {
             const icon = document.getElementById('modalIcon');
             document.getElementById('modalTitle').textContent = titulo;
@@ -188,6 +189,7 @@
         });
     }
     function reinaConfirm(titulo, mensaje) {
+        hideLoading(); // SEGURIDAD: Ocultar cualquier loader si hay una confirmación
         return new Promise((resolve) => {
             document.getElementById('modalTitle').textContent = titulo;
             document.getElementById('modalMessage').innerHTML = mensaje;

@@ -50,6 +50,26 @@
                 </div>
             </div>
 
+            <div class="row mb-3">
+                <div class="col-12" id="divFacturaElec" style="display: none;">
+                    <div class="bg-success bg-opacity-10 p-2 rounded-3 border border-success border-opacity-25">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="extra-small fw-bold text-success mb-0"><i class="fas fa-key me-1"></i>Clave de Acceso (49 dígitos)</label>
+                            <button type="button" class="btn btn-success btn-sm py-1 px-4 rounded-pill fw-bold shadow" style="font-size: 0.8rem;" onclick="consultarDatosSRI()">
+                                <i class="fas fa-cloud-download-alt fa-lg me-2"></i> VALIDAR E IMPORTAR
+                            </button>
+                        </div>
+                        <input type="text" id="compraClave" class="form-control form-control-sm border-success border-opacity-50 fw-bold bg-white" maxlength="49" placeholder="Pegue la clave de acceso aquí" value="{{ compra.clave_acceso if compra else '' }}">
+                    </div>
+                </div>
+                <div class="col-12" id="divAutorizacion" style="display: none;">
+                    <div class="bg-primary bg-opacity-10 p-2 rounded-3 border border-primary border-opacity-25">
+                        <label class="extra-small fw-bold text-primary d-block mb-1"><i class="fas fa-check-double me-1"></i>Número de Autorización SRI</label>
+                        <input type="text" id="compraAuto" class="form-control form-control-sm bg-white border-primary border-opacity-50 fw-bold" placeholder="Ingrese el número de autorización" value="{{ compra.numero_autorizacion if compra else '' }}">
+                    </div>
+                </div>
+            </div>
+
             <div class="input-comprobante-group mb-4">
                 <div class="row align-items-center">
                     <div class="col-md-4 text-end"><label class="extra-small fw-bold text-muted mb-0">Número de Comprobante:</label></div>
@@ -65,27 +85,7 @@
                 </div>
             </div>
 
-            <div class="row mb-4">
-                <div class="col-12" id="divFacturaElec" style="display: none;">
-                    <div class="bg-success bg-opacity-10 p-2 rounded-3 border border-success border-opacity-25">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="extra-small fw-bold text-success mb-0"><i class="fas fa-key me-1"></i>Clave de Acceso (49 dígitos)</label>
-                            <button type="button" class="btn btn-success btn-sm py-0 px-3 rounded-pill fw-bold shadow-sm" style="font-size: 0.6rem;" onclick="consultarDatosSRI()">
-                                <i class="fas fa-search-dollar me-1"></i> VALIDAR E IMPORTAR
-                            </button>
-                        </div>
-                        <input type="text" id="compraClave" class="form-control form-control-sm border-success border-opacity-50 fw-bold bg-white" maxlength="49" placeholder="Pegue la clave de acceso aquí" value="{{ compra.clave_acceso if compra else '' }}">
-                    </div>
-                </div>
-                <div class="col-12" id="divAutorizacion" style="display: none;">
-                    <div class="bg-primary bg-opacity-10 p-2 rounded-3 border border-primary border-opacity-25">
-                        <label class="extra-small fw-bold text-primary d-block mb-1"><i class="fas fa-check-double me-1"></i>Número de Autorización SRI</label>
-                        <input type="text" id="compraAuto" class="form-control form-control-sm bg-white border-primary border-opacity-50 fw-bold" placeholder="Ingrese el número de autorización" value="{{ compra.numero_autorizacion if compra else '' }}">
-                    </div>
-                </div>
-            </div>
-
-            <div class="panel-item-entry p-3 mb-3 shadow-sm">
+            <div class="panel-item-entry p-3 mb-3 shadow-sm" id="manualEntryPanel">
                 <div class="row g-2 align-items-end">
                     <div class="col-md-4">
                         <label class="extra-small opacity-75">Seleccionar Insumo</label>
@@ -101,9 +101,18 @@
                 </div>
             </div>
 
-            <div class="table-responsive" style="max-height: 300px;">
+            <div class="table-responsive" style="max-height: 450px;">
                 <table class="table table-hover align-middle table-details" id="tableDetalleCompra">
-                    <thead><tr class="extra-small text-muted"><th style="width: 40%;">Insumo</th><th class="text-center">Cant.</th><th class="text-center">IVA</th><th class="text-end">Total</th><th class="text-center"></th></tr></thead>
+                    <thead>
+                        <tr class="extra-small text-muted">
+                            <th id="thSriDesc" style="width: 25%; display: none;">Descripción Factura (SRI)</th>
+                            <th id="thInsumo" style="width: 55%;">Insumo (Catálogo)</th>
+                            <th class="text-center" style="width: 12%;">Cant. Invent.</th>
+                            <th class="text-end" style="width: 12%;">P. Unit</th>
+                            <th class="text-end" style="width: 12%;">Total Fila</th>
+                            <th class="text-center" style="width: 9%;"></th>
+                        </tr>
+                    </thead>
                     <tbody id="bodyCompra"></tbody>
                 </table>
             </div>
@@ -123,6 +132,34 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Creación Rápida Insumo -->
+<div class="modal fade" id="modalCrearInsumo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg">
+            <div class="modal-header bg-success text-white border-0">
+                <h6 class="modal-title fw-bold"><i class="fas fa-plus-circle me-2"></i> NUEVO INSUMO</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="mb-2">
+                    <label class="extra-small fw-bold">NOMBRE</label>
+                    <input type="text" id="nuevoInsumoNombre" class="form-control form-control-sm text-uppercase fw-bold bg-light border-0">
+                </div>
+                <div class="mb-3">
+                    <label class="extra-small fw-bold">UNIDAD MEDIDA</label>
+                    <select id="nuevoInsumoUM" class="form-select form-select-sm bg-light border-0 fw-bold">
+                        {% for u in unidades %}<option value="{{ u.id }}">{{ u.nombre }} ({{ u.abreviatura }})</option>{% endfor %}
+                    </select>
+                </div>
+                <button type="button" class="btn btn-success btn-sm w-100 fw-bold rounded-pill" onclick="guardarInsumoRapido()">
+                    <i class="fas fa-save me-1"></i> CREAR Y ASIGNAR
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Previsualización SRI -->
 <div class="modal fade" id="modalPreviewSRI" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -173,7 +210,7 @@
                 </div>
             </div>
             <div class="modal-footer border-0 p-4 pt-0">
-                <button type="button" class="btn btn-reina w-100 py-3 rounded-pill fw-bold" data-bs-dismiss="modal">
+                <button type="button" class="btn btn-reina w-100 py-3 rounded-pill fw-bold" onclick="confirmarImportacionSRI()">
                     LOS DATOS SON CORRECTOS - IMPORTAR PRODUCTOS AHORA
                 </button>
             </div>
@@ -183,32 +220,37 @@
 
 <script>
 let itemsCompra = [];
+let localInsumos = {{ insumos | tojson | safe }};
 const IVA_P = {{ iva_porcentaje or 15.0 }};
-const insumosLocales = {{ insumos | tojson | safe }};
-let totalFacturaSRI = {{ compra.total if (compra and compra.total) else 0 }};
-let modalPreview;
+let totalFacturaSRI = 0;
+let modalPreview, modalInsumo;
+let currentRowIdxForNewInsumo = -1;
 
 document.addEventListener('DOMContentLoaded', () => { 
     modalPreview = new bootstrap.Modal(document.getElementById('modalPreviewSRI')); 
+    modalInsumo = new bootstrap.Modal(document.getElementById('modalCrearInsumo')); 
     if (document.getElementById('compraId').value) {
         document.getElementById('btnGuardarCompra').disabled = false;
     }
-    toggleClaveAcceso(); // Ejecutar al cargar para mostrar/ocultar campos según el proveedor
+    toggleClaveAcceso(); 
 });
-
-function calcularModulo11(clave48) {
-    let suma = 0; let factor = 2;
-    for (let i = clave48.length - 1; i >= 0; i--) { suma += parseInt(clave48.charAt(i)) * factor; factor = (factor === 7) ? 2 : factor + 1; }
-    let digito = 11 - (suma % 11); if (digito === 11) digito = 0; if (digito === 10) digito = 1;
-    return digito;
-}
 
 function toggleClaveAcceso() {
     const sel = document.getElementById('compraProveedor'); if(!sel.value) return;
     const opt = sel.options[sel.selectedIndex];
     const divElec = document.getElementById('divFacturaElec'); const divAuto = document.getElementById('divAutorizacion');
-    if (opt && opt.dataset.tipo === 'FACTURA') { divElec.style.display = 'block'; divAuto.style.display = 'none'; }
-    else { divElec.style.display = 'none'; divAuto.style.display = 'block'; }
+    const manualPanel = document.getElementById('manualEntryPanel');
+
+    if (opt && opt.dataset.tipo === 'FACTURA') { 
+        divElec.style.display = 'block'; 
+        divAuto.style.display = 'none';
+        manualPanel.style.display = 'none'; // Ocultar añadir manual para facturas
+    }
+    else { 
+        divElec.style.display = 'none'; 
+        divAuto.style.display = 'block';
+        manualPanel.style.display = 'block'; // Mostrar para otros documentos
+    }
 }
 
 function addItemCompra() {
@@ -217,35 +259,109 @@ function addItemCompra() {
     const hasIVA = document.getElementById('checkIVA').checked;
     if(!opt.value || isNaN(cant) || isNaN(totalLine)) return;
     const divisor = 1 + (IVA_P / 100); let base = hasIVA ? totalLine / divisor : totalLine; let iva = hasIVA ? totalLine - base : 0;
-    itemsCompra.push({ insumo_id: opt.value, nombre: opt.dataset.nombre, unidad: opt.dataset.unidad, cantidad: cant, costo: base / cant, subtotal: base, iva_valor: iva, paga_iva: hasIVA });
+    itemsCompra.push({ 
+        insumo_id: opt.value, 
+        nombre_factura: "-", 
+        cantidad: cant, 
+        costo: base / cant, 
+        subtotal: base, 
+        iva_valor: iva, 
+        paga_iva: hasIVA 
+    });
     renderCompra(); document.getElementById('cantInsumo').value = ''; document.getElementById('totalLinea').value = '';
 }
 
 function renderCompra() {
     const body = document.getElementById('bodyCompra'); body.innerHTML = '';
     let s0 = 0, s15 = 0, ivaTotal = 0;
+    const compraId = document.getElementById('compraId').value;
+    
+    // Mostramos la descripción SRI solo si es NUEVA compra y hay datos de importación SRI activos
+    const showSriCol = totalFacturaSRI > 0 && !compraId;
+    document.getElementById('thSriDesc').style.display = showSriCol ? '' : 'none';
+    document.getElementById('thInsumo').style.width = showSriCol ? '30%' : '55%';
+
+    document.getElementById('btnGuardarCompra').disabled = (itemsCompra.length === 0);
+    const manualPanel = document.getElementById('manualEntryPanel');
+    if (totalFacturaSRI > 0 && !compraId) manualPanel.style.display = 'none'; else manualPanel.style.display = 'block';
+
     if (itemsCompra.length === 0) body.innerHTML = '<tr><td colspan="6" class="text-center py-3 text-muted small">No hay insumos</td></tr>';
+    
     itemsCompra.forEach((item, idx) => {
-        const sub = parseFloat(item.subtotal);
-        const iv = parseFloat(item.iva_valor);
+        const sub = parseFloat(item.subtotal || 0); const iv = parseFloat(item.iva_valor || 0);
         if(item.paga_iva) { s15 += sub; ivaTotal += iv; } else { s0 += sub; }
-        body.innerHTML += `<tr><td><div class="fw-bold small">${item.nombre}</div></td><td class="text-center">${item.cantidad}</td><td class="text-center small">${item.paga_iva ? IVA_P+'%':'0%'}</td><td class="text-end fw-bold">$${(sub + iv).toFixed(2)}</td><td class="text-center"><button class="btn btn-sm text-danger" onclick="itemsCompra.splice(${idx},1); renderCompra()"><i class="fas fa-trash"></i></button></td></tr>`;
+
+        let options = `<option value="">-- Seleccionar --</option>`;
+        localInsumos.forEach(ins => {
+            options += `<option value="${ins.id}" ${item.insumo_id == ins.id ? 'selected' : ''}>${ins.nombre} (${ins.unidad_medida})</option>`;
+        });
+
+        body.innerHTML += `
+            <tr>
+                <td class="small fw-bold text-muted" style="display: ${showSriCol ? '' : 'none'}">${item.nombre_factura}</td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <select class="form-select" onchange="updateItemRow(${idx}, 'insumo_id', this.value)">${options}</select>
+                        <button class="btn btn-outline-success" onclick="abrirModalInsumo(${idx})"><i class="fas fa-plus"></i></button>
+                    </div>
+                </td>
+                <td><input type="number" step="0.01" class="form-control form-control-sm text-center fw-bold" value="${item.cantidad || ''}" onchange="updateItemRow(${idx}, 'cantidad', this.value)"></td>
+                <td class="text-end small text-primary fw-bold">$ ${parseFloat(item.costo || 0).toFixed(4)}</td>
+                <td class="text-end fw-bold">$ ${(sub + iv).toFixed(2)}</td>
+                <td class="text-center">${(totalFacturaSRI > 0 && !compraId) ? '' : `<button class="btn btn-sm text-danger" onclick="itemsCompra.splice(${idx},1); renderCompra()"><i class="fas fa-trash"></i></button>`}</td>
+            </tr>`;
     });
+    
     const totalFinal = s0 + s15 + ivaTotal;
     document.getElementById('sub0').textContent = '$ ' + s0.toFixed(2); document.getElementById('sub15').textContent = '$ ' + s15.toFixed(2);
     document.getElementById('ivaVal').textContent = '$ ' + ivaTotal.toFixed(2); document.getElementById('labelTotalCompra').textContent = '$ ' + totalFinal.toFixed(2);
 }
 
-function validarIntegridadClave(clave, ruc, fecha, est, pto, sec) {
-    if (clave.length !== 49) return "La clave debe tener 49 dígitos.";
-    if (parseInt(clave.charAt(48)) !== calcularModulo11(clave.substring(0, 48))) return "Dígito verificador incorrecto.";
-    const fComp = fecha.split('-').reverse().join('');
-    if (clave.substring(0, 8) !== fComp) return "La FECHA en la clave no coincide.";
-    if (clave.substring(10, 23) !== ruc) return "El RUC en la clave no pertenece al proveedor.";
-    if (clave.substring(24, 27) !== est.padStart(3,'0')) return "El ESTABLECIMIENTO no coincide.";
-    if (clave.substring(27, 30) !== pto.padStart(3,'0')) return "El PUNTO DE EMISIÓN no coincide.";
-    if (clave.substring(30, 39) !== sec.padStart(9,'0')) return "El SECUENCIAL no coincide.";
-    return null;
+function updateItemRow(index, field, value) {
+    let item = itemsCompra[index];
+    if (field === 'insumo_id') {
+        item.insumo_id = value;
+    } else if (field === 'cantidad') {
+        const cant = parseFloat(value) || 0;
+        item.cantidad = cant;
+        
+        // Si hay un subtotal fijo (importado del SRI), recalculamos el costo unitario
+        if (item.subtotal > 0 && cant > 0) {
+            item.costo = item.subtotal / cant;
+        }
+    }
+    renderCompra();
+}
+
+function abrirModalInsumo(idx) {
+    currentRowIdxForNewInsumo = idx;
+    document.getElementById('nuevoInsumoNombre').value = itemsCompra[idx].nombre_factura !== '-' ? itemsCompra[idx].nombre_factura : '';
+    modalInsumo.show();
+}
+
+async function guardarInsumoRapido() {
+    const nom = document.getElementById('nuevoInsumoNombre').value.trim();
+    const um = document.getElementById('nuevoInsumoUM').value;
+    if(!nom) return;
+    
+    showLoading();
+    try {
+        const res = await fetch('/inventario/crear_ajax', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nombre: nom, unidad_medida_id: um })
+        });
+        const data = await res.json(); hideLoading();
+        if(data.success) {
+            const um_text = document.getElementById('nuevoInsumoUM').options[document.getElementById('nuevoInsumoUM').selectedIndex].text;
+            const nuevoInsumo = { id: data.id, nombre: data.nombre, unidad_medida: um_text };
+            localInsumos.push(nuevoInsumo);
+            if(currentRowIdxForNewInsumo !== -1) {
+                itemsCompra[currentRowIdxForNewInsumo].insumo_id = data.id;
+            }
+            modalInsumo.hide();
+            renderCompra();
+        } else { reinaAlert('Error', data.message, 'danger'); }
+    } catch(e) { hideLoading(); }
 }
 
 async function consultarDatosSRI() {
@@ -256,28 +372,14 @@ async function consultarDatosSRI() {
     if (checkData.existe) return reinaAlert('Factura Duplicada', 'Esta clave de acceso ya ha sido registrada.', 'danger');
     const provSelect = document.getElementById('compraProveedor'); if(!provSelect.value) return reinaAlert('Aviso', 'Seleccione primero un proveedor.', 'warning');
     const optProv = provSelect.options[provSelect.selectedIndex];
-    const fechaUser = document.getElementById('compraFecha').value;
-    const estUser = document.getElementById('compraEst').value; const ptoUser = document.getElementById('compraPto').value; const secUser = document.getElementById('compraSec').value;
 
     showLoading();
     try {
         const res = await fetch(`/compras/consultar_sri/${clave}`);
-        const data = await res.json();
-        hideLoading();
-
+        const data = await res.json(); hideLoading();
         if (data.success) {
-            const errorInt = validarIntegridadClave(clave, optProv.dataset.ruc, fechaUser, estUser, ptoUser, secUser);
-            if (errorInt) return reinaAlert('Validación SRI Fallida', errorInt, 'danger');
+            if (clave.substring(10, 23) !== optProv.dataset.ruc) return reinaAlert('Validación Fallida', 'El RUC no pertenece al proveedor.', 'danger');
             
-            document.getElementById('btnGuardarCompra').disabled = false;
-            totalFacturaSRI = data.total;
-
-            // --- RESTAURACIÓN: FORMATEAR CAMPOS CON DATOS OFICIALES DEL SRI ---
-            document.getElementById('compraEst').value = data.establecimiento;
-            document.getElementById('compraPto').value = data.punto_emision;
-            document.getElementById('compraSec').value = data.secuencial;
-
-            // Llenar datos en la vista previa restaurada
             document.getElementById('prevRazonSocial').textContent = data.razon_social;
             document.getElementById('prevRuc').textContent = data.ruc_proveedor;
             document.getElementById('prevComprobante').textContent = `${data.establecimiento}-${data.punto_emision}-${data.secuencial}`;
@@ -286,38 +388,70 @@ async function consultarDatosSRI() {
             document.getElementById('prevTotal').textContent = `$ ${data.total.toFixed(2)}`;
 
             let itemsHtml = '';
-            data.items.forEach(it => { 
-                itemsHtml += `<tr><td>${it.cantidad}</td><td>${it.nombre}</td><td class="text-end">$${it.precio_unitario.toFixed(2)}</td><td class="text-end">$${it.subtotal.toFixed(2)}</td></tr>`; 
-            });
+            data.items.forEach(it => { itemsHtml += `<tr><td>${it.cantidad}</td><td>${it.nombre}</td><td class="text-end">$${it.precio_unitario.toFixed(2)}</td><td class="text-end">$${it.subtotal.toFixed(2)}</td></tr>`; });
             document.getElementById('prevItemsBody').innerHTML = itemsHtml;
-            
+            window.lastSRIData = data;
             modalPreview.show();
-            itemsCompra = [];
-            data.items.forEach(itemSRI => {
-                const coincidencia = insumosLocales.find(ins => ins.nombre.toUpperCase().trim() === itemSRI.nombre.toUpperCase().trim());
-                if (coincidencia) {
-                    itemsCompra.push({
-                        insumo_id: coincidencia.id, nombre: coincidencia.nombre, unidad: coincidencia.unidad_medida,
-                        cantidad: itemSRI.cantidad, costo: itemSRI.precio_unitario, subtotal: itemSRI.subtotal,
-                        iva_valor: (itemSRI.paga_iva) ? (itemSRI.subtotal * (IVA_P/100)) : 0, paga_iva: itemSRI.paga_iva
-                    });
-                }
-            });
-            renderCompra();
         } else { reinaAlert('SRI Error', data.message, 'danger'); }
-    } catch (e) { hideLoading(); reinaAlert('Error', 'Conexión fallida.', 'danger'); }
+    } catch (e) { hideLoading(); }
+}
+
+function confirmarImportacionSRI() {
+    const data = window.lastSRIData; if (!data) return;
+    totalFacturaSRI = data.total;
+    document.getElementById('compraEst').value = data.establecimiento; document.getElementById('compraEst').readOnly = true;
+    document.getElementById('compraPto').value = data.punto_emision; document.getElementById('compraPto').readOnly = true;
+    document.getElementById('compraSec').value = data.secuencial; document.getElementById('compraSec').readOnly = true;
+    if (data.fecha_emision) { document.getElementById('compraFecha').value = data.fecha_emision; document.getElementById('compraFecha').readOnly = true; }
+
+    itemsCompra = [];
+    data.items.forEach(itemSRI => {
+        const coincidencia = localInsumos.find(ins => ins.nombre.toUpperCase().trim() === itemSRI.nombre.toUpperCase().trim());
+        itemsCompra.push({
+            insumo_id: coincidencia ? coincidencia.id : "", 
+            nombre_factura: itemSRI.nombre, 
+            cantidad: "", costo: itemSRI.precio_unitario, subtotal: itemSRI.subtotal, 
+            iva_valor: itemSRI.paga_iva ? (itemSRI.subtotal * (IVA_P/100)) : 0, paga_iva: itemSRI.paga_iva
+        });
+    });
+    renderCompra();
+    modalPreview.hide();
 }
 
 async function finalizarCompra() {
     const totalText = document.getElementById('labelTotalCompra').innerText.replace('$ ', '').trim();
     const totalMostrado = parseFloat(totalText);
-    const provSelect = document.getElementById('compraProveedor'); if(!provSelect.value) return;
-    const optProv = provSelect.options[provSelect.selectedIndex];
+    const provSelect = document.getElementById('compraProveedor'); 
     
+    if(!provSelect.value) return reinaAlert('Faltan Datos', 'Seleccione un proveedor.', 'warning');
+    const optProv = provSelect.options[provSelect.selectedIndex];
+    const fecha = document.getElementById('compraFecha').value;
+    if(!fecha) return reinaAlert('Faltan Datos', 'Ingrese la fecha de emisión.', 'warning');
+    
+    const est = document.getElementById('compraEst').value.trim();
+    const pto = document.getElementById('compraPto').value.trim();
+    const sec = document.getElementById('compraSec').value.trim();
+    if(!est || !pto || !sec) return reinaAlert('Faltan Datos', 'El número de comprobante (Est-Pto-Sec) es obligatorio.', 'warning');
+
+    const auto = document.getElementById('compraAuto').value.trim();
+    const clave = document.getElementById('compraClave').value.trim();
+
+    if (optProv.dataset.tipo === 'FACTURA' && !clave) {
+        return reinaAlert('Faltan Datos', 'Las facturas electrónicas requieren la Clave de Acceso.', 'warning');
+    }
+    if (optProv.dataset.tipo !== 'FACTURA' && !auto) {
+        return reinaAlert('Faltan Datos', 'Ingrese el Número de Autorización del SRI para este documento físico.', 'warning');
+    }
+
+    if(itemsCompra.length === 0) return reinaAlert('Faltan Datos', 'Añada al menos un insumo.', 'warning');
+
+    for (let i=0; i < itemsCompra.length; i++) {
+        if (!itemsCompra[i].insumo_id) return reinaAlert('Datos Incompletos', `Fila ${i+1}: Seleccione un insumo del catálogo.`, 'warning');
+        if (!itemsCompra[i].cantidad || itemsCompra[i].cantidad <= 0) return reinaAlert('Datos Incompletos', `Fila ${i+1}: Ingrese cantidad para el inventario.`, 'warning');
+    }
+
     if (optProv.dataset.tipo === 'FACTURA' && totalFacturaSRI > 0) {
-        if (Math.abs(totalMostrado - totalFacturaSRI) > 0.01) {
-            return reinaAlert('Total no coincide', `El total mostrado ($${totalMostrado.toFixed(2)}) debe ser igual al del SRI ($${totalFacturaSRI.toFixed(2)}).`, 'danger');
-        }
+        if (Math.abs(totalMostrado - totalFacturaSRI) > 0.01) return reinaAlert('Total no coincide', 'El total debe ser igual al del SRI.', 'danger');
     }
 
     showLoading();
@@ -326,30 +460,23 @@ async function finalizarCompra() {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ 
                 compra_id: document.getElementById('compraId').value || null, sucursal_id: document.getElementById('compraSucursal').value, 
-                proveedor_id: optProv.value, establecimiento: document.getElementById('compraEst').value, punto_emision: document.getElementById('compraPto').value, numero_comprobante: document.getElementById('compraSec').value,
-                clave_acceso: document.getElementById('compraClave').value.trim(), numero_autorizacion: document.getElementById('compraAuto').value, 
-                fecha: document.getElementById('compraFecha').value, total: totalMostrado, items: itemsCompra 
+                proveedor_id: optProv.value, establecimiento: est, punto_emision: pto, numero_comprobante: sec,
+                clave_acceso: clave, numero_autorizacion: auto, 
+                fecha: fecha, total: totalMostrado, items: itemsCompra 
             })
         });
-        const data = await res.json();
-        hideLoading(); 
-        
-        if(data.success) {
-            reinaAlert('¡Éxito!', 'Compra registrada correctamente.').then(() => { 
-                window.location.href = "{{ url_for('compras') }}"; 
-            });
-        } else { reinaAlert('Error', data.message, 'danger'); }
-    } catch (e) { hideLoading(); reinaAlert('Error', 'Fallo al guardar.', 'danger'); }
+        const data = await res.json(); hideLoading(); 
+        if(data.success) reinaAlert('¡Éxito!', 'Compra registrada correctamente.').then(() => { window.location.href = "{{ url_for('compras') }}"; });
+        else reinaAlert('Error', data.message, 'danger');
+    } catch (e) { hideLoading(); }
 }
 
-// Carga de datos inicial si estamos editando
 {% if detalles %}
 itemsCompra = [
     {% for d in detalles %}
     { 
         insumo_id: {{ d.insumo_id }}, 
-        nombre: {{ d.nombre | tojson }}, 
-        unidad: "{{ d.unidad_medida }}", 
+        nombre_factura: "-", 
         cantidad: {{ d.cantidad }}, 
         costo: {{ d.costo_unitario }}, 
         subtotal: {{ d.subtotal }}, 
@@ -358,6 +485,9 @@ itemsCompra = [
     }{{ "," if not loop.last else "" }}
     {% endfor %}
 ];
+{% if compra and compra.clave_acceso %}
+totalFacturaSRI = {{ compra.total }};
+{% endif %}
 renderCompra();
 {% endif %}
 </script>

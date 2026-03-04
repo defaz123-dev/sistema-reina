@@ -366,6 +366,27 @@ def guardar_insumo():
         registrar_auditoria('CREAR_INSUMO', f"Creó insumo: {nom}")
     mysql.connection.commit(); cur.close(); return redirect(url_for('inventario'))
 
+@app.route('/inventario/crear_ajax', methods=['POST'])
+@login_required
+@admin_required
+def crear_insumo_ajax():
+    try:
+        data = request.get_json()
+        cur = mysql.connection.cursor()
+        u_id = session['user_id']
+        nom = data['nombre'].upper()
+        um_id = data['unidad_medida_id']
+        suc_id = data.get('sucursal_id') or session['sucursal_id']
+        
+        cur.execute("INSERT INTO insumos (nombre, stock_actual, stock_minimo, unidad_medida_id, sucursal_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, 0, 0, %s, %s, %s, %s)", (nom, um_id, suc_id, u_id, u_id))
+        new_id = cur.lastrowid
+        mysql.connection.commit()
+        cur.close()
+        
+        return jsonify({'success': True, 'id': new_id, 'nombre': nom})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
 @app.route('/inventario/ajustar', methods=['POST'])
 @login_required
 @admin_required

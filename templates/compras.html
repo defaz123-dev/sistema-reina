@@ -37,7 +37,7 @@
                     <tr>
                         <td class="small">{{ c.fecha }}</td>
                         <td class="fw-bold">{{ c.razon_social }}</td>
-                        <td><span class="badge bg-light text-dark border">{{ c.numero_comprobante }}</span></td>
+                        <td><span class="badge bg-light text-dark border">{{ c.establecimiento }}-{{ c.punto_emision }}-{{ c.numero_comprobante }}</span></td>
                         <td><span class="badge bg-secondary">{{ c.sucursal_nombre }}</span></td>
                         <td class="text-end fw-bold text-success">${{ "%.2f"|format(c.total) }}</td>
                         <td class="text-end">

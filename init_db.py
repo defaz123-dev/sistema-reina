@@ -15,6 +15,11 @@ def run_sql_file(filename):
         db = MySQLdb.connect(**DB_CONFIG)
         cursor = db.cursor()
 
+        # Crear y seleccionar la base de datos
+        print("--- Creando base de datos 'sistema_reina' ---")
+        cursor.execute("CREATE DATABASE IF NOT EXISTS sistema_reina;")
+        cursor.execute("USE sistema_reina;")
+
         print(f"--- Ejecutando script: {filename} ---")
         
         with open(filename, 'r', encoding='utf-8') as f:
@@ -33,14 +38,14 @@ def run_sql_file(filename):
             if sql:
                 try:
                     cursor.execute(sql)
-                    print(f"✅ OK: {sql[:40]}...")
+                    # print(f"✅ OK: {sql[:40]}...") # Comentado para no saturar la salida
                 except Exception as e:
                     print(f"⚠️ Error en: {sql[:40]}... -> {str(e)}")
         
         db.commit()
         cursor.close()
         db.close()
-        print("\n¡Base de datos REINA lista! ✅")
+        print("\n¡Base de datos 'sistema_reina' lista! ✅")
 
     except Exception as e:
         print(f"\n❌ Error de conexión: {str(e)}")

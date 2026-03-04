@@ -1,6 +1,6 @@
 # Informe de Implementación - Sanduches La Reina
 
-Este documento detalla la evolución, mejoras y nuevas funcionalidades implementadas en el sistema hasta el 3 de marzo de 2026.
+Este documento detalla la evolución, mejoras y nuevas funcionalidades implementadas en el sistema hasta el 4 de marzo de 2026.
 
 ## 1. Gestión de Inventario Real e Inteligente
 - **Stock Dinámico**: La tabla `insumos` ahora maneja `stock_actual` y `stock_minimo`.
@@ -25,23 +25,23 @@ Este documento detalla la evolución, mejoras y nuevas funcionalidades implement
 
 ## 4. Interfaz de Usuario (UI) y Experiencia (UX)
 - **Estandarización de Navegación**: Todas las pantallas cuentan con una barra superior negra (`bg-dark`) y un botón de **"Inicio"** consistente con el icono de casa (`fas fa-home`).
-- **Mejora de Visibilidad**: Se incrementó el tamaño de los iconos de acción (Editar, Receta, Imprimir, Borrar) mediante la clase CSS `.action-icon` centralizada en `layout.html`.
-- **Corrección de Componentes**: Reestructuración de la comunicación entre tablas y modales usando atributos `data-*`, eliminando errores de sintaxis por caracteres especiales en nombres o direcciones.
+- **Jerarquía de Alertas**: Optimización global de `reinaAlert` para ocultar automáticamente cargadores y evitar bloqueos de pantalla en errores de validación.
+- **Limpieza de Modales**: Implementación de funciones de limpieza manual (`cleanupModals`) para evitar que el fondo gris bloquee la interactividad en procesos complejos.
 - **DataTables**: Implementación de búsqueda, filtrado y paginación en español en todas las tablas maestras.
 
-## 5. Infraestructura y Despliegue
-- **Cloud Computing**: Sistema desplegado exitosamente en **Render.com** (Flask) y **Aiven.io** (MariaDB/MySQL).
-- **Variables de Entorno**: Configuración segura de credenciales para la conexión a la nube.
-- **Control de Versiones**: Repositorio sincronizado en [GitHub](https://github.com/defaz123-dev/sistema-reina).
+## 5. Integración SRI y Compras Senior (Fase 2)
+- **Importación Inteligente**: La pantalla de compras ahora prioriza la Clave de Acceso. Al validar, autocompleta Fecha, Establecimiento, Punto de Emisión y Secuencial.
+- **Mapeo Dinámico**: Columna visual "Descripción Factura (SRI)" que permite asociar productos del XML con el catálogo local de forma visual.
+- **Creación en Caliente**: Botón "+" integrado en la tabla de compras para registrar nuevos insumos vía AJAX sin abandonar la transacción actual.
+- **Cálculo de Costo de Inventario**: El sistema permite ingresar cantidades para inventario (ej. en gramos) y calcula automáticamente el Precio Unitario basado en el subtotal fijo de la factura (`Subtotal / Cantidad`), garantizando la cuadratura contable.
+- **Validación Estricta**: Obligatoriedad de Número de Autorización y Comprobante completo para Notas de Venta y documentos físicos.
+- **Historial Completo**: Visualización de facturas en formato legal `XXX-XXX-XXXXXXXXX` en el historial de compras.
 
-## 7. Integración SRI y Compras Inteligentes
-- **Validación en Tiempo Real**: Conexión directa con los servicios web del SRI (Pruebas/Producción) para validar claves de acceso de 49 dígitos.
-- **Importación Automática**: Carga automática de cabecera (RUC, Fecha, Serie) y detalles de productos desde el XML del SRI hacia el inventario local.
-- **Control de Integridad**: Validación cruzada de totales y bloqueo de registros duplicados mediante Clave de Acceso única.
-- **Gestión de Stock**: Implementada la eliminación de facturas con reversión automática de existencias en insumos.
-- **Optimización de UI**: Nuevo loading instantáneo basado en CSS puro y rediseño de cabecera de facturación electrónica.
+## 6. Infraestructura y Despliegue
+- **Cloud Computing**: Sistema desplegado exitosamente en **Render.com** (Flask) y **Aiven.io** (MariaDB/MySQL).
+- **Inicialización Automatizada**: Script `init_db.py` actualizado para creación automática de esquema local y parches de estructura (columna `iva_porcentaje`).
 
 ---
-**Fecha de última actualización:** 3 de marzo de 2026 (Fase: SRI & Compras)
-**Estado:** Módulo de Compras y POS estabilizados con estándares legales del SRI.
+**Fecha de última actualización:** 4 de marzo de 2026 (Fase: Estabilización & Compras Senior)
+**Estado:** Producción y Local sincronizados. Módulo de compras robusto.
 ---
