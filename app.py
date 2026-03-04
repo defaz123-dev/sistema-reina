@@ -34,8 +34,11 @@ def get_db_cursor():
 def registrar_auditoria(accion, detalle):
     try:
         cur = mysql.connection.cursor()
+        # Capturar IP real (considerando proxies/nube)
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ',' in ip: ip = ip.split(',')[0] # Tomar la primera si hay varias
         cur.execute("INSERT INTO auditoria (usuario_id, accion, detalle, ip) VALUES (%s, %s, %s, %s)",
-                    (session.get('user_id'), accion, detalle, request.remote_addr))
+                    (session.get('user_id'), accion, detalle, ip))
         mysql.connection.commit(); cur.close()
     except: pass
 
@@ -110,19 +113,23 @@ def compras():
 @admin_required
 def nueva_compra():
     cur = mysql.connection.cursor()
+    cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1"); emp = cur.fetchone()
+    iva_p = emp['iva_porcentaje'] if emp else 15.00
     cur.execute("SELECT p.*, t.nombre as tipo_comprobante_nombre FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id")
     provs = cur.fetchall()
     cur.execute("SELECT * FROM sucursales"); sucs = cur.fetchall()
     cur.execute("SELECT * FROM unidades_medida"); ums = cur.fetchall()
     cur.execute("SELECT i.*, u.nombre as unidad_medida FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id")
     ins = cur.fetchall(); cur.close()
-    return render_template('nueva_compra.html', proveedores=provs, insumos=ins, sucursales=sucs, unidades=ums, fecha_hoy=datetime.now().strftime('%Y-%m-%d'))
+    return render_template('nueva_compra.html', proveedores=provs, insumos=ins, sucursales=sucs, unidades=ums, fecha_hoy=datetime.now().strftime('%Y-%m-%d'), iva_porcentaje=iva_p)
 
 @app.route('/compras/editar/<int:id>')
 @login_required
 @admin_required
 def editar_compra(id):
     cur = mysql.connection.cursor()
+    cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1"); emp = cur.fetchone()
+    iva_p = emp['iva_porcentaje'] if emp else 15.00
     cur.execute("SELECT * FROM compras WHERE id = %s", (id,))
     compra = cur.fetchone()
     cur.execute("SELECT dc.*, i.nombre, u.nombre as unidad_medida FROM detalles_compras dc JOIN insumos i ON dc.insumo_id = i.id JOIN unidades_medida u ON i.unidad_medida_id = u.id WHERE dc.compra_id = %s", (id,))
@@ -133,7 +140,7 @@ def editar_compra(id):
     cur.execute("SELECT * FROM unidades_medida"); ums = cur.fetchall()
     cur.execute("SELECT i.*, u.nombre as unidad_medida FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id")
     ins = cur.fetchall(); cur.close()
-    return render_template('nueva_compra.html', proveedores=provs, insumos=ins, sucursales=sucs, unidades=ums, compra=compra, detalles=detalles)
+    return render_template('nueva_compra.html', proveedores=provs, insumos=ins, sucursales=sucs, unidades=ums, compra=compra, detalles=detalles, iva_porcentaje=iva_p)
 
 @app.route('/compras/guardar', methods=['POST'])
 @login_required
@@ -226,8 +233,10 @@ def guardar_insumo():
     nom = d['nombre'].upper(); st_min = d.get('stock_minimo', 0); suc_id = d.get('sucursal_id') or session['sucursal_id']; um_id = d.get('unidad_medida_id')
     if d.get('id'): 
         cur.execute("UPDATE insumos SET nombre=%s, stock_actual=%s, stock_minimo=%s, unidad_medida_id=%s, sucursal_id=%s, usuario_modificacion_id=%s WHERE id=%s", (nom, d['stock'], st_min, um_id, suc_id, u_id, d['id']))
+        registrar_auditoria('EDITAR_INSUMO', f"Editó insumo: {nom} (ID: {d['id']})")
     else: 
         cur.execute("INSERT INTO insumos (nombre, stock_actual, stock_minimo, unidad_medida_id, sucursal_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s)", (nom, d['stock'], st_min, um_id, suc_id, u_id, u_id))
+        registrar_auditoria('CREAR_INSUMO', f"Creó insumo: {nom}")
     mysql.connection.commit(); cur.close(); return redirect(url_for('inventario'))
 
 @app.route('/inventario/ajustar', methods=['POST'])
@@ -237,9 +246,15 @@ def ajustar_inventario():
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
     ins_id, cant, tipo, mot = d['insumo_id'], float(d['cantidad']), d['tipo'], d['motivo'].upper()
     try:
+        # Obtener nombre del insumo para el log
+        cur.execute("SELECT nombre FROM insumos WHERE id=%s", (ins_id,))
+        ins_nom = cur.fetchone()['nombre']
+        
         cur.execute("INSERT INTO ajustes_inventario (insumo_id, cantidad, tipo, motivo, usuario_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s)", (ins_id, cant, tipo, mot, u_id, u_id, u_id))
         if tipo == 'INGRESO': cur.execute("UPDATE insumos SET stock_actual = stock_actual + %s WHERE id = %s", (cant, ins_id))
         else: cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (cant, ins_id))
+        
+        registrar_auditoria('AJUSTE_STOCK', f"{tipo} de {cant} en {ins_nom}. Motivo: {mot}")
         mysql.connection.commit(); flash('Ajuste realizado', 'success')
     except Exception as e: mysql.connection.rollback(); flash(str(e), 'danger')
     cur.close(); return redirect(url_for('inventario'))
@@ -278,7 +293,16 @@ def ver_receta(producto_id):
 @admin_required
 def agregar_insumo_receta():
     pi, ii, ct = request.form['producto_id'], request.form['insumo_id'], request.form['cantidad']; cur = mysql.connection.cursor(); u_id = session['user_id']
+    
+    # Obtener nombres para auditoría
+    cur.execute("SELECT nombre FROM productos WHERE id=%s", (pi,))
+    p_nom = cur.fetchone()['nombre']
+    cur.execute("SELECT nombre FROM insumos WHERE id=%s", (ii,))
+    i_nom = cur.fetchone()['nombre']
+    
     cur.execute("INSERT INTO recetas (producto_id, insumo_id, cantidad_requerida, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s)", (pi, ii, ct, u_id, u_id))
+    registrar_auditoria('AGREGAR_RECETA', f"Añadió {ct} de {i_nom} al producto {p_nom}")
+    
     mysql.connection.commit(); cur.close(); return redirect(url_for('ver_receta', producto_id=pi))
 
 @app.route('/productos/receta/eliminar/<int:id>/<int:p_id>')
@@ -286,10 +310,15 @@ def agregar_insumo_receta():
 @admin_required
 def eliminar_insumo_receta(id, p_id):
     cur = mysql.connection.cursor()
+    
+    # Obtener nombres para auditoría antes de borrar
+    cur.execute("SELECT p.nombre as prod, i.nombre as ins FROM recetas r JOIN productos p ON r.producto_id=p.id JOIN insumos i ON r.insumo_id=i.id WHERE r.id=%s", (id,))
+    data = cur.fetchone()
+    
     cur.execute("DELETE FROM recetas WHERE id=%s", (id,))
-    mysql.connection.commit()
-    cur.close()
-    return redirect(url_for('ver_receta', producto_id=p_id))
+    if data: registrar_auditoria('ELIMINAR_RECETA', f"Eliminó {data['ins']} de la receta de {data['prod']}")
+    
+    mysql.connection.commit(); cur.close(); return redirect(url_for('ver_receta', producto_id=p_id))
 
 @app.route('/auditoria')
 @login_required
