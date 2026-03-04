@@ -5,3 +5,5 @@ gunicorn
 cryptography
 Pillow
 requests
+setuptools
+wheel
