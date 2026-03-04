@@ -1,4 +1,4 @@
--- database_nube.sql (SISTEMA REINA - ESPEJO DE LOCAL ACTUALIZADO)
+-- database_nube.sql (SISTEMA REINA - ESPEJO DE LOCAL ACTUALIZADO 3-MARZO)
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS auditoria;
 DROP TABLE IF EXISTS detalles_ventas;
@@ -20,7 +20,7 @@ DROP TABLE IF EXISTS unidades_medida;
 DROP TABLE IF EXISTS empresa;
 SET FOREIGN_KEY_CHECKS = 1;
 
--- 1. Empresa
+-- 1. Empresa (IVA Parametrizable)
 CREATE TABLE empresa (
     id INT AUTO_INCREMENT PRIMARY KEY,
     ruc VARCHAR(13),
@@ -28,14 +28,14 @@ CREATE TABLE empresa (
     nombre_comercial VARCHAR(255),
     direccion_matriz VARCHAR(255),
     iva_porcentaje DECIMAL(5,2) DEFAULT 15.00,
-    ambiente INT DEFAULT 1,
+    ambiente INT DEFAULT 1, -- 1: Pruebas, 2: Producción
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
     fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
-INSERT INTO empresa (id, ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje) 
-VALUES (1, '1790000000001', 'SANDUCHES LA REINA', 'LA REINA', 'QUITO', 15.00);
+INSERT INTO empresa (id, ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente) 
+VALUES (1, '1790000000001', 'SANDUCHES LA REINA', 'LA REINA', 'QUITO', 15.00, 1);
 
 -- 2. Sucursales
 CREATE TABLE sucursales (
@@ -47,10 +47,10 @@ CREATE TABLE sucursales (
     fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 INSERT INTO sucursales (id, nombre) VALUES 
-(1, 'Reina Victoria Principal'),
+(1, 'REINA VICTORIA PRINCIPAL'),
 (2, 'GRANADOS NORTE');
 
--- 3. Usuarios (Sincronizados con Local)
+-- 3. Usuarios (Sincronizados con Local para acceso inmediato en nube)
 CREATE TABLE usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario VARCHAR(50) UNIQUE NOT NULL,
@@ -68,7 +68,7 @@ INSERT INTO usuarios (id, usuario, password, sucursal_id, rol, activo) VALUES
 (1, 'admin', 'scrypt:32768:8:1$OSyt2StROGDDPy4f$7a2ff17725e547c97110d2560d400e6126d2172d277fd22c61b7342b7a34b0bc07a7cd6e57a997202b3887261e6da9f79e933d46a33f239c4613891a95d0825b', 1, 'ADMIN', 1),
 (2, 'liliana', 'scrypt:32768:8:1$0KzrMh3tnG7kEoxZ$ded6e5fc4aad675c0debb2af7caa2338dd6e51c3f04fc412a06a3d8104424c2a65bd938701ed0ec0701e49b2961037ad276cc5a9a6c684f2ef014d0c77b862f5', 1, 'ADMIN', 1);
 
--- 4. Catálogos Base
+-- 4. Catálogos
 CREATE TABLE unidades_medida (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(50) NOT NULL);
 INSERT INTO unidades_medida (id, nombre) VALUES (1, 'UNIDAD'), (2, 'KILO'), (3, 'LITRO'), (4, 'GRAMO'), (5, 'PORCION');
 
@@ -184,7 +184,7 @@ CREATE TABLE recetas (
     FOREIGN KEY (insumo_id) REFERENCES insumos(id)
 );
 
--- 9. Ventas
+-- 9. Ventas (Con desglose de IVA dinámico)
 CREATE TABLE ventas (
     id INT AUTO_INCREMENT PRIMARY KEY,
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -219,17 +219,18 @@ CREATE TABLE detalles_ventas (
     FOREIGN KEY (producto_id) REFERENCES productos(id)
 );
 
--- 10. Compras
+-- 10. Compras (Estructura legal Ecuador)
 CREATE TABLE compras (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    fecha DATE NOT NULL,
     proveedor_id INT,
+    sucursal_id INT,
     establecimiento VARCHAR(3),
     punto_emision VARCHAR(3),
     numero_comprobante VARCHAR(50),
-    total DECIMAL(10,2),
-    fecha DATE,
     clave_acceso VARCHAR(49),
     numero_autorizacion VARCHAR(50),
+    total DECIMAL(10,2),
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
@@ -250,7 +251,7 @@ CREATE TABLE detalles_compras (
     FOREIGN KEY (insumo_id) REFERENCES insumos(id)
 );
 
--- 11. Auditoría
+-- 11. Auditoría (Con IP Real)
 CREATE TABLE auditoria (
     id INT AUTO_INCREMENT PRIMARY KEY,
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
