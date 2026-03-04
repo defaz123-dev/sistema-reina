@@ -79,11 +79,11 @@ def login():
         cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)=%s AND u.activo=1", (u,))
         user = cur.fetchone(); cur.close()
         if user and check_password_hash(user['password'], p):
-            if user['rol'] == 'ADMIN' or user['sucursal_id'] == s:
-                session.update({'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol'], 'sucursal_id': user['sucursal_id'], 'sucursal_nombre': user['sucursal_nombre']})
-                registrar_auditoria('LOGIN', f"Usuario {user['usuario']} inició sesión")
-                return redirect(url_for('dashboard'))
-        flash('Credenciales incorrectas o sucursal no válida', 'danger')
+            # Se elimina la validación estricta de sucursal para permitir rotación de empleados
+            session.update({'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol'], 'sucursal_id': s, 'sucursal_nombre': user['sucursal_nombre']})
+            registrar_auditoria('LOGIN', f"Usuario {user['usuario']} inició sesión en sucursal ID: {s}")
+            return redirect(url_for('dashboard'))
+        flash('Credenciales incorrectas', 'danger')
     return redirect(url_for('index'))
 
 @app.route('/logout')
@@ -392,8 +392,9 @@ def configuracion_empresa():
 def guardar_empresa():
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
     ruc, razon, nom, dir = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion_matriz'].upper()
-    if d.get('id'): cur.execute("UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, ambiente=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, d['ambiente'], u_id, d['id']))
-    else: cur.execute("INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, ambiente, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s)", (ruc, razon, nom, dir, d['ambiente'], u_id, u_id))
+    iva = d.get('iva_porcentaje', 15.00)
+    if d.get('id'): cur.execute("UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, iva, d['ambiente'], u_id, d['id']))
+    else: cur.execute("INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (ruc, razon, nom, dir, iva, d['ambiente'], u_id, u_id))
     mysql.connection.commit(); cur.close(); flash('Datos guardados', 'success'); return redirect(url_for('configuracion_empresa'))
 
 @app.route('/pos')
@@ -403,8 +404,11 @@ def pos():
     cur.execute("SELECT * FROM categorias")
     c = cur.fetchall()
     
-    # Lógica Senior: Calculamos cuántas unidades de cada producto se pueden preparar
-    # basándonos en el insumo que menos stock tenga en la sucursal actual.
+    # Obtener IVA parametrizado
+    cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1")
+    emp = cur.fetchone()
+    iva_p = emp['iva_porcentaje'] if emp else 15.00
+    
     query_productos = """
         SELECT p.id, p.codigo, p.nombre, p.precio, p.categoria_id, IF(p.imagen IS NOT NULL, 1, 0) as tiene_foto,
         (
@@ -419,11 +423,8 @@ def pos():
     p = cur.fetchall()
     cur.close()
     
-    # Si un producto no tiene receta (stock_disponible es NULL), asumimos stock infinito (999)
-    # Si tiene receta pero no hay insumos cargados, el MIN devolverá NULL, lo tratamos como 0.
     for prod in p:
         if prod['stock_disponible'] is None:
-            # Verificamos si tiene receta
             cur = mysql.connection.cursor()
             cur.execute("SELECT COUNT(*) as cuenta FROM recetas WHERE producto_id = %s", (prod['id'],))
             tiene_receta = cur.fetchone()['cuenta'] > 0
@@ -435,25 +436,49 @@ def pos():
     ti = cur.fetchall()
     cur.close()
 
-    return render_template('pos.html', categorias=c, productos=p, tipos_id=ti)
+    return render_template('pos.html', categorias=c, productos=p, tipos_id=ti, iva_porcentaje=iva_p)
 
 @app.route('/pos/venta', methods=['POST'])
 @login_required
-def procesar_venta_v2(): # Renombrado para evitar conflicto con la anterior si quedó rastro
+def procesar_venta_v2():
     data = request.get_json(); cur = mysql.connection.cursor(); u_id = session['user_id']
     try:
         c_id = data.get('cliente_id'); fpago = data.get('forma_pago', 'EFECTIVO').upper()
-        cur.execute("SELECT ruc, ambiente FROM empresa LIMIT 1"); emp = cur.fetchone()
+        s_id = session['sucursal_id']
+        
+        # 1. Obtener datos de empresa e IVA dinámico
+        cur.execute("SELECT ruc, ambiente, iva_porcentaje FROM empresa LIMIT 1"); emp = cur.fetchone()
         ruc = emp['ruc'] if emp else "1790000000001"; amb = emp['ambiente'] if emp else 1
+        iva_p = float(emp['iva_porcentaje']) if emp else 15.00
+        divisor_iva = 1 + (iva_p / 100)
         clave = generar_clave_acceso_sri(datetime.now(), ruc, amb)
-        cur.execute("INSERT INTO ventas (usuario_id, sucursal_id, cliente_id, total, forma_pago, clave_acceso_sri, estado_sri, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, 'AUTORIZADO', %s, %s)", (u_id, session['sucursal_id'], c_id, data['total'], fpago, clave, u_id, u_id))
+
+        # 2. Insertar Cabecera
+        cur.execute("""INSERT INTO ventas 
+            (usuario_id, sucursal_id, cliente_id, subtotal_0, subtotal_15, iva_valor, total, forma_pago, clave_acceso_sri, estado_sri, usuario_creacion_id, usuario_modificacion_id) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'AUTORIZADO', %s, %s)""", 
+            (u_id, s_id, c_id, data.get('subtotal_0', 0), data.get('subtotal_15', 0), 
+             data.get('iva_valor', 0), data['total'], fpago, clave, u_id, u_id))
         v_id = cur.lastrowid
+
+        # 3. Procesar Items
         for i in data['items']:
-            cur.execute("INSERT INTO detalles_ventas (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s)", (v_id, i['id'], i['cantidad'], i['precio'], float(i['precio']) * int(i['cantidad'])))
+            item_total = float(i['precio']) * int(i['cantidad'])
+            item_iva = item_total - (item_total / divisor_iva)
+            
+            cur.execute("INSERT INTO detalles_ventas (venta_id, producto_id, cantidad, precio_unitario, subtotal, iva_valor) VALUES (%s, %s, %s, %s, %s, %s)", 
+                        (v_id, i['id'], i['cantidad'], i['precio'], item_total, item_iva))
+            
             cur.execute("SELECT insumo_id, cantidad_requerida FROM recetas WHERE producto_id=%s", (i['id'],))
-            for ing in cur.fetchall(): cur.execute("UPDATE insumos SET stock_actual=stock_actual-%s WHERE id=%s", (float(ing['cantidad_requerida']) * int(i['cantidad']), ing['insumo_id']))
-        mysql.connection.commit(); cur.close(); return jsonify({'success': True, 'venta_id': v_id})
-    except Exception as e: return jsonify({'success': False, 'message': str(e)})
+            for ing in cur.fetchall():
+                cur.execute("UPDATE insumos SET stock_actual=stock_actual-%s WHERE id=%s AND sucursal_id=%s", 
+                            (float(ing['cantidad_requerida']) * int(i['cantidad']), ing['insumo_id'], s_id))
+        
+        mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta registrada ID: {v_id} por ${data['total']}")
+        return jsonify({'success': True, 'venta_id': v_id})
+    except Exception as e:
+        mysql.connection.rollback(); return jsonify({'success': False, 'message': str(e)})
+    finally: cur.close()
 
 @app.route('/ventas')
 @login_required

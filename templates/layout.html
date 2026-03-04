@@ -120,6 +120,20 @@
     </div>
 </div>
 
+<!-- Modal de Carga Global -->
+<div class="modal fade" id="loadingModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 250px;">
+        <div class="modal-content border-0 bg-transparent">
+            <div class="modal-body text-center p-4">
+                <div class="spinner-border text-success mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <h6 class="text-white fw-bold shadow-sm">PROCESANDO...</h6>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Scripts al final del Body -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -130,6 +144,18 @@
 
 <script>
     const rModal = new bootstrap.Modal(document.getElementById('reinaModal'));
+    const lModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+
+    function showLoading() { lModal.show(); }
+    function hideLoading() { lModal.hide(); }
+
+    // Auto-mostrar loading en formularios estándar
+    document.addEventListener('submit', function(e) {
+        if (!e.target.classList.contains('no-loading')) {
+            showLoading();
+        }
+    });
+
     function reinaAlert(titulo, mensaje, tipo = 'success') {
         return new Promise((resolve) => {
             const icon = document.getElementById('modalIcon');
