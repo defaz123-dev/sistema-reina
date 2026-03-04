@@ -104,8 +104,8 @@
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold text-muted">Imagen del Producto</label>
-                        <input type="file" name="imagen" id="prod_img" class="form-control bg-light border-0" accept="image/*" onchange="validarTamanoImagen(this)">
-                        <div class="extra-small text-muted mt-1">Máximo 2MB. Se redimensionará automáticamente.</div>
+                        <input type="file" name="imagen" id="prod_img" class="form-control bg-light border-0" accept="image/*">
+                        <div class="extra-small text-muted mt-1">Se redimensionará y optimizará automáticamente.</div>
                     </div>
                 </div>
                 <div class="modal-footer border-0 p-4 pt-0">
@@ -142,16 +142,6 @@
         document.getElementById('prod_nom').value = btn.getAttribute('data-nombre');
         document.getElementById('prod_cat').value = btn.getAttribute('data-cat-id');
         document.getElementById('modalProductoTitle').innerText = 'Editar Producto';
-    }
-
-    function validarTamanoImagen(input) {
-        if (input.files && input.files[0]) {
-            const size = input.files[0].size / 1024 / 1024; // MB
-            if (size > 2) {
-                reinaAlert('Archivo muy pesado', 'La imagen supera los 2MB. Por favor elija una más ligera.', 'danger');
-                input.value = '';
-            }
-        }
     }
 </script>
 {% endblock %}

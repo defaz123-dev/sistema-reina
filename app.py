@@ -9,7 +9,6 @@ import random, csv, io
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'clave_secreta_reina_2024')
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 # Límite de 2MB
 
 # Configuración de Base de Datos
 app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST', 'localhost')
