@@ -9,6 +9,7 @@ import random, csv, io
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'clave_secreta_reina_2024')
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 # Límite de 2MB
 
 # Configuración de Base de Datos
 app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST', 'localhost')
@@ -27,6 +28,20 @@ else:
 mysql = MySQL(app)
 
 # --- AYUDANTES ---
+from PIL import Image
+
+def procesar_imagen(file_storage, max_size=(800, 800), quality=85):
+    try:
+        img = Image.open(file_storage)
+        if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+        output = io.BytesIO()
+        img.save(output, format='JPEG', quality=quality, optimize=True)
+        return output.getvalue(), 'image/jpeg'
+    except Exception as e:
+        file_storage.seek(0)
+        return file_storage.read(), file_storage.content_type
+
 def get_db_cursor():
     try: return mysql.connection.cursor()
     except Exception as e: return str(e)
@@ -271,15 +286,18 @@ def productos():
 @login_required
 @admin_required
 def guardar_producto():
-    d = request.form; img = request.files.get('imagen'); cur = mysql.connection.cursor(); u_id = session['user_id']
+    d = request.form; img_file = request.files.get('imagen'); cur = mysql.connection.cursor(); u_id = session['user_id']
     cod, nom = d['codigo'].upper(), d['nombre'].upper()
-    if img and img.filename != '':
-        ib = img.read(); mt = img.content_type
+    
+    if img_file and img_file.filename != '':
+        # Procesar imagen con Pillow (Redimensión y Compresión)
+        ib, mt = procesar_imagen(img_file)
         if d.get('id'): cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, imagen=%s, mimetype=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, d['precio'], d['categoria_id'], ib, mt, u_id, d['id']))
         else: cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, imagen, mimetype, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (cod, nom, d['precio'], d['categoria_id'], ib, mt, u_id, u_id))
     else:
         if d.get('id'): cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, d['precio'], d['categoria_id'], u_id, d['id']))
         else: cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s)", (cod, nom, d['precio'], d['categoria_id'], u_id, u_id))
+    
     mysql.connection.commit(); cur.close(); return redirect(url_for('productos'))
 
 @app.route('/productos/receta/<int:producto_id>')
