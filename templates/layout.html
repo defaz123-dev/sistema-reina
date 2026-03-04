@@ -69,13 +69,27 @@
             font-size: 0.85rem !important;
         }
 
-        /* Estilo centralizado para iconos de acción (Editar, Receta, etc.) */
-        .action-icon {
-            font-size: 1.2rem; /* Tamaño aumentado pero no gigante */
-            transition: transform 0.2s;
+        /* Estilos para el Loading Temático */
+        .loading-overlay {
+            background: rgba(255, 255, 255, 0.7) !important;
+            backdrop-filter: blur(8px);
         }
-        .btn:hover .action-icon {
-            transform: scale(1.2); /* Efecto visual al pasar el mouse */
+        .crown-loader {
+            font-size: 4rem;
+            color: var(--reina-yellow);
+            filter: drop-shadow(0 0 15px rgba(255, 194, 14, 0.5));
+            animation: crown-pulse 1.5s infinite ease-in-out;
+        }
+        @keyframes crown-pulse {
+            0% { transform: scale(1) rotate(-10deg); opacity: 0.8; }
+            50% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+            100% { transform: scale(1) rotate(-10deg); opacity: 0.8; }
+        }
+        .loading-text {
+            color: var(--reina-green);
+            letter-spacing: 3px;
+            font-weight: 900;
+            margin-top: 15px;
         }
     </style>
 </head>
@@ -120,15 +134,16 @@
     </div>
 </div>
 
-<!-- Modal de Carga Global -->
+<!-- Modal de Carga Temático -->
 <div class="modal fade" id="loadingModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" style="max-width: 250px;">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 bg-transparent">
-            <div class="modal-body text-center p-4">
-                <div class="spinner-border text-success mb-3" role="status" style="width: 3rem; height: 3rem;">
-                    <span class="visually-hidden">Cargando...</span>
+            <div class="modal-body text-center">
+                <div class="crown-loader">
+                    <i class="fas fa-crown"></i>
                 </div>
-                <h6 class="text-white fw-bold shadow-sm">PROCESANDO...</h6>
+                <div class="loading-text h5">SISTEMA REINA</div>
+                <div class="text-muted small fw-bold">PROCESANDO SOLICITUD...</div>
             </div>
         </div>
     </div>
