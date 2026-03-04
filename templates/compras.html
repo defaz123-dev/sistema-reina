@@ -41,9 +41,12 @@
                         <td><span class="badge bg-secondary">{{ c.sucursal_nombre }}</span></td>
                         <td class="text-end fw-bold text-success">${{ "%.2f"|format(c.total) }}</td>
                         <td class="text-end">
-                            <a href="{{ url_for('editar_compra', id=c.id) }}" class="btn btn-sm btn-outline-primary border-0">
+                            <a href="{{ url_for('editar_compra', id=c.id) }}" class="btn btn-sm btn-outline-primary border-0" title="Editar">
                                 <i class="fas fa-edit action-icon"></i>
                             </a>
+                            <button class="btn btn-sm btn-outline-danger border-0" onclick="confirmarEliminarCompra({{ c.id }}, '{{ c.numero_comprobante }}')" title="Eliminar">
+                                <i class="fas fa-trash-alt action-icon"></i>
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -63,6 +66,13 @@
             });
         }
     });
+
+    async function confirmarEliminarCompra(id, numero) {
+        const ok = await reinaConfirm('¿Eliminar Compra?', `Esta acción eliminará la factura N° ${numero} y revertirá el stock de los insumos. ¿Desea continuar?`);
+        if (ok) {
+            window.location.href = `/compras/eliminar/${id}`;
+        }
+    }
 </script>
 {% endblock %}
 {% endblock %}

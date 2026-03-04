@@ -34,13 +34,14 @@ Este documento detalla la evolución, mejoras y nuevas funcionalidades implement
 - **Variables de Entorno**: Configuración segura de credenciales para la conexión a la nube.
 - **Control de Versiones**: Repositorio sincronizado en [GitHub](https://github.com/defaz123-dev/sistema-reina).
 
-## 6. Módulo de Login (Fase de Perfeccionamiento)
-- **Seguridad de Acceso**: Implementación de hashing `scrypt` para la protección de credenciales en la tabla `usuarios`.
-- **Control de Sucursales**: Validación obligatoria de punto de trabajo al iniciar sesión, con bypass inteligente para el rol `ADMIN`.
-- **Auditoría de Sesión**: Registro automático de cada inicio de sesión exitoso en la bitácora global, capturando IP y marca de tiempo.
-- **Interfaz Adaptativa**: Formulario de acceso centrado con soporte para visualización de contraseña y selección de sucursal mediante catálogo dinámico.
+## 7. Integración SRI y Compras Inteligentes
+- **Validación en Tiempo Real**: Conexión directa con los servicios web del SRI (Pruebas/Producción) para validar claves de acceso de 49 dígitos.
+- **Importación Automática**: Carga automática de cabecera (RUC, Fecha, Serie) y detalles de productos desde el XML del SRI hacia el inventario local.
+- **Control de Integridad**: Validación cruzada de totales y bloqueo de registros duplicados mediante Clave de Acceso única.
+- **Gestión de Stock**: Implementada la eliminación de facturas con reversión automática de existencias en insumos.
+- **Optimización de UI**: Nuevo loading instantáneo basado en CSS puro y rediseño de cabecera de facturación electrónica.
 
 ---
-**Fecha de última actualización:** 3 de marzo de 2026 (Fase: Login)
-**Estado:** Módulo de Login en proceso de optimización.
+**Fecha de última actualización:** 3 de marzo de 2026 (Fase: SRI & Compras)
+**Estado:** Módulo de Compras y POS estabilizados con estándares legales del SRI.
 ---

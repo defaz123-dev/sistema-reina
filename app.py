@@ -5,7 +5,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
 from datetime import datetime
 import os
-import random, csv, io
+import random, csv, io, requests
+import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'clave_secreta_reina_2024')
@@ -156,6 +157,75 @@ def editar_compra(id):
     ins = cur.fetchall(); cur.close()
     return render_template('nueva_compra.html', proveedores=provs, insumos=ins, sucursales=sucs, unidades=ums, compra=compra, detalles=detalles, iva_porcentaje=iva_p)
 
+@app.route('/compras/consultar_sri/<string:clave>')
+@login_required
+@admin_required
+def consultar_sri(clave):
+    if len(clave) != 49: return jsonify({'success': False, 'message': 'Clave debe tener 49 dígitos'})
+    
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT ambiente FROM empresa LIMIT 1"); emp = cur.fetchone(); cur.close()
+    ambiente = emp['ambiente'] if emp else 1
+    
+    # URL dinámica según ambiente
+    if ambiente == 2: # PRODUCCIÓN
+        url = "https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline"
+    else: # PRUEBAS
+        url = "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline"
+    
+    soap_body = f"""<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ecua="http://ec.gob.sri.ws.autorizacion"><soap:Body><ecua:autorizacionComprobante><claveAccesoComprobante>{clave}</claveAccesoComprobante></ecua:autorizacionComprobante></soap:Body></soap:Envelope>"""
+    try:
+        headers = {'Content-Type': 'text/xml; charset=utf-8'}
+        response = requests.post(url, data=soap_body, headers=headers, timeout=10)
+        if response.status_code != 200: return jsonify({'success': False, 'message': f'Error de conexión con SRI (Ambiente {ambiente})'})
+        root = ET.fromstring(response.content); comprobante_xml_str = ""
+        for elem in root.iter('comprobante'): comprobante_xml_str = elem.text; break
+        if not comprobante_xml_str: return jsonify({'success': False, 'message': f'Comprobante no encontrado en SRI (Ambiente {"Producción" if ambiente==2 else "Pruebas"})'})
+        factura_root = ET.fromstring(comprobante_xml_str)
+        info_t = factura_root.find('infoTributaria'); info_f = factura_root.find('infoFactura')
+        
+        # Extraer Detalles (Items)
+        items_sri = []
+        detalles_node = factura_root.find('detalles')
+        if detalles_node is not None:
+            for d in detalles_node.findall('detalle'):
+                paga_iva = False
+                impuestos = d.find('impuestos')
+                if impuestos is not None:
+                    for imp in impuestos.findall('impuesto'):
+                        tarifa = imp.find('tarifa')
+                        if tarifa is not None and float(tarifa.text) > 0: paga_iva = True; break
+                
+                items_sri.append({
+                    'nombre': d.find('descripcion').text.upper(),
+                    'cantidad': float(d.find('cantidad').text),
+                    'precio_unitario': float(d.find('precioUnitario').text),
+                    'subtotal': float(d.find('precioTotalSinImpuesto').text),
+                    'paga_iva': paga_iva
+                })
+
+        f_sri = info_f.find('fechaEmision').text; f_parts = f_sri.split('/'); f_iso = f"{f_parts[2]}-{f_parts[1]}-{f_parts[0]}"
+        return jsonify({
+            'success': True, 'ruc_proveedor': info_t.find('ruc').text, 'razon_social': info_t.find('razonSocial').text,
+            'establecimiento': info_t.find('estab').text, 'punto_emision': info_t.find('ptoEmi').text,
+            'secuencial': info_t.find('secuencial').text, 'fecha_emision': f_iso, 'total': float(info_f.find('importeTotal').text),
+            'items': items_sri
+        })
+    except Exception as e: return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/compras/verificar_clave/<string:clave>')
+@login_required
+@admin_required
+def verificar_clave_compra(clave):
+    compra_id = request.args.get('exclude_id')
+    cur = mysql.connection.cursor()
+    if compra_id:
+        cur.execute("SELECT id FROM compras WHERE clave_acceso = %s AND id != %s", (clave, compra_id))
+    else:
+        cur.execute("SELECT id FROM compras WHERE clave_acceso = %s", (clave,))
+    existe = cur.fetchone(); cur.close()
+    return jsonify({'existe': True if existe else False})
+
 @app.route('/compras/guardar', methods=['POST'])
 @login_required
 @admin_required
@@ -164,21 +234,61 @@ def guardar_compra():
     try:
         id_c = data.get('compra_id'); f = data['fecha']; cl = data.get('clave_acceso'); s_id = data.get('sucursal_id') or session['sucursal_id']
         u_id = session['user_id']
+        est = data.get('establecimiento') or '001'
+        pto = data.get('punto_emision') or '001'
+        sec = (data.get('numero_comprobante') or '').upper()
+        n_aut = data.get('numero_autorizacion')
+        
         if id_c:
             cur.execute("SELECT insumo_id, cantidad FROM detalles_compras WHERE compra_id = %s", (id_c,))
             for iv in cur.fetchall(): cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (iv['cantidad'], iv['insumo_id']))
-            cur.execute("UPDATE compras SET proveedor_id=%s, sucursal_id=%s, numero_comprobante=%s, total=%s, fecha=%s, clave_acceso=%s, usuario_modificacion_id=%s WHERE id=%s", (data['proveedor_id'], s_id, data['numero_comprobante'].upper(), data['total'], f, cl, u_id, id_c))
+            cur.execute("""UPDATE compras SET proveedor_id=%s, sucursal_id=%s, establecimiento=%s, punto_emision=%s, numero_comprobante=%s, 
+                           total=%s, fecha=%s, clave_acceso=%s, numero_autorizacion=%s, usuario_modificacion_id=%s WHERE id=%s""", 
+                        (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, cl, n_aut, u_id, id_c))
             cur.execute("DELETE FROM detalles_compras WHERE compra_id = %s", (id_c,)); comp_id = id_c
         else:
-            cur.execute("INSERT INTO compras (proveedor_id, sucursal_id, numero_comprobante, total, fecha, clave_acceso, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (data['proveedor_id'], s_id, data['numero_comprobante'].upper(), data['total'], f, cl, u_id, u_id))
+            cur.execute("""INSERT INTO compras (proveedor_id, sucursal_id, establecimiento, punto_emision, numero_comprobante, total, fecha, clave_acceso, numero_autorizacion, usuario_creacion_id, usuario_modificacion_id) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
+                        (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, cl, n_aut, u_id, u_id))
             comp_id = cur.lastrowid
+        
         for i in data['items']:
             cur.execute("INSERT INTO detalles_compras (compra_id, insumo_id, cantidad, costo_unitario, subtotal, iva_valor) VALUES (%s, %s, %s, %s, %s, %s)", (comp_id, i['insumo_id'], i['cantidad'], i['costo'], i['subtotal'], i['iva_valor']))
             cur.execute("UPDATE insumos SET stock_actual = stock_actual + %s WHERE id = %s", (i['cantidad'], i['insumo_id']))
+        
         mysql.connection.commit(); cur.close()
-        registrar_auditoria('COMPRA', f"Guardó factura {data['numero_comprobante']}")
+        registrar_auditoria('COMPRA', f"Guardó factura {est}-{pto}-{data['numero_comprobante']}")
         return jsonify({'success': True})
     except Exception as e: mysql.connection.rollback(); cur.close(); return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/compras/eliminar/<int:id>')
+@login_required
+@admin_required
+def eliminar_compra(id):
+    cur = mysql.connection.cursor()
+    try:
+        # 1. Obtener datos para auditoría y reversión de stock
+        cur.execute("SELECT numero_comprobante, sucursal_id FROM compras WHERE id = %s", (id,))
+        compra = cur.fetchone()
+        if not compra: return redirect(url_for('compras'))
+
+        # 2. Revertir Stock de Insumos
+        cur.execute("SELECT insumo_id, cantidad FROM detalles_compras WHERE compra_id = %s", (id,))
+        detalles = cur.fetchall()
+        for d in detalles:
+            cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (d['cantidad'], d['insumo_id']))
+
+        # 3. Eliminar Compra (Detalles se borran por cascada o manualmente)
+        cur.execute("DELETE FROM detalles_compras WHERE compra_id = %s", (id,))
+        cur.execute("DELETE FROM compras WHERE id = %s", (id,))
+        
+        registrar_auditoria('ELIMINAR_COMPRA', f"Eliminó factura de compra N° {compra['numero_comprobante']}")
+        mysql.connection.commit(); flash('Compra eliminada y stock revertido', 'success')
+    except Exception as e:
+        mysql.connection.rollback(); flash(f"Error al eliminar: {str(e)}", 'danger')
+    finally:
+        cur.close()
+    return redirect(url_for('compras'))
 
 # --- CLIENTES ---
 @app.route('/clientes')

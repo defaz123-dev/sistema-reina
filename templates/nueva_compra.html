@@ -12,149 +12,171 @@
 
 {% block content %}
 <style>
-    /* Forzar uso de todo el ancho y eliminar scroll innecesario */
     .container.py-4 { max-width: 100% !important; padding-left: 20px !important; padding-right: 20px !important; padding-top: 10px !important; }
-    
     .form-section-title { font-size: 1rem; border-left: 4px solid var(--reina-green); padding-left: 10px; margin-bottom: 15px; }
-    .table-details thead th { background-color: #f8f9fa; border-bottom: 2px solid #dee2e6; font-size: 0.75rem; }
-    .panel-item-entry { background-color: #212529; color: white; border-radius: 12px; }
     .extra-small { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; }
-    
-    .card { margin-bottom: 10px !important; }
-    .p-4 { padding: 1.5rem !important; }
-    
-    /* Ajuste para que la tabla no sea gigante */
-    .table td, .table th { padding: 0.5rem 0.75rem; font-size: 0.9rem; }
+    .panel-item-entry { background-color: #212529; color: white; border-radius: 12px; }
+    .table-details thead th { background-color: #f8f9fa; font-size: 0.75rem; }
+    .input-comprobante-group { background: #f8f9fa; padding: 10px; border-radius: 10px; border: 1px solid #dee2e6; }
+    .input-comprobante { letter-spacing: 1px; font-weight: bold; text-align: center; font-size: 1rem !important; height: 38px; }
+    .serie-box { width: 60px !important; flex: none !important; }
+    .secuencial-box { width: 130px !important; flex: none !important; }
+    .invoice-preview { background: white; padding: 30px; border-radius: 8px; font-family: 'Courier New', Courier, monospace; line-height: 1.2; color: #333; }
 </style>
 
 <div class="row g-3">
-    <!-- COLUMNA PRINCIPAL -->
     <div class="col-lg-9">
-        <div class="card border-0 shadow-sm rounded-4 p-3">
-            <div class="form-section-title fw-bold text-dark mb-3">DATOS DEL COMPROBANTE</div>
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <div class="form-section-title fw-bold text-dark mb-4">REGISTRO DE COMPROBANTE DE COMPRA</div>
             
-            <div class="row g-2 mb-3">
+            <div class="row g-3 mb-4">
                 <input type="hidden" id="compraId" value="{{ compra.id if compra else '' }}">
-                
-                <div class="col-md-3">
-                    <label class="extra-small fw-bold text-muted">Sucursal</label>
-                    <select id="compraSucursal" class="form-select form-select-sm bg-light border-0 fw-bold">
-                        {% for s in sucursales %}
-                        <option value="{{ s.id }}" {{ 'selected' if (compra and compra.sucursal_id == s.id) or (not compra and session['sucursal_id'] == s.id) else '' }}>
-                            {{ s.nombre }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
                 <div class="col-md-4">
-                    <label class="extra-small fw-bold text-muted">Proveedor</label>
-                    <select id="compraProveedor" class="form-select form-select-sm bg-light border-0" onchange="toggleClaveAcceso()">
-                        <option value="" disabled selected>Seleccione...</option>
-                        {% for p in proveedores %}
-                        <option value="{{ p.id }}" data-tipo="{{ p.tipo_comprobante_nombre }}" {{ 'selected' if compra and compra.proveedor_id == p.id else '' }}>
-                            {{ p.razon_social }}
-                        </option>
-                        {% endfor %}
+                    <label class="extra-small fw-bold text-muted">Sucursal de Destino</label>
+                    <select id="compraSucursal" class="form-select form-select-sm bg-light border-0 fw-bold">
+                        {% for s in sucursales %}<option value="{{ s.id }}" {{ 'selected' if (compra and compra.sucursal_id == s.id) or (not compra and session['sucursal_id'] == s.id) else '' }}>{{ s.nombre }}</option>{% endfor %}
                     </select>
                 </div>
-
-                <div class="col-md-2">
-                    <label class="extra-small fw-bold text-muted">Fecha</label>
-                    <input type="date" id="compraFecha" class="form-control form-select-sm bg-light border-0" value="{{ compra.fecha.strftime('%Y-%m-%d') if (compra and compra.fecha and not compra.fecha is string) else (compra.fecha if (compra and compra.fecha is string) else fecha_hoy) }}">
+                <div class="col-md-5">
+                    <label class="extra-small fw-bold text-muted">Proveedor</label>
+                    <select id="compraProveedor" class="form-select form-select-sm bg-light border-0 fw-bold" onchange="toggleClaveAcceso()">
+                        <option value="" disabled selected>Seleccione el proveedor...</option>
+                        {% for p in proveedores %}<option value="{{ p.id }}" data-ruc="{{ p.ruc }}" data-tipo="{{ p.tipo_comprobante_nombre }}" {{ 'selected' if compra and compra.proveedor_id == p.id else '' }}>{{ p.razon_social }} ({{ p.ruc }})</option>{% endfor %}
+                    </select>
                 </div>
-
                 <div class="col-md-3">
-                    <label class="extra-small fw-bold text-muted">N° Comprobante</label>
-                    <input type="text" id="compraNumero" class="form-control form-select-sm bg-light border-0 force-upper" placeholder="001-001-000000001" value="{{ compra.numero_comprobante if compra else '' }}">
-                </div>
-
-                <div class="col-12" id="divClaveAcceso" style="display: none;">
-                    <label class="extra-small fw-bold text-success">Clave de Acceso SRI (49 dígitos)</label>
-                    <input type="text" id="compraClave" class="form-control form-select-sm bg-light border-0" maxlength="49" value="{{ compra.clave_acceso if compra else '' }}">
+                    <label class="extra-small fw-bold text-muted">Fecha Emisión</label>
+                    <input type="date" id="compraFecha" class="form-control form-control-sm bg-light border-0 fw-bold" value="{{ compra.fecha.strftime('%Y-%m-%d') if (compra and compra.fecha and not compra.fecha is string) else (compra.fecha if (compra and compra.fecha is string) else fecha_hoy) }}">
                 </div>
             </div>
 
-            <!-- PANEL DE ENTRADA (COMPACTO) -->
+            <div class="input-comprobante-group mb-4">
+                <div class="row align-items-center">
+                    <div class="col-md-4 text-end"><label class="extra-small fw-bold text-muted mb-0">Número de Comprobante:</label></div>
+                    <div class="col-md-8">
+                        <div class="input-group" style="max-width: 320px;">
+                            <input type="text" id="compraEst" class="form-control input-comprobante shadow-sm serie-box" maxlength="3" placeholder="001" value="{{ compra.establecimiento if compra else '001' }}">
+                            <span class="input-group-text bg-transparent border-0 fw-bold">-</span>
+                            <input type="text" id="compraPto" class="form-control input-comprobante shadow-sm serie-box" maxlength="3" placeholder="001" value="{{ compra.punto_emision if compra else '001' }}">
+                            <span class="input-group-text bg-transparent border-0 fw-bold">-</span>
+                            <input type="text" id="compraSec" class="form-control input-comprobante shadow-sm secuencial-box" maxlength="9" placeholder="000000001" value="{{ compra.numero_comprobante if compra else '' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-12" id="divFacturaElec" style="display: none;">
+                    <div class="bg-success bg-opacity-10 p-2 rounded-3 border border-success border-opacity-25">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="extra-small fw-bold text-success mb-0"><i class="fas fa-key me-1"></i>Clave de Acceso (49 dígitos)</label>
+                            <button type="button" class="btn btn-success btn-sm py-0 px-3 rounded-pill fw-bold shadow-sm" style="font-size: 0.6rem;" onclick="consultarDatosSRI()">
+                                <i class="fas fa-search-dollar me-1"></i> VALIDAR E IMPORTAR
+                            </button>
+                        </div>
+                        <input type="text" id="compraClave" class="form-control form-control-sm border-success border-opacity-50 fw-bold bg-white" maxlength="49" placeholder="Pegue la clave de acceso aquí" value="{{ compra.clave_acceso if compra else '' }}">
+                    </div>
+                </div>
+                <div class="col-12" id="divAutorizacion" style="display: none;">
+                    <div class="bg-primary bg-opacity-10 p-2 rounded-3 border border-primary border-opacity-25">
+                        <label class="extra-small fw-bold text-primary d-block mb-1"><i class="fas fa-check-double me-1"></i>Número de Autorización SRI</label>
+                        <input type="text" id="compraAuto" class="form-control form-control-sm bg-white border-primary border-opacity-50 fw-bold" placeholder="Ingrese el número de autorización" value="{{ compra.numero_autorizacion if compra else '' }}">
+                    </div>
+                </div>
+            </div>
+
             <div class="panel-item-entry p-3 mb-3 shadow-sm">
                 <div class="row g-2 align-items-end">
                     <div class="col-md-4">
-                        <label class="extra-small opacity-75">Insumo</label>
+                        <label class="extra-small opacity-75">Seleccionar Insumo</label>
                         <select id="selectInsumo" class="form-select form-select-sm border-0 shadow-sm">
-                            <option value="" disabled selected>Seleccionar...</option>
-                            {% for i in insumos %}
-                            <option value="{{ i.id }}" data-nombre="{{ i.nombre }}" data-unidad="{{ i.unidad_medida }}" data-sucursal="{{ i.sucursal_id }}">
-                                {{ i.nombre }} ({{ i.unidad_medida }})
-                            </option>
-                            {% endfor %}
+                            <option value="" disabled selected>Escriba para buscar...</option>
+                            {% for i in insumos %}<option value="{{ i.id }}" data-nombre="{{ i.nombre }}" data-unidad="{{ i.unidad_medida }}">{{ i.nombre }} ({{ i.unidad_medida }})</option>{% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-2">
-                        <label class="extra-small opacity-75">Cant.</label>
-                        <input type="number" step="0.01" id="cantInsumo" class="form-control form-select-sm border-0 shadow-sm" placeholder="0.00">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="extra-small opacity-75">Total Línea ($)</label>
-                        <input type="number" step="0.01" id="totalLinea" class="form-control form-select-sm border-0 shadow-sm" placeholder="0.00">
-                    </div>
-                    <div class="col-md-2 text-center">
-                        <label class="extra-small d-block mb-1 opacity-75">IVA</label>
-                        <div class="form-check form-switch d-inline-block">
-                            <input class="form-check-input" type="checkbox" id="checkIVA" checked style="cursor: pointer;">
-                        </div>
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-warning btn-sm w-100 fw-bold shadow" onclick="addItemCompra()">
-                            <i class="fas fa-plus"></i> AÑADIR
-                        </button>
-                    </div>
+                    <div class="col-md-2"><label class="extra-small opacity-75">Cant.</label><input type="number" step="0.01" id="cantInsumo" class="form-control form-select-sm border-0 shadow-sm" placeholder="0.00"></div>
+                    <div class="col-md-2"><label class="extra-small opacity-75">Total Línea ($)</label><input type="number" step="0.01" id="totalLinea" class="form-control form-select-sm border-0 shadow-sm" placeholder="0.00"></div>
+                    <div class="col-md-2 text-center"><label class="extra-small d-block mb-1 opacity-75">IVA</label><div class="form-check form-switch d-inline-block"><input class="form-check-input" type="checkbox" id="checkIVA" checked style="cursor: pointer;"></div></div>
+                    <div class="col-md-2"><button class="btn btn-warning btn-sm w-100 fw-bold shadow" onclick="addItemCompra()"><i class="fas fa-plus"></i> AÑADIR</button></div>
                 </div>
             </div>
 
-            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <div class="table-responsive" style="max-height: 300px;">
                 <table class="table table-hover align-middle table-details" id="tableDetalleCompra">
-                    <thead>
-                        <tr class="extra-small text-muted">
-                            <th style="width: 40%;">Insumo</th>
-                            <th class="text-center">Cant.</th>
-                            <th class="text-center">Costo Unit.</th>
-                            <th class="text-center">IVA</th>
-                            <th class="text-end">Total</th>
-                            <th class="text-center"></th>
-                        </tr>
-                    </thead>
+                    <thead><tr class="extra-small text-muted"><th style="width: 40%;">Insumo</th><th class="text-center">Cant.</th><th class="text-center">IVA</th><th class="text-end">Total</th><th class="text-center"></th></tr></thead>
                     <tbody id="bodyCompra"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- RESUMEN -->
     <div class="col-lg-3">
         <div class="card border-0 shadow-sm rounded-4 p-3 sticky-top" style="top: 10px;">
-            <h6 class="fw-bold mb-3 text-center text-muted">RESUMEN</h6>
-            
-            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                <span class="extra-small fw-bold">SUB 0%:</span>
-                <span id="sub0" class="small fw-bold">$ 0.00</span>
-            </div>
-            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                <span class="extra-small fw-bold">SUB {{ iva_porcentaje|int }}%:</span>
-                <span id="sub15" class="small fw-bold">$ 0.00</span>
-            </div>
-            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                <span class="extra-small fw-bold text-success">IVA:</span>
-                <span id="ivaVal" class="small fw-bold text-success">$ 0.00</span>
-            </div>
-            
-            <div class="bg-light p-2 rounded-3 mb-3 text-center">
-                <div class="extra-small fw-bold mb-0">TOTAL</div>
-                <h3 id="labelTotalCompra" class="fw-bold text-dark mb-0">$ 0.00</h3>
-            </div>
-            
-            <button class="btn btn-reina w-100 py-2 rounded-pill fw-bold shadow mb-2" onclick="finalizarCompra()">
-                <i class="fas fa-save me-2"></i> GUARDAR
+            <h6 class="fw-bold mb-3 text-center text-muted">RESUMEN DE FACTURA</h6>
+            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom"><span class="extra-small fw-bold">SUB 0%:</span><span id="sub0" class="small fw-bold">$ 0.00</span></div>
+            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom"><span class="extra-small fw-bold">SUB {{ iva_porcentaje|int }}%:</span><span id="sub15" class="small fw-bold">$ 0.00</span></div>
+            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom"><span class="extra-small fw-bold text-success">IVA:</span><span id="ivaVal" class="small fw-bold text-success">$ 0.00</span></div>
+            <div class="bg-light p-3 rounded-3 mb-3 text-center"><div class="extra-small fw-bold mb-1">TOTAL A PAGAR</div><h2 id="labelTotalCompra" class="fw-bold text-dark mb-0">$ 0.00</h2></div>
+            <button class="btn btn-reina w-100 py-3 rounded-pill fw-bold shadow mb-2" id="btnGuardarCompra" onclick="finalizarCompra()" disabled>
+                <i class="fas fa-save me-2"></i> GUARDAR COMPRA
             </button>
+        </div>
+    </div>
+</div>
+<!-- Modal Previsualización SRI -->
+<div class="modal fade" id="modalPreviewSRI" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg">
+            <div class="modal-header bg-dark text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fas fa-file-invoice me-2"></i> VISTA PREVIA DE FACTURA (SRI)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light p-4">
+                <div class="invoice-preview shadow-sm border" style="background: white; padding: 25px; border-radius: 8px;">
+                    <div class="invoice-header text-center mb-4" style="border-bottom: 2px solid #333; padding-bottom: 15px;">
+                        <h4 class="fw-bold mb-1" id="prevRazonSocial"></h4>
+                        <div class="small">RUC: <span id="prevRuc"></span></div>
+                        <div class="small fw-bold mt-2 text-primary">FACTURA ELECTRÓNICA N° <span id="prevComprobante"></span></div>
+                        <div class="extra-small mt-1 text-muted" style="word-break: break-all;">CLAVE: <span id="prevClave"></span></div>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-6">
+                            <div class="extra-small fw-bold text-muted">FECHA EMISIÓN:</div>
+                            <div id="prevFecha" class="fw-bold"></div>
+                        </div>
+                        <div class="col-6 text-end">
+                            <div class="extra-small fw-bold text-muted">ADQUIRENTE:</div>
+                            <div class="fw-bold">SANDUCHES LA REINA</div>
+                        </div>
+                    </div>
+                    <table class="table table-sm extra-small">
+                        <thead class="table-light">
+                            <tr class="border-bottom border-dark">
+                                <th>CANT.</th>
+                                <th>DESCRIPCIÓN</th>
+                                <th class="text-end">P.UNIT</th>
+                                <th class="text-end">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="prevItemsBody"></tbody>
+                    </table>
+                    <div class="invoice-totals mt-4" style="border-top: 2px solid #333; padding-top: 15px;">
+                        <div class="row justify-content-end">
+                            <div class="col-5">
+                                <div class="d-flex justify-content-between h5 fw-bold text-success">
+                                    <span>TOTAL FACTURA:</span>
+                                    <span id="prevTotal"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button type="button" class="btn btn-reina w-100 py-3 rounded-pill fw-bold" data-bs-dismiss="modal">
+                    LOS DATOS SON CORRECTOS - IMPORTAR PRODUCTOS AHORA
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -162,116 +184,181 @@
 <script>
 let itemsCompra = [];
 const IVA_P = {{ iva_porcentaje or 15.0 }};
+const insumosLocales = {{ insumos | tojson | safe }};
+let totalFacturaSRI = {{ compra.total if (compra and compra.total) else 0 }};
+let modalPreview;
 
-document.getElementById('selectInsumo').addEventListener('change', function() {
-    const opt = this.options[this.selectedIndex];
-    const sucDestino = document.getElementById('compraSucursal').value;
-    const aviso = document.getElementById('avisoSucursal');
-    if (opt.dataset.sucursal != sucDestino) { reinaAlert('Aviso', 'Insumo de otra sucursal', 'warning'); }
+document.addEventListener('DOMContentLoaded', () => { 
+    modalPreview = new bootstrap.Modal(document.getElementById('modalPreviewSRI')); 
+    if (document.getElementById('compraId').value) {
+        document.getElementById('btnGuardarCompra').disabled = false;
+    }
+    toggleClaveAcceso(); // Ejecutar al cargar para mostrar/ocultar campos según el proveedor
 });
 
-function addItemCompra() {
-    const sel = document.getElementById('selectInsumo');
-    const opt = sel.options[sel.selectedIndex];
-    const cant = parseFloat(document.getElementById('cantInsumo').value);
-    const totalLine = parseFloat(document.getElementById('totalLinea').value);
-    const hasIVA = document.getElementById('checkIVA').checked;
-
-    if(!opt.value || !cant || !totalLine) {
-        reinaAlert('Faltan Datos', 'Complete Insumo, Cantidad y Total.', 'warning');
-        return;
-    }
-
-    const divisor = 1 + (IVA_P / 100);
-    let base = hasIVA ? totalLine / divisor : totalLine;
-    let iva = hasIVA ? totalLine - base : 0;
-
-    itemsCompra.push({
-        insumo_id: opt.value, nombre: opt.dataset.nombre, unidad: opt.dataset.unidad,
-        cantidad: cant, costo: base / cant, subtotal: base, iva_valor: iva, paga_iva: hasIVA
-    });
-
-    renderCompra();
-    document.getElementById('cantInsumo').value = '';
-    document.getElementById('totalLinea').value = '';
-    sel.selectedIndex = 0;
-}
-
-function renderCompra() {
-    const body = document.getElementById('bodyCompra');
-    body.innerHTML = '';
-    let s0 = 0, s15 = 0, ivaTotal = 0;
-
-    if (itemsCompra.length === 0) {
-        body.innerHTML = '<tr><td colspan="6" class="text-center py-3 text-muted small">No hay insumos</td></tr>';
-    }
-
-    itemsCompra.forEach((item, idx) => {
-        if(item.paga_iva) { s15 += item.subtotal; ivaTotal += item.iva_valor; }
-        else { s0 += item.subtotal; }
-
-        body.innerHTML += `<tr>
-            <td><div class="fw-bold">${item.nombre}</div><small class="text-muted">${item.unidad}</small></td>
-            <td class="text-center">${item.cantidad}</td>
-            <td class="text-center">$${item.costo.toFixed(4)}</td>
-            <td class="text-center"><span class="badge ${item.paga_iva ? 'bg-success':'bg-secondary'} opacity-75">${item.paga_iva ? IVA_P+'%':'0%'}</span></td>
-            <td class="text-end fw-bold">$${(item.subtotal + item.iva_valor).toFixed(2)}</td>
-            <td class="text-center"><button class="btn btn-sm text-danger p-0" onclick="itemsCompra.splice(${idx},1); renderCompra()"><i class="fas fa-trash"></i></button></td>
-        </tr>`;
-    });
-
-    const totalFinal = s0 + s15 + ivaTotal;
-    document.getElementById('sub0').textContent = '$ ' + s0.toFixed(2);
-    document.getElementById('sub15').textContent = '$ ' + s15.toFixed(2);
-    document.getElementById('ivaVal').textContent = '$ ' + ivaTotal.toFixed(2);
-    document.getElementById('labelTotalCompra').textContent = '$ ' + totalFinal.toFixed(2);
-}
-
-async function finalizarCompra() {
-    const sucId = document.getElementById('compraSucursal').value;
-    const provId = document.getElementById('compraProveedor').value;
-    const num = document.getElementById('compraNumero').value;
-    const fecha = document.getElementById('compraFecha').value;
-    const clave = document.getElementById('compraClave').value;
-    const compraId = document.getElementById('compraId').value;
-    
-    if(!provId || !num || !fecha || itemsCompra.length === 0) {
-        reinaAlert('Error', 'Faltan datos obligatorios.', 'danger');
-        return;
-    }
-
-    showLoading();
-    const total = itemsCompra.reduce((s, i) => s + i.subtotal + i.iva_valor, 0);
-
-    const res = await fetch('/compras/guardar', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ 
-            compra_id: compraId || null, sucursal_id: sucId, proveedor_id: provId, 
-            numero_comprobante: num, clave_acceso: clave, fecha: fecha, total: total, items: itemsCompra 
-        })
-    });
-    const data = await res.json();
-    hideLoading();
-    
-    if(data.success) {
-        reinaAlert('¡Éxito!', 'Compra guardada.').then(() => { window.location.href = "{{ url_for('compras') }}"; });
-    } else { reinaAlert('Error', data.message, 'danger'); }
+function calcularModulo11(clave48) {
+    let suma = 0; let factor = 2;
+    for (let i = clave48.length - 1; i >= 0; i--) { suma += parseInt(clave48.charAt(i)) * factor; factor = (factor === 7) ? 2 : factor + 1; }
+    let digito = 11 - (suma % 11); if (digito === 11) digito = 0; if (digito === 10) digito = 1;
+    return digito;
 }
 
 function toggleClaveAcceso() {
-    const sel = document.getElementById('compraProveedor');
+    const sel = document.getElementById('compraProveedor'); if(!sel.value) return;
     const opt = sel.options[sel.selectedIndex];
-    document.getElementById('divClaveAcceso').style.display = (opt && opt.dataset.tipo === 'FACTURA') ? 'block' : 'none';
+    const divElec = document.getElementById('divFacturaElec'); const divAuto = document.getElementById('divAutorizacion');
+    if (opt && opt.dataset.tipo === 'FACTURA') { divElec.style.display = 'block'; divAuto.style.display = 'none'; }
+    else { divElec.style.display = 'none'; divAuto.style.display = 'block'; }
 }
 
+function addItemCompra() {
+    const sel = document.getElementById('selectInsumo'); const opt = sel.options[sel.selectedIndex];
+    const cant = parseFloat(document.getElementById('cantInsumo').value); const totalLine = parseFloat(document.getElementById('totalLinea').value);
+    const hasIVA = document.getElementById('checkIVA').checked;
+    if(!opt.value || isNaN(cant) || isNaN(totalLine)) return;
+    const divisor = 1 + (IVA_P / 100); let base = hasIVA ? totalLine / divisor : totalLine; let iva = hasIVA ? totalLine - base : 0;
+    itemsCompra.push({ insumo_id: opt.value, nombre: opt.dataset.nombre, unidad: opt.dataset.unidad, cantidad: cant, costo: base / cant, subtotal: base, iva_valor: iva, paga_iva: hasIVA });
+    renderCompra(); document.getElementById('cantInsumo').value = ''; document.getElementById('totalLinea').value = '';
+}
+
+function renderCompra() {
+    const body = document.getElementById('bodyCompra'); body.innerHTML = '';
+    let s0 = 0, s15 = 0, ivaTotal = 0;
+    if (itemsCompra.length === 0) body.innerHTML = '<tr><td colspan="6" class="text-center py-3 text-muted small">No hay insumos</td></tr>';
+    itemsCompra.forEach((item, idx) => {
+        const sub = parseFloat(item.subtotal);
+        const iv = parseFloat(item.iva_valor);
+        if(item.paga_iva) { s15 += sub; ivaTotal += iv; } else { s0 += sub; }
+        body.innerHTML += `<tr><td><div class="fw-bold small">${item.nombre}</div></td><td class="text-center">${item.cantidad}</td><td class="text-center small">${item.paga_iva ? IVA_P+'%':'0%'}</td><td class="text-end fw-bold">$${(sub + iv).toFixed(2)}</td><td class="text-center"><button class="btn btn-sm text-danger" onclick="itemsCompra.splice(${idx},1); renderCompra()"><i class="fas fa-trash"></i></button></td></tr>`;
+    });
+    const totalFinal = s0 + s15 + ivaTotal;
+    document.getElementById('sub0').textContent = '$ ' + s0.toFixed(2); document.getElementById('sub15').textContent = '$ ' + s15.toFixed(2);
+    document.getElementById('ivaVal').textContent = '$ ' + ivaTotal.toFixed(2); document.getElementById('labelTotalCompra').textContent = '$ ' + totalFinal.toFixed(2);
+}
+
+function validarIntegridadClave(clave, ruc, fecha, est, pto, sec) {
+    if (clave.length !== 49) return "La clave debe tener 49 dígitos.";
+    if (parseInt(clave.charAt(48)) !== calcularModulo11(clave.substring(0, 48))) return "Dígito verificador incorrecto.";
+    const fComp = fecha.split('-').reverse().join('');
+    if (clave.substring(0, 8) !== fComp) return "La FECHA en la clave no coincide.";
+    if (clave.substring(10, 23) !== ruc) return "El RUC en la clave no pertenece al proveedor.";
+    if (clave.substring(24, 27) !== est.padStart(3,'0')) return "El ESTABLECIMIENTO no coincide.";
+    if (clave.substring(27, 30) !== pto.padStart(3,'0')) return "El PUNTO DE EMISIÓN no coincide.";
+    if (clave.substring(30, 39) !== sec.padStart(9,'0')) return "El SECUENCIAL no coincide.";
+    return null;
+}
+
+async function consultarDatosSRI() {
+    const clave = document.getElementById('compraClave').value.trim();
+    if (clave.length !== 49) return reinaAlert('Aviso', 'Ingrese clave de 49 dígitos', 'warning');
+    const checkRes = await fetch(`/compras/verificar_clave/${clave}${document.getElementById('compraId').value ? '?exclude_id='+document.getElementById('compraId').value : ''}`);
+    const checkData = await checkRes.json();
+    if (checkData.existe) return reinaAlert('Factura Duplicada', 'Esta clave de acceso ya ha sido registrada.', 'danger');
+    const provSelect = document.getElementById('compraProveedor'); if(!provSelect.value) return reinaAlert('Aviso', 'Seleccione primero un proveedor.', 'warning');
+    const optProv = provSelect.options[provSelect.selectedIndex];
+    const fechaUser = document.getElementById('compraFecha').value;
+    const estUser = document.getElementById('compraEst').value; const ptoUser = document.getElementById('compraPto').value; const secUser = document.getElementById('compraSec').value;
+
+    showLoading();
+    try {
+        const res = await fetch(`/compras/consultar_sri/${clave}`);
+        const data = await res.json();
+        hideLoading();
+
+        if (data.success) {
+            const errorInt = validarIntegridadClave(clave, optProv.dataset.ruc, fechaUser, estUser, ptoUser, secUser);
+            if (errorInt) return reinaAlert('Validación SRI Fallida', errorInt, 'danger');
+            
+            document.getElementById('btnGuardarCompra').disabled = false;
+            totalFacturaSRI = data.total;
+
+            // --- RESTAURACIÓN: FORMATEAR CAMPOS CON DATOS OFICIALES DEL SRI ---
+            document.getElementById('compraEst').value = data.establecimiento;
+            document.getElementById('compraPto').value = data.punto_emision;
+            document.getElementById('compraSec').value = data.secuencial;
+
+            // Llenar datos en la vista previa restaurada
+            document.getElementById('prevRazonSocial').textContent = data.razon_social;
+            document.getElementById('prevRuc').textContent = data.ruc_proveedor;
+            document.getElementById('prevComprobante').textContent = `${data.establecimiento}-${data.punto_emision}-${data.secuencial}`;
+            document.getElementById('prevClave').textContent = clave;
+            document.getElementById('prevFecha').textContent = data.fecha_emision;
+            document.getElementById('prevTotal').textContent = `$ ${data.total.toFixed(2)}`;
+
+            let itemsHtml = '';
+            data.items.forEach(it => { 
+                itemsHtml += `<tr><td>${it.cantidad}</td><td>${it.nombre}</td><td class="text-end">$${it.precio_unitario.toFixed(2)}</td><td class="text-end">$${it.subtotal.toFixed(2)}</td></tr>`; 
+            });
+            document.getElementById('prevItemsBody').innerHTML = itemsHtml;
+            
+            modalPreview.show();
+            itemsCompra = [];
+            data.items.forEach(itemSRI => {
+                const coincidencia = insumosLocales.find(ins => ins.nombre.toUpperCase().trim() === itemSRI.nombre.toUpperCase().trim());
+                if (coincidencia) {
+                    itemsCompra.push({
+                        insumo_id: coincidencia.id, nombre: coincidencia.nombre, unidad: coincidencia.unidad_medida,
+                        cantidad: itemSRI.cantidad, costo: itemSRI.precio_unitario, subtotal: itemSRI.subtotal,
+                        iva_valor: (itemSRI.paga_iva) ? (itemSRI.subtotal * (IVA_P/100)) : 0, paga_iva: itemSRI.paga_iva
+                    });
+                }
+            });
+            renderCompra();
+        } else { reinaAlert('SRI Error', data.message, 'danger'); }
+    } catch (e) { hideLoading(); reinaAlert('Error', 'Conexión fallida.', 'danger'); }
+}
+
+async function finalizarCompra() {
+    const totalText = document.getElementById('labelTotalCompra').innerText.replace('$ ', '').trim();
+    const totalMostrado = parseFloat(totalText);
+    const provSelect = document.getElementById('compraProveedor'); if(!provSelect.value) return;
+    const optProv = provSelect.options[provSelect.selectedIndex];
+    
+    if (optProv.dataset.tipo === 'FACTURA' && totalFacturaSRI > 0) {
+        if (Math.abs(totalMostrado - totalFacturaSRI) > 0.01) {
+            return reinaAlert('Total no coincide', `El total mostrado ($${totalMostrado.toFixed(2)}) debe ser igual al del SRI ($${totalFacturaSRI.toFixed(2)}).`, 'danger');
+        }
+    }
+
+    showLoading();
+    try {
+        const res = await fetch('/compras/guardar', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ 
+                compra_id: document.getElementById('compraId').value || null, sucursal_id: document.getElementById('compraSucursal').value, 
+                proveedor_id: optProv.value, establecimiento: document.getElementById('compraEst').value, punto_emision: document.getElementById('compraPto').value, numero_comprobante: document.getElementById('compraSec').value,
+                clave_acceso: document.getElementById('compraClave').value.trim(), numero_autorizacion: document.getElementById('compraAuto').value, 
+                fecha: document.getElementById('compraFecha').value, total: totalMostrado, items: itemsCompra 
+            })
+        });
+        const data = await res.json();
+        hideLoading(); 
+        
+        if(data.success) {
+            reinaAlert('¡Éxito!', 'Compra registrada correctamente.').then(() => { 
+                window.location.href = "{{ url_for('compras') }}"; 
+            });
+        } else { reinaAlert('Error', data.message, 'danger'); }
+    } catch (e) { hideLoading(); reinaAlert('Error', 'Fallo al guardar.', 'danger'); }
+}
+
+// Carga de datos inicial si estamos editando
 {% if detalles %}
-itemsCompra = [{% for d in detalles %}{
-    insumo_id: {{ d.insumo_id }}, nombre: "{{ d.nombre }}", unidad: "{{ d.unidad_medida }}",
-    cantidad: {{ d.cantidad }}, costo: {{ d.costo_unitario }}, subtotal: {{ d.subtotal }},
-    iva_valor: {{ d.iva_valor or 0 }}, paga_iva: {{ 'true' if d.iva_valor and d.iva_valor > 0 else 'false' }}
-}{{ "," if not loop.last else "" }}{% endfor %}];
-renderCompra(); toggleClaveAcceso();
+itemsCompra = [
+    {% for d in detalles %}
+    { 
+        insumo_id: {{ d.insumo_id }}, 
+        nombre: {{ d.nombre | tojson }}, 
+        unidad: "{{ d.unidad_medida }}", 
+        cantidad: {{ d.cantidad }}, 
+        costo: {{ d.costo_unitario }}, 
+        subtotal: {{ d.subtotal }}, 
+        iva_valor: {{ d.iva_valor or 0 }}, 
+        paga_iva: {{ 'true' if (d.iva_valor and d.iva_valor > 0) else 'false' }} 
+    }{{ "," if not loop.last else "" }}
+    {% endfor %}
+];
+renderCompra();
 {% endif %}
 </script>
 {% endblock %}

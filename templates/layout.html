@@ -134,19 +134,13 @@
     </div>
 </div>
 
-<!-- Modal de Carga Temático -->
-<div class="modal fade" id="loadingModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 bg-transparent">
-            <div class="modal-body text-center">
-                <div class="crown-loader">
-                    <i class="fas fa-crown"></i>
-                </div>
-                <div class="loading-text h5">SISTEMA REINA</div>
-                <div class="text-muted small fw-bold">PROCESANDO SOLICITUD...</div>
-            </div>
-        </div>
+<!-- Overlay de Carga Temático (CSS Puro para velocidad instantánea) -->
+<div id="reina-loader" class="d-none" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); backdrop-filter: blur(5px); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+    <div class="crown-loader" style="font-size: 5rem; color: var(--reina-yellow); animation: crown-pulse 1.2s infinite ease-in-out;">
+        <i class="fas fa-crown"></i>
     </div>
+    <div class="loading-text h4 mt-3" style="color: var(--reina-green); font-weight: 900; letter-spacing: 2px;">SISTEMA REINA</div>
+    <div class="text-muted fw-bold">PROCESANDO...</div>
 </div>
 
 <!-- Scripts al final del Body -->
@@ -159,10 +153,9 @@
 
 <script>
     const rModal = new bootstrap.Modal(document.getElementById('reinaModal'));
-    const lModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-
-    function showLoading() { lModal.show(); }
-    function hideLoading() { lModal.hide(); }
+    
+    function showLoading() { document.getElementById('reina-loader').classList.remove('d-none'); }
+    function hideLoading() { document.getElementById('reina-loader').classList.add('d-none'); }
 
     // Auto-cerrar alertas flash después de 3 segundos
     document.addEventListener('DOMContentLoaded', function() {
