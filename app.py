@@ -18,6 +18,9 @@ app.config['MYSQL_PASSWORD'] = os.environ.get('MYSQL_PASSWORD', '')
 app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB', 'sistema_reina')
 app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
+# Configuraciones adicionales para estabilidad en la nube
+app.config['MYSQL_CONNECT_TIMEOUT'] = 10
+app.config['MYSQL_CUSTOM_OPTIONS'] = {"connect_timeout": 10}
 
 # SSL Flexible para Aiven
 if 'MYSQL_HOST' in os.environ and os.environ['MYSQL_HOST'] != 'localhost':
