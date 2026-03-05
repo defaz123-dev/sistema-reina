@@ -1,8 +1,9 @@
--- database.sql (ESQUEMA LOCAL ACTUALIZADO)
+-- database.sql (VERSIÓN LOCAL ACTUALIZADA CON SEGURIDAD POR CÉDULA)
 SET FOREIGN_KEY_CHECKS=0;
 DROP TABLE IF EXISTS auditoria, detalles_ventas, ventas, clientes, detalles_compras, compras, recetas, insumos, productos, categorias, proveedores, usuarios, sucursales, empresa, tipos_identificacion, tipos_comprobantes, unidades_medida, ajustes_inventario;
 SET FOREIGN_KEY_CHECKS=1;
 
+-- 1. Catálogos Base
 CREATE TABLE unidades_medida (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL,
@@ -20,6 +21,7 @@ CREATE TABLE tipos_comprobantes (
     nombre VARCHAR(50) NOT NULL
 );
 
+-- 2. Estructura Principal
 CREATE TABLE sucursales (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
@@ -37,7 +39,7 @@ CREATE TABLE empresa (
     direccion_matriz VARCHAR(255) NOT NULL,
     iva_porcentaje DECIMAL(5,2) DEFAULT 15.00,
     obligado_contabilidad VARCHAR(2) DEFAULT 'NO',
-    ambiente INT DEFAULT 1,
+    ambiente INT DEFAULT 1, -- 1: Pruebas, 2: Produccion
     color_tema VARCHAR(7) DEFAULT '#008938',
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -47,16 +49,19 @@ CREATE TABLE empresa (
 
 CREATE TABLE usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    usuario VARCHAR(50) NOT NULL UNIQUE,
+    cedula VARCHAR(13) NOT NULL UNIQUE,
+    tipo_identificacion_id INT,
+    usuario VARCHAR(50) NOT NULL,
     password VARCHAR(255) NOT NULL,
     sucursal_id INT,
-    rol ENUM('ADMIN', 'VENDEDOR') DEFAULT 'VENDEDOR',
+    rol ENUM('ADMIN', 'USER') DEFAULT 'USER',
     activo TINYINT(1) DEFAULT 1,
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
     fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
+    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
+    FOREIGN KEY (tipo_identificacion_id) REFERENCES tipos_identificacion(id)
 );
 
 CREATE TABLE categorias (
@@ -234,3 +239,24 @@ CREATE TABLE auditoria (
     ip VARCHAR(45),
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 );
+
+-- 3. Inserción de Datos Iniciales (Usuarios Migrados y Catálogos)
+INSERT INTO unidades_medida (id, nombre, abreviatura) VALUES 
+(1, 'GRAMOS', 'gr'), (2, 'KILOS', 'kg'), (3, 'LITROS', 'lt'), (4, 'UNIDADES', 'u');
+
+INSERT INTO tipos_identificacion (id, nombre, codigo_sri) VALUES 
+(1, 'CEDULA', '05'), (2, 'RUC', '04'), (3, 'PASAPORTE', '06'), (4, 'CONSUMIDOR FINAL', '07');
+
+INSERT INTO tipos_comprobantes (id, nombre) VALUES 
+(1, 'FACTURA'), (2, 'NOTA DE VENTA');
+
+INSERT INTO sucursales (id, nombre) VALUES 
+(1, 'REINA VICTORIA PRINCIPAL'), (2, 'GRANADOS NORTE');
+
+-- USUARIOS MIGRADOS DESDE LOCAL
+INSERT INTO usuarios (id, cedula, tipo_identificacion_id, usuario, password, sucursal_id, rol, activo) VALUES 
+(1, '1002597886', 1, 'CHRISTIAN DEFAZ', 'scrypt:32768:8:1$aMgnwvz2kmlCAbeU$0faa2b09d46b93a49b127171fbdafea440fc6ffb652887fdaf39a9a3f1329d75f47ad43b21fe519fb6b5df5f087173d70cdcd0b2a03423e19386ffbcc72eb330', 1, 'ADMIN', 1),
+(2, '1714990726', 1, 'LILANA TADAY', 'scrypt:32768:8:1$yNbECha0koWV3lez$3718b2aa226db0a915a130292f3631bd7f52a8f7ef510311b521d83067873a572bcb1fe58348d14910c7c9d7e7505cc418de43aa907dc234190b3eb0d106d2f7', 1, 'ADMIN', 1);
+
+INSERT INTO empresa (id, ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema) VALUES 
+(1, '1793023118001', 'ALIMENTOS LA REINA', 'SANDUCHES LA REINA', 'AV. PRINCIPAL Y SECUNDARIA', 15.00, 2, '#008a4e');

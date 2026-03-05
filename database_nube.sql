@@ -1,4 +1,4 @@
--- database_nube.sql (VERSIÓN WHITELABEL ACTUALIZADA)
+-- database_nube.sql (VERSIÓN WHITELABEL CON SEGURIDAD POR CÉDULA)
 SET FOREIGN_KEY_CHECKS=0;
 DROP TABLE IF EXISTS auditoria, detalles_ventas, ventas, clientes, detalles_compras, compras, recetas, insumos, productos, categorias, proveedores, usuarios, sucursales, empresa, tipos_identificacion, tipos_comprobantes, unidades_medida, ajustes_inventario;
 SET FOREIGN_KEY_CHECKS=1;
@@ -49,16 +49,19 @@ CREATE TABLE empresa (
 
 CREATE TABLE usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    usuario VARCHAR(50) NOT NULL UNIQUE,
+    cedula VARCHAR(13) NOT NULL UNIQUE,
+    tipo_identificacion_id INT,
+    usuario VARCHAR(50) NOT NULL,
     password VARCHAR(255) NOT NULL,
     sucursal_id INT,
-    rol ENUM('ADMIN', 'VENDEDOR') DEFAULT 'VENDEDOR',
+    rol ENUM('ADMIN', 'USER') DEFAULT 'USER',
     activo TINYINT(1) DEFAULT 1,
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
     fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
+    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
+    FOREIGN KEY (tipo_identificacion_id) REFERENCES tipos_identificacion(id)
 );
 
 CREATE TABLE categorias (
@@ -250,9 +253,10 @@ INSERT INTO tipos_comprobantes (id, nombre) VALUES
 INSERT INTO sucursales (id, nombre) VALUES 
 (1, 'REINA VICTORIA PRINCIPAL'), (2, 'GRANADOS NORTE');
 
-INSERT INTO usuarios (id, usuario, password, sucursal_id, rol, activo) VALUES 
-(1, 'admin', 'scrypt:32768:8:1$OSyt2StROGDDPy4f$7a2ff17725e547c97110d2560d400e6126d2172d277fd22c61b7342b7a34b0bc07a7cd6e57a997202b3887261e6da9f79e933d46a33f239c4613891a95d0825b', 1, 'ADMIN', 1),
-(2, 'liliana', 'scrypt:32768:8:1$0KzrMh3tnG7kEoxZ$ded6e5fc4aad675c0debb2af7caa2338dd6e51c3f04fc412a06a3d8104424c2a65bd938701ed0ec0701e49b2961037ad276cc5a9a6c684f2ef014d0c77b862f5', 1, 'ADMIN', 1);
+-- USUARIOS MIGRADOS DESDE LOCAL
+INSERT INTO usuarios (id, cedula, tipo_identificacion_id, usuario, password, sucursal_id, rol, activo) VALUES 
+(1, '1002597886', 1, 'CHRISTIAN DEFAZ', 'scrypt:32768:8:1$aMgnwvz2kmlCAbeU$0faa2b09d46b93a49b127171fbdafea440fc6ffb652887fdaf39a9a3f1329d75f47ad43b21fe519fb6b5df5f087173d70cdcd0b2a03423e19386ffbcc72eb330', 1, 'ADMIN', 1),
+(2, '1714990726', 1, 'LILANA TADAY', 'scrypt:32768:8:1$yNbECha0koWV3lez$3718b2aa226db0a915a130292f3631bd7f52a8f7ef510311b521d83067873a572bcb1fe58348d14910c7c9d7e7505cc418de43aa907dc234190b3eb0d106d2f7', 1, 'ADMIN', 1);
 
 INSERT INTO empresa (id, ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema) VALUES 
 (1, '1793023118001', 'ALIMENTOS LA REINA', 'SANDUCHES LA REINA', 'AV. PRINCIPAL Y SECUNDARIA', 15.00, 2, '#008a4e');
