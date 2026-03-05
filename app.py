@@ -282,6 +282,9 @@ def guardar_compra():
         sec = (data.get('numero_comprobante') or '').upper()
         n_aut = data.get('numero_autorizacion')
         f_cad = data.get('fecha_caducidad')
+        # Limpieza estricta: Si está vacío o solo tiene espacios, forzar a None (NULL en DB)
+        if not f_cad or str(f_cad).strip() == '':
+            f_cad = None
         
         # Validación de Caducidad (Si viene fecha de caducidad)
         if f_cad:
