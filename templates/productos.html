@@ -13,12 +13,17 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="brand-logo"><i class="fas fa-hamburger me-2"></i>Maestro de Productos</h2>
-    <button class="btn btn-reina rounded-pill px-4 shadow-sm" 
-            data-bs-toggle="modal" 
-            data-bs-target="#modalProducto"
-            onclick="prepararNuevoProducto()">
-        <i class="fas fa-plus me-2"></i>Nuevo Producto
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn-excel-reina" onclick="exportTableToExcel('tablaProductos', 'productos_reina')">
+            <i class="fas fa-file-excel me-2"></i> Excel
+        </button>
+        <button class="btn btn-reina rounded-pill px-4 shadow-sm" 
+                data-bs-toggle="modal" 
+                data-bs-target="#modalProducto"
+                onclick="prepararNuevoProducto()">
+            <i class="fas fa-plus me-2"></i>Nuevo Producto
+        </button>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm rounded-4">

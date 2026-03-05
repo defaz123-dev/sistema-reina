@@ -41,7 +41,21 @@ Este documento detalla la evolución, mejoras y nuevas funcionalidades implement
 - **Cloud Computing**: Sistema desplegado exitosamente en **Render.com** (Flask) y **Aiven.io** (MariaDB/MySQL).
 - **Inicialización Automatizada**: Script `init_db.py` actualizado para creación automática de esquema local y parches de estructura (columna `iva_porcentaje`).
 
+## 7. Mejoras de Estabilización y Reportabilidad (Actualizado 04/Marzo)
+- **Sincronización de Tiempo (Ecuador)**: 
+    - Actualización técnica en `app.py` mediante la función `get_db_cursor` para forzar la sesión de MySQL a la zona horaria de Ecuador (`-05:00`).
+    - Configuración recomendada de la variable de entorno `TZ` en Render.com (`America/Guayaquil`) para alinear el servidor Python con la hora local.
+- **Buscador y Filtrado**: Corrección en `clientes.html` para asegurar la carga correcta de DataTables y la visualización del buscador en la cabecera.
+- **Módulo de Exportación Global (Excel)**:
+    - Implementación de las librerías `DataTables Buttons`, `JSZip` y `html5` en el layout principal.
+    - Activación de botón "Excel" en 10 módulos críticos (Ventas, Compras, Clientes, Inventario, Auditoría, etc.).
+    - **Diseño UX Premium**: 
+        - Botón posicionado estratégicamente sobre el buscador para no interferir con la tabla.
+        - Efecto interactivo de **Zoom Suave** (`scale 1.1`) al pasar el mouse.
+        - Icono y texto combinados para máxima claridad.
+- **Mantenimiento y Estética**: Limpieza de residuos de código en la cabecera de la gestión de usuarios y estandarización del espaciado en los controles de tabla.
+
 ---
-**Fecha de última actualización:** 4 de marzo de 2026 (Fase: Estabilización & Compras Senior)
-**Estado:** Producción y Local sincronizados. Módulo de compras robusto.
+**Fecha de última actualización:** 4 de marzo de 2026 (Fase: Estabilización & Reportabilidad)
+**Estado:** Producción y Local sincronizados. Módulo de exportación robusto.
 ---

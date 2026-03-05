@@ -13,12 +13,17 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="brand-logo"><i class="fas fa-users me-2"></i>Gestión de Clientes</h2>
-    <button class="btn btn-reina rounded-pill px-4 shadow-sm" 
-            data-bs-toggle="modal" 
-            data-bs-target="#modalCliente" 
-            onclick="prepararNuevoCliente()">
-        <i class="fas fa-plus me-2"></i>Nuevo Cliente
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn-excel-reina" onclick="exportTableToExcel('tablaClientes', 'clientes_reina')">
+            <i class="fas fa-file-excel me-2"></i> Excel
+        </button>
+        <button class="btn btn-reina rounded-pill px-4 shadow-sm" 
+                data-bs-toggle="modal" 
+                data-bs-target="#modalCliente" 
+                onclick="prepararNuevoCliente()">
+            <i class="fas fa-plus me-2"></i>Nuevo Cliente
+        </button>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm rounded-4">
@@ -127,6 +132,8 @@
     </div>
 </div>
 
+{% endblock %}
+
 {% block scripts %}
 <script>
     // --- LÓGICA DE VALIDACIÓN (ECUADOR) ---
@@ -199,5 +206,4 @@
         document.getElementById('modalClienteTitle').innerText = 'Editar Cliente';
     }
 </script>
-{% endblock %}
 {% endblock %}

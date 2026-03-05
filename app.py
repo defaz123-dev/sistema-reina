@@ -46,7 +46,10 @@ def procesar_imagen(file_storage, max_size=(800, 800), quality=85):
         return file_storage.read(), file_storage.content_type
 
 def get_db_cursor():
-    try: return mysql.connection.cursor()
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("SET time_zone = '-05:00'")
+        return cur
     except Exception as e: return str(e)
 
 def registrar_auditoria(accion, detalle):
