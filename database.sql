@@ -1,6 +1,6 @@
 -- database.sql (ESQUEMA LOCAL ACTUALIZADO)
 SET FOREIGN_KEY_CHECKS=0;
-DROP TABLE IF EXISTS auditoria, detalles_ventas, ventas, detalles_compras, compras, recetas, insumos, productos, categorias, proveedores, usuarios, sucursales, empresa, tipos_identificacion, tipos_comprobantes, unidades_medida, ajustes_inventario;
+DROP TABLE IF EXISTS auditoria, detalles_ventas, ventas, clientes, detalles_compras, compras, recetas, insumos, productos, categorias, proveedores, usuarios, sucursales, empresa, tipos_identificacion, tipos_comprobantes, unidades_medida, ajustes_inventario;
 SET FOREIGN_KEY_CHECKS=1;
 
 CREATE TABLE unidades_medida (
