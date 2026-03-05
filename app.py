@@ -48,14 +48,18 @@ def procesar_imagen(file_storage, max_size=(800, 800), quality=85):
 def get_db_cursor():
     try:
         cur = mysql.connection.cursor()
-        cur.execute("SET time_zone = '-05:00'")
+        try:
+            cur.execute("SET time_zone = '-05:00'")
+        except: pass # Ignorar si el servidor no permite cambiar la zona horaria
         return cur
     except Exception as e: return str(e)
 
 def registrar_auditoria(accion, detalle):
     try:
         cur = mysql.connection.cursor()
-        cur.execute("SET time_zone = '-05:00'") # Forzar zona horaria en esta conexión
+        try:
+            cur.execute("SET time_zone = '-05:00'")
+        except: pass
         # Capturar IP real (considerando proxies/nube)
         ip = request.headers.get('X-Forwarded-For', request.remote_addr)
         if ',' in ip: ip = ip.split(',')[0] # Tomar la primera si hay varias
