@@ -75,7 +75,7 @@
 
     <div class="ticket">
         <div class="text-center header">
-            <div class="logo">SANDUCHES LA REINA</div>
+            <div class="logo">{{ config_empresa.nombre_comercial|upper }}</div>
             <div>RUC: {{ empresa.ruc if empresa else '1790000000001' }}</div>
             <div>{{ empresa.razon_social if empresa else 'EMISOR GENERICO' }}</div>
             <div>{{ empresa.direccion_matriz if empresa else 'QUITO - ECUADOR' }}</div>

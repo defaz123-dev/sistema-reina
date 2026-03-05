@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% block title %}Dashboard - Sanduches La Reina{% endblock %}
+{% block title %}Dashboard - {{ config_empresa.nombre_comercial }}{% endblock %}
 
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
@@ -18,7 +18,7 @@
 <div class="row mb-4 mt-2">
     <div class="col-12 text-center">
         <h2 class="fw-bold text-dark">Panel de Control</h2>
-        <p class="text-muted small">Bienvenido a Sanduches La Reina</p>
+        <p class="text-muted small">Bienvenido a {{ config_empresa.nombre_comercial }}</p>
     </div>
 </div>
 
