@@ -4,7 +4,7 @@
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
-        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA</a>
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">{{ config_empresa.nombre_comercial }}</a>
         <div class="d-flex align-items-center">
             <span class="me-3 small text-white-50"><i class="fas fa-store me-1 text-warning"></i> {{ session['sucursal_nombre'] }}</span>
             <span class="me-3 small text-white-50"><i class="fas fa-user-circle me-1 text-success"></i> {{ session['usuario'] }}</span>

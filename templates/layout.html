@@ -4,19 +4,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Sanduches La Reina{% endblock %}</title>
+    <title>{% block title %}{{ config_empresa.nombre_comercial }}{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
     <style>
-        :root { --reina-green: #008938; --reina-yellow: #ffc20e; --reina-dark: #212529; --reina-light: #f8f9fa; }
+        :root { 
+            --reina-green: {{ config_empresa.color_tema }}; 
+            --reina-yellow: #ffc20e; 
+            --reina-dark: #212529; 
+            --reina-light: #f8f9fa; 
+        }
+        
+        /* Sobrescribir Bootstrap con el color del tema */
+        .bg-success { background-color: var(--reina-green) !important; }
+        .text-success { color: var(--reina-green) !important; }
+        .btn-success { background-color: var(--reina-green) !important; border-color: var(--reina-green) !important; }
+        .btn-outline-success { color: var(--reina-green) !important; border-color: var(--reina-green) !important; }
+        .btn-outline-success:hover { background-color: var(--reina-green) !important; color: white !important; }
+        .border-success { border-color: var(--reina-green) !important; }
+        
         body { background: #f0f2f5; min-height: 100vh; font-family: 'Segoe UI', sans-serif; {% block body_style %}{% endblock %} }
         .brand-logo { color: var(--reina-green); font-weight: 800; letter-spacing: -1px; }
         .card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
         .btn-reina { background-color: var(--reina-green); border: none; color: white; border-radius: 10px; font-weight: 600; transition: all 0.3s; }
-        .btn-reina:hover { background-color: #00702e; color: white; transform: translateY(-1px); }
+        .btn-reina:hover { background-color: var(--reina-green); filter: brightness(0.9); color: white; transform: translateY(-1px); }
         .btn-reina-secondary { background-color: var(--reina-yellow); border: none; color: var(--reina-dark); border-radius: 10px; font-weight: 600; }
         .form-control, .form-select { 
             border-radius: 8px !important; 
@@ -72,7 +86,8 @@
 
         /* Botón Excel Elegante Fuera de la Tabla */
         .btn-excel-reina {
-            background-color: #1d6f42 !important;
+            background-color: var(--reina-green) !important;
+            filter: brightness(1.1);
             color: white !important;
             border: none !important;
             padding: 7px 18px !important;
@@ -85,7 +100,7 @@
             text-decoration: none !important;
         }
         .btn-excel-reina:hover {
-            background-color: #155231 !important;
+            filter: brightness(0.9) !important;
             transform: scale(1.08) !important;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
             color: white !important;
@@ -164,7 +179,7 @@
     <div class="crown-loader" style="font-size: 5rem; color: var(--reina-yellow); animation: crown-pulse 1.2s infinite ease-in-out;">
         <i class="fas fa-crown"></i>
     </div>
-    <div class="loading-text h4 mt-3" style="color: var(--reina-green); font-weight: 900; letter-spacing: 2px;">SISTEMA REINA</div>
+    <div class="loading-text h4 mt-3" style="color: var(--reina-green); font-weight: 900; letter-spacing: 2px;">{{ config_empresa.nombre_comercial }}</div>
     <div class="text-muted fw-bold">PROCESANDO...</div>
 </div>
 

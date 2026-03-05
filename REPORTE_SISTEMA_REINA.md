@@ -14,48 +14,41 @@ Este documento detalla la evolución, mejoras y nuevas funcionalidades implement
 - **Tracking por Registro**: Todas las tablas del sistema ahora incluyen columnas de control:
     - `usuario_creacion_id` y `fecha_creacion`.
     - `usuario_modificacion_id` y `fecha_modificacion` (se actualiza automáticamente).
+- **Detalle por Sucursal**: La auditoría ahora incluye automáticamente el nombre de la sucursal donde se realizó la acción para un control multisede efectivo.
 - **Modales Estáticas**: Se configuró `data-bs-backdrop="static"` en todas las ventanas emergentes para evitar el cierre accidental al hacer clic fuera de ellas.
-- **Protección de Datos**: Eliminación de bypass de emergencia; el acceso ahora es estrictamente mediante credenciales cifradas en la base de datos.
 
-## 3. Normalización y Catálogos (Arquitectura Senior)
+## 3. Arquitectura Whitelabel (Marca Blanca)
+- **Identidad Dinámica**: Eliminación de nombres estáticos. El sistema obtiene el nombre comercial directamente de la configuración de la empresa para mostrarlo en barras de navegación, títulos y cargadores.
+- **Tematización Dinámica (Colores)**: 
+    - Implementación de selector de color profesional en el panel de Empresa.
+    - El color elegido se aplica instantáneamente a botones, cabeceras de modales, bordes, loaders y efectos hover en todo el sistema.
+    - Sobrescritura inteligente de clases Bootstrap (`bg-success`, `btn-success`) para respetar el color de marca del cliente.
+
+## 4. Normalización y Catálogos (Arquitectura Senior)
 - **Desacoplamiento de Datos**: Se eliminaron los textos planos y se implementaron tablas de catálogo para garantizar la integridad:
     - `unidades_medida`: GRAMOS, KILOS, LITROS, UNIDADES.
     - `tipos_identificacion`: CEDULA, RUC, PASAPORTE, CONSUMIDOR FINAL (incluye códigos SRI).
 - **Validación Ecuador**: Implementación del algoritmo Módulo 10 para la validación real de Cédula (10 dígitos) y RUC (13 dígitos) tanto en el módulo de Clientes como en el registro rápido del POS.
+- **Unicidad de Consumidor Final**: Validación lógica para permitir solo un registro de tipo "Consumidor Final" en la base de datos, evitando duplicidad contable.
 
-## 4. Interfaz de Usuario (UI) y Experiencia (UX)
-- **Estandarización de Navegación**: Todas las pantallas cuentan con una barra superior negra (`bg-dark`) y un botón de **"Inicio"** consistente con el icono de casa (`fas fa-home`).
-- **Jerarquía de Alertas**: Optimización global de `reinaAlert` para ocultar automáticamente cargadores y evitar bloqueos de pantalla en errores de validación.
-- **Limpieza de Modales**: Implementación de funciones de limpieza manual (`cleanupModals`) para evitar que el fondo gris bloquee la interactividad en procesos complejos.
-- **DataTables**: Implementación de búsqueda, filtrado y paginación en español en todas las tablas maestras.
+## 5. Integración SRI y Compras Avanzadas
+- **Controles de Vigencia**: 
+    - **Validación de Caducidad**: Campo obligatorio para Notas de Venta con validación inmediata (`onblur`). El sistema bloquea documentos caducados.
+    - **Validación de Emisión**: Bloqueo automático de facturas con fecha futura.
+- **Importación Inteligente**: Priorización de Clave de Acceso con autocompletado de datos del SRI.
+- **Tipo de Dato DATE**: Optimización de la base de datos para almacenar solo la fecha contable en compras, eliminando ruidos de horas innecesarias.
 
-## 5. Integración SRI y Compras Senior (Fase 2)
-- **Importación Inteligente**: La pantalla de compras ahora prioriza la Clave de Acceso. Al validar, autocompleta Fecha, Establecimiento, Punto de Emisión y Secuencial.
-- **Mapeo Dinámico**: Columna visual "Descripción Factura (SRI)" que permite asociar productos del XML con el catálogo local de forma visual.
-- **Creación en Caliente**: Botón "+" integrado en la tabla de compras para registrar nuevos insumos vía AJAX sin abandonar la transacción actual.
-- **Cálculo de Costo de Inventario**: El sistema permite ingresar cantidades para inventario (ej. en gramos) y calcula automáticamente el Precio Unitario basado en el subtotal fijo de la factura (`Subtotal / Cantidad`), garantizando la cuadratura contable.
-- **Validación Estricta**: Obligatoriedad de Número de Autorización y Comprobante completo para Notas de Venta y documentos físicos.
-- **Historial Completo**: Visualización de facturas en formato legal `XXX-XXX-XXXXXXXXX` en el historial de compras.
+## 6. Interfaz de Usuario (UI) y Experiencia (UX)
+- **Módulo de Exportación Global (Excel)**: Botón "Excel" premium fuera de la tabla, con diseño integrado al tema, icono + texto y efecto de zoom suave.
+- **Alertas Estilizadas**: Uso global de `reinaAlert` (modal temática) para mensajes de error, éxito y validaciones de integridad.
+- **Optimización de Tablas**: Separación del tipo de identificación en columnas independientes en la gestión de clientes para mejorar la legibilidad.
 
-## 6. Infraestructura y Despliegue
+## 7. Infraestructura y Despliegue
 - **Cloud Computing**: Sistema desplegado exitosamente en **Render.com** (Flask) y **Aiven.io** (MariaDB/MySQL).
-- **Inicialización Automatizada**: Script `init_db.py` actualizado para creación automática de esquema local y parches de estructura (columna `iva_porcentaje`).
-
-## 7. Mejoras de Estabilización y Reportabilidad (Actualizado 04/Marzo)
-- **Sincronización de Tiempo (Ecuador)**: 
-    - Actualización técnica en `app.py` mediante la función `get_db_cursor` para forzar la sesión de MySQL a la zona horaria de Ecuador (`-05:00`).
-    - Configuración recomendada de la variable de entorno `TZ` en Render.com (`America/Guayaquil`) para alinear el servidor Python con la hora local.
-- **Buscador y Filtrado**: Corrección en `clientes.html` para asegurar la carga correcta de DataTables y la visualización del buscador en la cabecera.
-- **Módulo de Exportación Global (Excel)**:
-    - Implementación de las librerías `DataTables Buttons`, `JSZip` y `html5` en el layout principal.
-    - Activación de botón "Excel" en 10 módulos críticos (Ventas, Compras, Clientes, Inventario, Auditoría, etc.).
-    - **Diseño UX Premium**: 
-        - Botón posicionado estratégicamente sobre el buscador para no interferir con la tabla.
-        - Efecto interactivo de **Zoom Suave** (`scale 1.1`) al pasar el mouse.
-        - Icono y texto combinados para máxima claridad.
-- **Mantenimiento y Estética**: Limpieza de residuos de código en la cabecera de la gestión de usuarios y estandarización del espaciado en los controles de tabla.
+- **Sincronización de Tiempo**: Forzado técnico de zona horaria `America/Guayaquil` tanto en la sesión de base de datos como en el servidor Python.
+- **Esquemas Actualizados**: Archivos `database.sql` y `database_nube.sql` sincronizados con la versión Whitelabel y usuarios actuales.
 
 ---
-**Fecha de última actualización:** 4 de marzo de 2026 (Fase: Estabilización & Reportabilidad)
-**Estado:** Producción y Local sincronizados. Módulo de exportación robusto.
+**Fecha de última actualización:** 4 de marzo de 2026 (Fase: Transformación Whitelabel & Controles SRI)
+**Estado:** Producción y Local sincronizados. Sistema listo para comercialización bajo marca propia.
 ---

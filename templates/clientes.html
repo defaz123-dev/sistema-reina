@@ -1,10 +1,10 @@
 {% extends "layout.html" %}
-{% block title %}Maestro de Clientes - Sanduches La Reina{% endblock %}
+{% block title %}Maestro de Clientes - {{ config_empresa.nombre_comercial }}{% endblock %}
 
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
-        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA</a>
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">{{ config_empresa.nombre_comercial }}</a>
         <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3"><i class="fas fa-home me-1"></i> Inicio</a>
     </div>
 </nav>
@@ -32,6 +32,7 @@
             <table class="table table-hover align-middle" id="tablaClientes">
                 <thead class="table-light">
                     <tr class="small text-muted text-uppercase">
+                        <th>Tipo</th>
                         <th>Identificación</th>
                         <th>Nombres y Apellidos</th>
                         <th>Dirección</th>
@@ -43,12 +44,10 @@
                 <tbody>
                     {% for c in clientes %}
                     <tr>
-                        <td class="fw-bold">
-                            {{ c.cedula_ruc }} <br>
-                            <small class="badge bg-light text-dark border">{{ c.tipo_id_nombre }}</small>
-                        </td>
+                        <td><span class="badge bg-light text-dark border small">{{ c.tipo_id_nombre }}</span></td>
+                        <td class="fw-bold">{{ c.cedula_ruc }}</td>
                         <td>{{ c.nombres }} {{ c.apellidos }}</td>
-                        <td class="small">{{ c.direccion }}</td>
+                        <td class="small text-muted">{{ c.direccion }}</td>
                         <td>{{ c.telefono }}</td>
                         <td class="small">{{ c.email }}</td>
                         <td class="text-end">

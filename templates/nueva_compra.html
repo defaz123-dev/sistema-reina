@@ -4,7 +4,7 @@
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container-fluid px-4">
-        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">SANDUCHES LA REINA</a>
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">{{ config_empresa.nombre_comercial }}</a>
         <a href="{{ url_for('compras') }}" class="btn btn-outline-light btn-sm rounded-pill px-3"><i class="fas fa-arrow-left me-1"></i> Volver a Compras</a>
     </div>
 </nav>
@@ -46,7 +46,7 @@
                 </div>
                 <div class="col-md-3">
                     <label class="extra-small fw-bold text-muted">Fecha Emisión</label>
-                    <input type="date" id="compraFecha" class="form-control form-control-sm bg-light border-0 fw-bold" value="{{ compra.fecha.strftime('%Y-%m-%d') if (compra and compra.fecha and not compra.fecha is string) else (compra.fecha if (compra and compra.fecha is string) else fecha_hoy) }}">
+                    <input type="date" id="compraFecha" class="form-control form-control-sm bg-light border-0 fw-bold" value="{{ compra.fecha.strftime('%Y-%m-%d') if (compra and compra.fecha and not compra.fecha is string) else (compra.fecha if (compra and compra.fecha is string) else fecha_hoy) }}" onblur="validarFechaEmisionBlur()">
                 </div>
             </div>
 
@@ -64,8 +64,16 @@
                 </div>
                 <div class="col-12" id="divAutorizacion" style="display: none;">
                     <div class="bg-primary bg-opacity-10 p-2 rounded-3 border border-primary border-opacity-25">
-                        <label class="extra-small fw-bold text-primary d-block mb-1"><i class="fas fa-check-double me-1"></i>Número de Autorización SRI</label>
-                        <input type="text" id="compraAuto" class="form-control form-control-sm bg-white border-primary border-opacity-50 fw-bold" placeholder="Ingrese el número de autorización" value="{{ compra.numero_autorizacion if compra else '' }}">
+                        <div class="row g-2">
+                            <div class="col-md-8">
+                                <label class="extra-small fw-bold text-primary d-block mb-1"><i class="fas fa-check-double me-1"></i>Número de Autorización SRI</label>
+                                <input type="text" id="compraAuto" class="form-control form-control-sm bg-white border-primary border-opacity-50 fw-bold" placeholder="Ingrese el número de autorización" value="{{ compra.numero_autorizacion if compra else '' }}">
+                            </div>
+                            <div class="col-md-4" id="divCaducidad" style="display: none;">
+                                <label class="extra-small fw-bold text-danger d-block mb-1"><i class="fas fa-calendar-times me-1"></i>Fecha Caducidad</label>
+                                <input type="date" id="compraFechaCaducidad" class="form-control form-control-sm bg-white border-danger fw-bold" value="{{ compra.fecha_caducidad_fmt if compra else '' }}" onblur="validarCaducidadBlur()">
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -183,7 +191,7 @@
                         </div>
                         <div class="col-6 text-end">
                             <div class="extra-small fw-bold text-muted">ADQUIRENTE:</div>
-                            <div class="fw-bold">SANDUCHES LA REINA</div>
+                            <div class="fw-bold">{{ config_empresa.nombre_comercial }}</div>
                         </div>
                     </div>
                     <table class="table table-sm extra-small">
@@ -239,17 +247,46 @@ function toggleClaveAcceso() {
     const sel = document.getElementById('compraProveedor'); if(!sel.value) return;
     const opt = sel.options[sel.selectedIndex];
     const divElec = document.getElementById('divFacturaElec'); const divAuto = document.getElementById('divAutorizacion');
+    const divCad = document.getElementById('divCaducidad');
     const manualPanel = document.getElementById('manualEntryPanel');
 
     if (opt && opt.dataset.tipo === 'FACTURA') { 
         divElec.style.display = 'block'; 
         divAuto.style.display = 'none';
-        manualPanel.style.display = 'none'; // Ocultar añadir manual para facturas
+        divCad.style.display = 'none';
+        manualPanel.style.display = 'none'; 
     }
     else { 
         divElec.style.display = 'none'; 
         divAuto.style.display = 'block';
-        manualPanel.style.display = 'block'; // Mostrar para otros documentos
+        divCad.style.display = 'block'; // MOSTRAR CADUCIDAD
+        manualPanel.style.display = 'block'; 
+    }
+}
+
+function validarCaducidadBlur() {
+    const f_cad = document.getElementById('compraFechaCaducidad').value;
+    if (!f_cad) return;
+    
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const cad = new Date(f_cad + 'T00:00:00');
+    
+    if (cad < hoy) {
+        reinaAlert('Documento Caducado', 'LA NOTA DE VENTA ESTÁ CADUCADA. NO SE PUEDE INGRESAR.', 'danger');
+        document.getElementById('compraFechaCaducidad').value = ''; // Limpiar campo
+    }
+}
+
+function validarFechaEmisionBlur() {
+    const f_emi = document.getElementById('compraFecha').value;
+    if (!f_emi) return;
+    
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const emi = new Date(f_emi + 'T00:00:00');
+    
+    if (emi > hoy) {
+        reinaAlert('Fecha Inválida', 'LA FECHA DE EMISIÓN NO PUEDE SER MAYOR A LA FECHA ACTUAL.', 'danger');
+        document.getElementById('compraFecha').value = "{{ fecha_hoy }}"; // Resetear a hoy
     }
 }
 
@@ -435,12 +472,21 @@ async function finalizarCompra() {
 
     const auto = document.getElementById('compraAuto').value.trim();
     const clave = document.getElementById('compraClave').value.trim();
+    const f_cad = document.getElementById('compraFechaCaducidad').value;
 
     if (optProv.dataset.tipo === 'FACTURA' && !clave) {
         return reinaAlert('Faltan Datos', 'Las facturas electrónicas requieren la Clave de Acceso.', 'warning');
     }
-    if (optProv.dataset.tipo !== 'FACTURA' && !auto) {
-        return reinaAlert('Faltan Datos', 'Ingrese el Número de Autorización del SRI para este documento físico.', 'warning');
+    if (optProv.dataset.tipo !== 'FACTURA') {
+        if (!auto) return reinaAlert('Faltan Datos', 'Ingrese el Número de Autorización del SRI para este documento físico.', 'warning');
+        if (!f_cad) return reinaAlert('Faltan Datos', 'La fecha de caducidad es obligatoria para Notas de Venta.', 'warning');
+        
+        // Validación de Vigencia en JS
+        const hoy = new Date(); hoy.setHours(0,0,0,0);
+        const cad = new Date(f_cad + 'T00:00:00');
+        if (cad < hoy) {
+            return reinaAlert('Documento Caducado', 'LA NOTA DE VENTA ESTÁ CADUCADA. NO SE PUEDE INGRESAR.', 'danger');
+        }
     }
 
     if(itemsCompra.length === 0) return reinaAlert('Faltan Datos', 'Añada al menos un insumo.', 'warning');
@@ -461,7 +507,7 @@ async function finalizarCompra() {
             body: JSON.stringify({ 
                 compra_id: document.getElementById('compraId').value || null, sucursal_id: document.getElementById('compraSucursal').value, 
                 proveedor_id: optProv.value, establecimiento: est, punto_emision: pto, numero_comprobante: sec,
-                clave_acceso: clave, numero_autorizacion: auto, 
+                clave_acceso: clave, numero_autorizacion: auto, fecha_caducidad: f_cad,
                 fecha: fecha, total: totalMostrado, items: itemsCompra 
             })
         });

@@ -58,8 +58,13 @@ def registrar_auditoria(accion, detalle):
         # Capturar IP real (considerando proxies/nube)
         ip = request.headers.get('X-Forwarded-For', request.remote_addr)
         if ',' in ip: ip = ip.split(',')[0] # Tomar la primera si hay varias
+        
+        # Incluir nombre de sucursal en el detalle si está en sesión
+        suc_nom = session.get('sucursal_nombre', 'S/S')
+        detalle_enriquecido = f"[{suc_nom}] {detalle}"
+        
         cur.execute("INSERT INTO auditoria (usuario_id, accion, detalle, ip) VALUES (%s, %s, %s, %s)",
-                    (session.get('user_id'), accion, detalle, ip))
+                    (session.get('user_id'), accion, detalle_enriquecido, ip))
         mysql.connection.commit(); cur.close()
     except: pass
 
@@ -71,6 +76,18 @@ def generar_clave_acceso_sri(fecha, ruc_empresa, ambiente):
     f = fecha.strftime('%d%m%Y')
     clave = f"{f}01{ruc_empresa}{ambiente}001001{random.randint(1,999999):09d}123456781"
     return clave[:49]
+
+# --- CONTEXT PROCESSOR GLOBAL ---
+@app.context_processor
+def inject_empresa():
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT nombre_comercial, color_tema FROM empresa LIMIT 1")
+        e = cur.fetchone()
+        cur.close()
+        if e: return dict(config_empresa=e)
+    except: pass
+    return dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938'})
 
 # --- DECORADORES ---
 def login_required(f):
@@ -151,7 +168,7 @@ def editar_compra(id):
     cur = mysql.connection.cursor()
     cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1"); emp = cur.fetchone()
     iva_p = emp['iva_porcentaje'] if emp else 15.00
-    cur.execute("SELECT * FROM compras WHERE id = %s", (id,))
+    cur.execute("SELECT *, DATE_FORMAT(fecha_caducidad, '%%Y-%%m-%%d') as fecha_caducidad_fmt FROM compras WHERE id = %s", (id,))
     compra = cur.fetchone()
     cur.execute("SELECT dc.*, i.nombre, u.nombre as unidad_medida FROM detalles_compras dc JOIN insumos i ON dc.insumo_id = i.id JOIN unidades_medida u ON i.unidad_medida_id = u.id WHERE dc.compra_id = %s", (id,))
     detalles = cur.fetchall()
@@ -244,18 +261,26 @@ def guardar_compra():
         pto = data.get('punto_emision') or '001'
         sec = (data.get('numero_comprobante') or '').upper()
         n_aut = data.get('numero_autorizacion')
+        f_cad = data.get('fecha_caducidad')
         
+        # Validación de Caducidad (Si viene fecha de caducidad)
+        if f_cad:
+            hoy = datetime.now().date()
+            cad = datetime.strptime(f_cad, '%Y-%m-%d').date()
+            if cad < hoy:
+                return jsonify({'success': False, 'message': 'LA NOTA DE VENTA ESTÁ CADUCADA. NO SE PUEDE INGRESAR.'})
+
         if id_c:
             cur.execute("SELECT insumo_id, cantidad FROM detalles_compras WHERE compra_id = %s", (id_c,))
             for iv in cur.fetchall(): cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (iv['cantidad'], iv['insumo_id']))
             cur.execute("""UPDATE compras SET proveedor_id=%s, sucursal_id=%s, establecimiento=%s, punto_emision=%s, numero_comprobante=%s, 
-                           total=%s, fecha=%s, clave_acceso=%s, numero_autorizacion=%s, usuario_modificacion_id=%s WHERE id=%s""", 
-                        (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, cl, n_aut, u_id, id_c))
+                           total=%s, fecha=%s, clave_acceso=%s, numero_autorizacion=%s, fecha_caducidad=%s, usuario_modificacion_id=%s WHERE id=%s""", 
+                        (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, cl, n_aut, f_cad, u_id, id_c))
             cur.execute("DELETE FROM detalles_compras WHERE compra_id = %s", (id_c,)); comp_id = id_c
         else:
-            cur.execute("""INSERT INTO compras (proveedor_id, sucursal_id, establecimiento, punto_emision, numero_comprobante, total, fecha, clave_acceso, numero_autorizacion, usuario_creacion_id, usuario_modificacion_id) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
-                        (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, cl, n_aut, u_id, u_id))
+            cur.execute("""INSERT INTO compras (proveedor_id, sucursal_id, establecimiento, punto_emision, numero_comprobante, total, fecha, clave_acceso, numero_autorizacion, fecha_caducidad, usuario_creacion_id, usuario_modificacion_id) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
+                        (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, cl, n_aut, f_cad, u_id, u_id))
             comp_id = cur.lastrowid
         
         for i in data['items']:
@@ -320,6 +345,17 @@ def buscar_cliente(cedula):
 def guardar_cliente():
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
     t_id = d.get('tipo_identificacion_id') or identificar_tipo_doc(d['cedula_ruc'])
+    
+    # --- VALIDACIÓN: SOLO UN CONSUMIDOR FINAL (ID 4) ---
+    if str(t_id) == '4':
+        query_check = "SELECT id FROM clientes WHERE tipo_identificacion_id = 4"
+        if d.get('id'): query_check += f" AND id != {d['id']}" # Si es edición, ignorar al actual
+        cur.execute(query_check)
+        if cur.fetchone():
+            cur.close()
+            flash('YA EXISTE UN REGISTRO DE CONSUMIDOR FINAL. NO SE PERMITEN DUPLICADOS.', 'danger')
+            return redirect(url_for('clientes'))
+
     nom, ape, dir = d['nombres'].upper(), d['apellidos'].upper(), d['direccion'].upper()
     if d.get('id'):
         cur.execute("UPDATE clientes SET cedula_ruc=%s, tipo_identificacion_id=%s, nombres=%s, apellidos=%s, direccion=%s, telefono=%s, email=%s, usuario_modificacion_id=%s WHERE id=%s", (d['cedula_ruc'], t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, d['id']))
@@ -576,8 +612,9 @@ def guardar_empresa():
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
     ruc, razon, nom, dir = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion_matriz'].upper()
     iva = d.get('iva_porcentaje', 15.00)
-    if d.get('id'): cur.execute("UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, iva, d['ambiente'], u_id, d['id']))
-    else: cur.execute("INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (ruc, razon, nom, dir, iva, d['ambiente'], u_id, u_id))
+    color = d.get('color_tema', '#008938')
+    if d.get('id'): cur.execute("UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, iva, d['ambiente'], color, u_id, d['id']))
+    else: cur.execute("INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (ruc, razon, nom, dir, iva, d['ambiente'], color, u_id, u_id))
     mysql.connection.commit(); cur.close(); flash('Datos guardados', 'success'); return redirect(url_for('configuracion_empresa'))
 
 @app.route('/pos')
