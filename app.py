@@ -55,6 +55,7 @@ def get_db_cursor():
 def registrar_auditoria(accion, detalle):
     try:
         cur = mysql.connection.cursor()
+        cur.execute("SET time_zone = '-05:00'") # Forzar zona horaria en esta conexión
         # Capturar IP real (considerando proxies/nube)
         ip = request.headers.get('X-Forwarded-For', request.remote_addr)
         if ',' in ip: ip = ip.split(',')[0] # Tomar la primera si hay varias
