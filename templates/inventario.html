@@ -84,7 +84,7 @@
 
 <!-- Modal Nuevo/Editar Insumo -->
 <div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="modalInsumo" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
         <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
             <form action="{{ url_for('guardar_insumo') }}" method="POST">
                 <div class="modal-header bg-success text-white border-0">
@@ -119,6 +119,7 @@
                     <div class="mb-3">
                         <label class="small fw-bold text-muted">Sucursal</label>
                         <select name="sucursal_id" id="insumo_sucursal" class="form-select bg-light border-0" required>
+                            <option value="" disabled selected>-- SELECCIONE SUCURSAL --</option>
                             {% for s in sucursales %}
                             <option value="{{ s.id }}">{{ s.nombre }}</option>
                             {% endfor %}
@@ -136,7 +137,7 @@
 
 <!-- Modal Ajuste Manual -->
 <div class="modal fade" id="modalAjuste" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
         <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
             <form action="{{ url_for('ajustar_inventario') }}" method="POST">
                 <div class="modal-header bg-warning border-0">
@@ -147,6 +148,7 @@
                     <div class="mb-3">
                         <label class="small fw-bold text-muted">Seleccionar Insumo</label>
                         <select name="insumo_id" class="form-select bg-light border-0" required>
+                            <option value="" disabled selected>-- SELECCIONE INSUMO --</option>
                             {% for i in insumos %}
                             <option value="{{ i.id }}">{{ i.nombre }} ({{ i.sucursal_nombre }})</option>
                             {% endfor %}
@@ -156,6 +158,7 @@
                         <div class="col-md-6 mb-3">
                             <label class="small fw-bold text-muted">Tipo</label>
                             <select name="tipo" class="form-select bg-light border-0" required>
+                                <option value="" disabled selected>-- TIPO --</option>
                                 <option value="EGRESO">MERMA/PÉRDIDA</option>
                                 <option value="INGRESO">CORRECCIÓN (+)</option>
                             </select>
@@ -198,7 +201,8 @@ function nuevoInsumo() {
     document.getElementById('insumo_nombre').value = '';
     document.getElementById('insumo_stock').value = '0';
     document.getElementById('insumo_minimo').value = '0';
-    document.getElementById('insumo_unidad_id').value = '';
+    document.getElementById('insumo_unidad_id').value = ''; // Resetear unidad
+    document.getElementById('insumo_sucursal').value = ''; // Resetear sucursal
     document.getElementById('modalInsumoTitle').innerText = 'Nuevo Insumo';
     miModalInsumo.show();
 }

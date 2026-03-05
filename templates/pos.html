@@ -235,11 +235,19 @@
 </div>
 
 <div class="modal fade" id="modalCliente" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
         <div class="modal-content border-0 rounded-4 shadow">
             <div class="modal-header bg-success text-white border-0"><h5 class="fw-bold mb-0">Nuevo Cliente</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
             <div class="modal-body p-4">
-                <div class="mb-3"><label class="small fw-bold text-muted">Tipo de Identificación</label><select id="new_tipo_id" class="form-select bg-light border-0">{% for t in tipos_id %}<option value="{{ t.id }}">{{ t.nombre }}</option>{% endfor %}</select></div>
+                <div class="mb-3">
+                    <label class="small fw-bold text-muted">Tipo de Identificación</label>
+                    <select id="new_tipo_id" class="form-select bg-light border-0" required>
+                        <option value="" disabled selected>-- SELECCIONE TIPO --</option>
+                        {% for t in tipos_id %}
+                        <option value="{{ t.id }}">{{ t.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <div class="mb-3"><label class="small fw-bold text-muted">Número de Identificación</label><input type="text" id="new_cedula" class="form-control bg-light border-0" required></div>
                 <div class="row"><div class="col-6 mb-3"><label class="small fw-bold text-muted">Nombres</label><input type="text" id="new_nombres" class="form-control bg-light border-0 force-upper"></div><div class="col-6 mb-3"><label class="small fw-bold text-muted">Apellidos</label><input type="text" id="new_apellidos" class="form-control bg-light border-0 force-upper"></div></div>
                 <div class="mb-3"><label class="small fw-bold text-muted">Dirección</label><input type="text" id="new_direccion" class="form-control bg-light border-0 force-upper"></div>

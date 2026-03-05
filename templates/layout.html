@@ -203,13 +203,22 @@
 
     // Auto-cerrar alertas flash después de 3 segundos
     document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(function() {
-            let alerts = document.querySelectorAll('.alert');
-            alerts.forEach(function(alert) {
-                let bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
-            });
-        }, 3000);
+        // Capturar mensajes flash de error para mostrarlos en reinaAlert si son críticos
+        let alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function(alert) {
+            if (alert.classList.contains('alert-danger')) {
+                // Si es un error, usar el modal elegante reinaAlert
+                const mensaje = alert.textContent.trim().replace('×', ''); // Limpiar el botón de cierre
+                reinaAlert('Atención', mensaje, 'danger');
+                alert.remove(); // Quitar la alerta pequeña
+            } else {
+                // Si es éxito o info, dejar la alerta flotante y cerrarla en 3s
+                setTimeout(function() {
+                    let bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }, 3000);
+            }
+        });
     });
 
     // Auto-mostrar loading en formularios estándar (Solo si no han sido cancelados)

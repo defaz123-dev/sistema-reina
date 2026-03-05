@@ -56,6 +56,10 @@
                                     data-eml="{{ p.email }}" data-tipo="{{ p.tipo_comprobante_id }}">
                                 <i class="fas fa-edit text-primary"></i>
                             </button>
+                            <button class="btn btn-sm btn-light rounded-pill px-3" 
+                                    onclick="confirmarBajaProveedor({{ p.id }}, '{{ p.razon_social }}')">
+                                <i class="fas fa-trash text-danger"></i>
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -103,6 +107,7 @@
                         <div class="col-md-4">
                             <label class="form-label small fw-bold">Tipo Comprobante</label>
                             <select name="tipo_comprobante_id" id="inputTipo" class="form-select" required>
+                                <option value="" disabled selected>-- SELECCIONE --</option>
                                 {% for t in tipos %}
                                 <option value="{{ t.id }}">{{ t.nombre }}</option>
                                 {% endfor %}
@@ -158,6 +163,14 @@ if(modalProv) {
         const f = modalProv.querySelector('form');
         if(f) f.reset();
         document.querySelector('.modal-title').innerHTML = '<i class="fas fa-truck me-2"></i> Datos del Proveedor';
+    });
+}
+
+function confirmarBajaProveedor(id, nombre) {
+    reinaConfirm('¿Dar de baja proveedor?', `¿Está seguro de eliminar a <b>${nombre}</b>? Esta acción no se puede deshacer.`).then((ok) => {
+        if (ok) {
+            window.location.href = "/proveedores/eliminar/" + id;
+        }
     });
 }
 </script>

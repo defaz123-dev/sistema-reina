@@ -76,7 +76,7 @@
 
 <!-- Modal Cliente -->
 <div class="modal fade" id="modalCliente" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
         <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
             <form action="{{ url_for('guardar_cliente') }}" method="POST" onsubmit="return validarAntesDeEnviar()">
                 <div class="modal-header bg-success text-white border-0">
@@ -85,40 +85,46 @@
                 </div>
                 <div class="modal-body p-4">
                     <input type="hidden" name="id" id="cliente_id">
+                    
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted">Tipo de Identificación</label>
-                        <select name="tipo_identificacion_id" id="cliente_tipo_id" class="form-select bg-light border-0" required>
+                        <label class="extra-small fw-bold text-muted text-uppercase">Tipo de Identificación</label>
+                        <select name="tipo_identificacion_id" id="cliente_tipo_id" class="form-select form-select-sm bg-light border-0" required>
+                            <option value="" disabled selected>-- SELECCIONE TIPO --</option>
                             {% for t in tipos_id %}
                             <option value="{{ t.id }}">{{ t.nombre }}</option>
                             {% endfor %}
                         </select>
                     </div>
+
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted">Número de Identificación</label>
-                        <input type="text" name="cedula_ruc" id="cliente_doc" class="form-control bg-light border-0" required>
+                        <label class="extra-small fw-bold text-muted text-uppercase">Número de Identificación</label>
+                        <input type="text" name="cedula_ruc" id="cliente_doc" class="form-control form-control-sm bg-light border-0" required>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="small fw-bold text-muted">Nombres</label>
-                            <input type="text" name="nombres" id="cliente_nom" class="form-control bg-light border-0 force-upper" required>
+
+                    <div class="row g-2">
+                        <div class="col-6 mb-3">
+                            <label class="extra-small fw-bold text-muted text-uppercase">Nombres</label>
+                            <input type="text" name="nombres" id="cliente_nom" class="form-control form-control-sm bg-light border-0 force-upper" required>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="small fw-bold text-muted">Apellidos</label>
-                            <input type="text" name="apellidos" id="cliente_ape" class="form-control bg-light border-0 force-upper" required>
+                        <div class="col-6 mb-3">
+                            <label class="extra-small fw-bold text-muted text-uppercase">Apellidos</label>
+                            <input type="text" name="apellidos" id="cliente_ape" class="form-control form-control-sm bg-light border-0 force-upper" required>
                         </div>
                     </div>
+
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted">Dirección</label>
-                        <input type="text" name="direccion" id="cliente_dir" class="form-control bg-light border-0 force-upper">
+                        <label class="extra-small fw-bold text-muted text-uppercase">Dirección</label>
+                        <input type="text" name="direccion" id="cliente_dir" class="form-control form-control-sm bg-light border-0 force-upper">
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="small fw-bold text-muted">Teléfono</label>
-                            <input type="text" name="telefono" id="cliente_tel" class="form-control bg-light border-0">
+
+                    <div class="row g-2">
+                        <div class="col-6 mb-3">
+                            <label class="extra-small fw-bold text-muted text-uppercase">Teléfono</label>
+                            <input type="text" name="telefono" id="cliente_tel" class="form-control form-control-sm bg-light border-0">
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="small fw-bold text-muted">Email</label>
-                            <input type="email" name="email" id="cliente_eml" class="form-control bg-light border-0">
+                        <div class="col-6 mb-0">
+                            <label class="extra-small fw-bold text-muted text-uppercase">Email</label>
+                            <input type="email" name="email" id="cliente_eml" class="form-control form-control-sm bg-light border-0">
                         </div>
                     </div>
                 </div>
@@ -183,13 +189,13 @@
 
     function prepararNuevoCliente() {
         document.getElementById('cliente_id').value = '';
-        document.getElementById('cliente_tipo_id').value = '1';
         document.getElementById('cliente_doc').value = '';
         document.getElementById('cliente_nom').value = '';
         document.getElementById('cliente_ape').value = '';
         document.getElementById('cliente_dir').value = '';
         document.getElementById('cliente_tel').value = '';
         document.getElementById('cliente_eml').value = '';
+        document.getElementById('cliente_tipo_id').value = ''; // Resetear selector
         document.getElementById('modalClienteTitle').innerText = 'Nuevo Cliente';
     }
 

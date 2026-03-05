@@ -101,7 +101,8 @@
                     </div>
                     <div class="mb-3">
                         <label class="small fw-bold text-muted">Categoría</label>
-                        <select name="categoria_id" id="prod_cat" class="form-select bg-light border-0">
+                        <select name="categoria_id" id="prod_cat" class="form-select bg-light border-0" required>
+                            <option value="" disabled selected>-- SELECCIONE CATEGORÍA --</option>
                             {% for c in categorias %}
                             <option value="{{ c.id }}">{{ c.nombre }}</option>
                             {% endfor %}
@@ -137,6 +138,7 @@
         document.getElementById('prod_cod').value = '';
         document.getElementById('prod_pre').value = '';
         document.getElementById('prod_nom').value = '';
+        document.getElementById('prod_cat').value = ''; // Resetear categoría
         document.getElementById('modalProductoTitle').innerText = 'Nuevo Producto';
     }
 

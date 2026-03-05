@@ -120,16 +120,26 @@ def index():
 @app.route('/login', methods=['POST'])
 def login():
     if request.method == 'POST':
-        u, p, s = request.form['usuario'].lower().strip(), request.form['password'], int(request.form['sucursal'])
+        c, p, s = request.form['usuario'].strip(), request.form['password'], int(request.form['sucursal'])
         cur = mysql.connection.cursor()
-        cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE LOWER(u.usuario)=%s AND u.activo=1", (u,))
+        # Buscamos el usuario por su Cédula (Identificador único)
+        cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE u.cedula=%s", (c,))
         user = cur.fetchone(); cur.close()
-        if user and check_password_hash(user['password'], p):
-            # Se elimina la validación estricta de sucursal para permitir rotación de empleados
-            session.update({'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol'], 'sucursal_id': s, 'sucursal_nombre': user['sucursal_nombre']})
-            registrar_auditoria('LOGIN', f"Usuario {user['usuario']} inició sesión en sucursal ID: {s}")
-            return redirect(url_for('dashboard'))
-        flash('Credenciales incorrectas', 'danger')
+        
+        if user:
+            # 1. Verificar si está activo
+            if user['activo'] == 0:
+                flash('SU CUENTA HA SIDO DESACTIVADA. CONTACTE AL ADMINISTRADOR.', 'danger')
+                return redirect(url_for('index'))
+            
+            # 2. Verificar contraseña
+            if check_password_hash(user['password'], p):
+                session.update({'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol'], 'sucursal_id': s, 'sucursal_nombre': user['sucursal_nombre']})
+                registrar_auditoria('LOGIN', f"Usuario {user['usuario']} (Cédula: {user['cedula']}) inició sesión en sucursal ID: {s}")
+                return redirect(url_for('dashboard'))
+        
+        # 3. Si no existe o contraseña mal
+        flash('CREDENCIALES INCORRECTAS (Cédula o Contraseña).', 'danger')
     return redirect(url_for('index'))
 
 @app.route('/logout')
@@ -212,6 +222,10 @@ def consultar_sri(clave):
         factura_root = ET.fromstring(comprobante_xml_str)
         info_t = factura_root.find('infoTributaria'); info_f = factura_root.find('infoFactura')
         
+        # Obtener razón social del comprador (Adquirente)
+        comprador = info_f.find('razonSocialComprador')
+        razon_comprador = comprador.text if comprador is not None else "NO IDENTIFICADO"
+
         # Extraer Detalles (Items)
         items_sri = []
         detalles_node = factura_root.find('detalles')
@@ -235,6 +249,7 @@ def consultar_sri(clave):
         f_sri = info_f.find('fechaEmision').text; f_parts = f_sri.split('/'); f_iso = f"{f_parts[2]}-{f_parts[1]}-{f_parts[0]}"
         return jsonify({
             'success': True, 'ruc_proveedor': info_t.find('ruc').text, 'razon_social': info_t.find('razonSocial').text,
+            'razon_social_comprador': razon_comprador,
             'establecimiento': info_t.find('estab').text, 'punto_emision': info_t.find('ptoEmi').text,
             'secuencial': info_t.find('secuencial').text, 'fecha_emision': f_iso, 'total': float(info_f.find('importeTotal').text),
             'items': items_sri
@@ -528,30 +543,47 @@ def ver_auditoria():
 @login_required
 @admin_required
 def usuarios():
-    cur = mysql.connection.cursor(); cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u LEFT JOIN sucursales s ON u.sucursal_id=s.id"); u = cur.fetchall(); cur.execute("SELECT * FROM sucursales"); s = cur.fetchall(); cur.close(); return render_template('usuarios.html', usuarios=u, sucursales=s)
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT u.*, s.nombre as sucursal_nombre, t.nombre as tipo_id_nombre FROM usuarios u LEFT JOIN sucursales s ON u.sucursal_id=s.id JOIN tipos_identificacion t ON u.tipo_identificacion_id = t.id")
+    u = cur.fetchall()
+    cur.execute("SELECT * FROM sucursales")
+    s = cur.fetchall()
+    # Excluir RUC (ID 2) y Consumidor Final (ID 4) para el registro de usuarios
+    cur.execute("SELECT * FROM tipos_identificacion WHERE id NOT IN (2, 4)")
+    t = cur.fetchall()
+    cur.close()
+    return render_template('usuarios.html', usuarios=u, sucursales=s, tipos_id=t)
 
 @app.route('/usuarios/crear', methods=['POST'])
 @login_required
 @admin_required
 def crear_usuario():
-    u, p, s, r = request.form['usuario'], request.form['password'], request.form['sucursal_id'], request.form['rol']; hp = generate_password_hash(p); cur = mysql.connection.cursor()
-    cur.execute("INSERT INTO usuarios (usuario, password, sucursal_id, rol, activo) VALUES (%s, %s, %s, %s, 1)", (u, hp, s, r)); mysql.connection.commit(); cur.close(); return redirect(url_for('usuarios'))
+    c, u, p, s, r, tid = request.form['cedula'].strip(), request.form['usuario'].upper().strip(), request.form['password'], request.form['sucursal_id'], request.form['rol'], request.form['tipo_identificacion_id']
+    hp = generate_password_hash(p); cur = mysql.connection.cursor()
+    try:
+        cur.execute("INSERT INTO usuarios (cedula, usuario, password, sucursal_id, rol, activo, tipo_identificacion_id) VALUES (%s, %s, %s, %s, %s, 1, %s)", (c, u, hp, s, r, tid)); mysql.connection.commit()
+    except Exception as e: flash(f"Error al crear: {str(e)}", 'danger')
+    cur.close(); return redirect(url_for('usuarios'))
 
 @app.route('/usuarios/editar', methods=['POST'])
 @login_required
 @admin_required
 def editar_usuario():
-    id_u, u, p, s, r, a = request.form['id'], request.form['usuario'], request.form['password'], request.form['sucursal_id'], request.form['rol'], request.form['activo']; cur = mysql.connection.cursor()
-    if p: hp = generate_password_hash(p); cur.execute("UPDATE usuarios SET usuario=%s, password=%s, sucursal_id=%s, rol=%s, activo=%s WHERE id=%s", (u, hp, s, r, a, id_u))
-    else: cur.execute("UPDATE usuarios SET usuario=%s, sucursal_id=%s, rol=%s, activo=%s WHERE id=%s", (u, s, r, a, id_u))
-    mysql.connection.commit(); cur.close(); return redirect(url_for('usuarios'))
+    id_u, c, u, p, s, r, a, tid = request.form['id'], request.form['cedula'].strip(), request.form['usuario'].upper().strip(), request.form['password'], request.form['sucursal_id'], request.form['rol'], request.form['activo'], request.form['tipo_identificacion_id']
+    cur = mysql.connection.cursor()
+    try:
+        if p: hp = generate_password_hash(p); cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, password=%s, sucursal_id=%s, rol=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, hp, s, r, a, tid, id_u))
+        else: cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, sucursal_id=%s, rol=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, s, r, a, tid, id_u))
+        mysql.connection.commit()
+    except Exception as e: flash(f"Error al editar: {str(e)}", 'danger')
+    cur.close(); return redirect(url_for('usuarios'))
 
 @app.route('/proveedores')
 @login_required
 @admin_required
 def proveedores():
     cur = mysql.connection.cursor()
-    cur.execute("SELECT p.*, t.nombre as tipo_comprobante FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id")
+    cur.execute("SELECT p.*, t.nombre as tipo_comprobante_nombre FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id")
     p = cur.fetchall()
     cur.execute("SELECT * FROM tipos_comprobantes"); t = cur.fetchall(); cur.close()
     return render_template('proveedores.html', proveedores=p, tipos=t)
@@ -573,6 +605,35 @@ def guardar_proveedor():
         mysql.connection.commit(); flash('Proveedor guardado', 'success')
     except Exception as e: flash(str(e), 'danger')
     cur.close(); return redirect(url_for('proveedores'))
+
+@app.route('/proveedores/eliminar/<int:id>')
+@login_required
+@admin_required
+def eliminar_proveedor(id):
+    cur = mysql.connection.cursor()
+    try:
+        # Verificar si tiene compras asociadas
+        cur.execute("SELECT COUNT(*) as cuenta FROM compras WHERE proveedor_id = %s", (id,))
+        tiene_compras = cur.fetchone()['cuenta'] > 0
+        
+        if tiene_compras:
+            flash('NO SE PUEDE DAR DE BAJA: El proveedor tiene compras registradas en el historial.', 'danger')
+        else:
+            cur.execute("SELECT razon_social FROM proveedores WHERE id = %s", (id,))
+            p = cur.fetchone()
+            razon = p['razon_social'] if p else "Desconocido"
+            
+            cur.execute("DELETE FROM proveedores WHERE id = %s", (id,))
+            mysql.connection.commit()
+            registrar_auditoria('ELIMINAR_PROVEEDOR', f"Eliminó al proveedor: {razon}")
+            flash('Proveedor eliminado correctamente', 'success')
+            
+    except Exception as e:
+        mysql.connection.rollback()
+        flash(f"Error al procesar la solicitud: {str(e)}", 'danger')
+    finally:
+        cur.close()
+    return redirect(url_for('proveedores'))
 
 @app.route('/sucursales')
 @login_required

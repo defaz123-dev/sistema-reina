@@ -33,8 +33,9 @@
                 <input type="hidden" id="compraId" value="{{ compra.id if compra else '' }}">
                 <div class="col-md-4">
                     <label class="extra-small fw-bold text-muted">Sucursal de Destino</label>
-                    <select id="compraSucursal" class="form-select form-select-sm bg-light border-0 fw-bold">
-                        {% for s in sucursales %}<option value="{{ s.id }}" {{ 'selected' if (compra and compra.sucursal_id == s.id) or (not compra and session['sucursal_id'] == s.id) else '' }}>{{ s.nombre }}</option>{% endfor %}
+                    <select id="compraSucursal" class="form-select form-select-sm bg-light border-0 fw-bold" required>
+                        <option value="" disabled selected>-- SELECCIONE SUCURSAL --</option>
+                        {% for s in sucursales %}<option value="{{ s.id }}" {{ 'selected' if (compra and compra.sucursal_id == s.id) else '' }}>{{ s.nombre }}</option>{% endfor %}
                     </select>
                 </div>
                 <div class="col-md-5">
@@ -191,7 +192,7 @@
                         </div>
                         <div class="col-6 text-end">
                             <div class="extra-small fw-bold text-muted">ADQUIRENTE:</div>
-                            <div class="fw-bold">{{ config_empresa.nombre_comercial }}</div>
+                            <div id="prevAdquirente" class="fw-bold"></div>
                         </div>
                     </div>
                     <table class="table table-sm extra-small">
@@ -422,6 +423,7 @@ async function consultarDatosSRI() {
             document.getElementById('prevComprobante').textContent = `${data.establecimiento}-${data.punto_emision}-${data.secuencial}`;
             document.getElementById('prevClave').textContent = clave;
             document.getElementById('prevFecha').textContent = data.fecha_emision;
+            document.getElementById('prevAdquirente').textContent = data.razon_social_comprador || "CLIENTE NO IDENTIFICADO";
             document.getElementById('prevTotal').textContent = `$ ${data.total.toFixed(2)}`;
 
             let itemsHtml = '';

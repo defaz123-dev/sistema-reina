@@ -32,6 +32,7 @@
             <table class="table table-hover align-middle" id="tablaUsuarios">
                 <thead class="table-light">
                     <tr class="small text-muted text-uppercase">
+                        <th>Identificación</th>
                         <th>Usuario</th>
                         <th>Sucursal Asignada</th>
                         <th>Rol</th>
@@ -42,6 +43,10 @@
                 <tbody>
                     {% for u in usuarios %}
                     <tr>
+                        <td>
+                            <div class="fw-bold text-dark">{{ u.cedula }}</div>
+                            <div class="extra-small text-muted text-uppercase">{{ u.tipo_id_nombre }}</div>
+                        </td>
                         <td class="fw-bold"><i class="fas fa-user-circle me-2 text-primary"></i> {{ u.usuario }}</td>
                         <td><span class="badge bg-light text-dark border">{{ u.sucursal_nombre }}</span></td>
                         <td><span class="badge {{ 'bg-success' if u.rol == 'ADMIN' else 'bg-secondary' }}">{{ u.rol }}</span></td>
@@ -57,6 +62,8 @@
                                     data-bs-toggle="modal" 
                                     data-bs-target="#modalUsuario"
                                     data-id="{{ u.id }}"
+                                    data-cedula="{{ u.cedula }}"
+                                    data-tipo-id="{{ u.tipo_identificacion_id }}"
                                     data-usuario="{{ u.usuario }}"
                                     data-sucursal-id="{{ u.sucursal_id }}"
                                     data-rol="{{ u.rol }}"
@@ -75,7 +82,7 @@
 
 <!-- Modal Usuario -->
 <div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="modalUsuario" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
         <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
             <form action="{{ url_for('crear_usuario') }}" id="formUsuario" method="POST">
                 <div class="modal-header bg-success text-white border-0">
@@ -84,33 +91,58 @@
                 </div>
                 <div class="modal-body p-4">
                     <input type="hidden" name="id" id="user_id">
+                    
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted">Nombre de Usuario</label>
-                        <input type="text" name="usuario" id="user_name" class="form-control bg-light border-0" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="small fw-bold text-muted">Contraseña</label>
-                        <input type="password" name="password" id="user_pass" class="form-control bg-light border-0" placeholder="Mín. 4 caracteres">
-                        <small class="text-muted" id="passHelp">Dejar en blanco si no desea cambiarla al editar.</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="small fw-bold text-muted">Sucursal</label>
-                        <select name="sucursal_id" id="user_suc" class="form-select bg-light border-0">
-                            {% for s in sucursales %}
-                            <option value="{{ s.id }}">{{ s.nombre }}</option>
+                        <label class="extra-small fw-bold text-muted text-uppercase">Tipo de Identificación</label>
+                        <select name="tipo_identificacion_id" id="user_tipo_id" class="form-select form-select-sm bg-light border-0" required>
+                            <option value="" disabled selected>-- SELECCIONE --</option>
+                            {% for t in tipos_id %}
+                            <option value="{{ t.id }}">{{ t.nombre }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="small fw-bold text-muted">Rol</label>
-                        <select name="rol" id="user_rol" class="form-select bg-light border-0">
-                            <option value="ADMIN">ADMINISTRADOR</option>
-                            <option value="VENDEDOR">VENDEDOR</option>
-                        </select>
+
+                    <div class="row g-2">
+                        <div class="col-6 mb-3">
+                            <label class="extra-small fw-bold text-muted text-uppercase">Identificación</label>
+                            <input type="text" name="cedula" id="user_ced" class="form-control form-control-sm bg-light border-0" required maxlength="13">
+                            <div id="cedulaError" class="text-danger extra-small mt-1" style="display:none;">Inválida.</div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="extra-small fw-bold text-muted text-uppercase">Usuario</label>
+                            <input type="text" name="usuario" id="user_name" class="form-control form-control-sm bg-light border-0 force-upper" required>
+                        </div>
                     </div>
-                    <div class="mb-3" id="divActivo" style="display:none;">
-                        <label class="small fw-bold text-muted">Estado del Usuario</label>
-                        <select name="activo" id="user_act" class="form-select bg-light border-0">
+
+                    <div class="row g-2">
+                        <div class="col-6 mb-3">
+                            <label class="extra-small fw-bold text-muted text-uppercase">Sucursal</label>
+                            <select name="sucursal_id" id="edit_sucursal_id" class="form-select form-select-sm bg-light border-0" required>
+                                <option value="" disabled>-- SUCURSAL --</option>
+                                {% for s in sucursales %}
+                                <option value="{{ s.id }}">{{ s.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="extra-small fw-bold text-muted text-uppercase">Rol</label>
+                            <select name="rol" id="edit_rol" class="form-select form-select-sm bg-light border-0" required>
+                                <option value="" disabled>-- ROL --</option>
+                                <option value="ADMIN">ADMINISTRADOR</option>
+                                <option value="USER">CAJERO</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="extra-small fw-bold text-muted text-uppercase">Contraseña</label>
+                        <input type="password" name="password" id="user_pass" class="form-control form-control-sm bg-light border-0" placeholder="Mín. 4 caracteres">
+                        <small class="text-muted extra-small" id="passHelp">Blanco para no cambiar.</small>
+                    </div>
+
+                    <div class="mb-0" id="divActivo" style="display:none;">
+                        <label class="extra-small fw-bold text-muted text-uppercase">Estado</label>
+                        <select name="activo" id="user_act" class="form-select form-select-sm bg-light border-0">
                             <option value="1">ACTIVO</option>
                             <option value="0">INACTIVO (BLOQUEADO)</option>
                         </select>
@@ -138,25 +170,67 @@
     function prepararNuevoUsuario() {
         document.getElementById('formUsuario').action = "{{ url_for('crear_usuario') }}";
         document.getElementById('user_id').value = '';
+        document.getElementById('user_tipo_id').value = '';
+        document.getElementById('user_ced').value = '';
         document.getElementById('user_name').value = '';
         document.getElementById('user_pass').required = true;
+        document.getElementById('edit_sucursal_id').value = '';
+        document.getElementById('edit_rol').value = '';
         document.getElementById('passHelp').style.display = 'none';
         document.getElementById('divActivo').style.display = 'none';
         document.getElementById('modalUsuarioTitle').innerText = 'Nuevo Usuario';
+        document.getElementById('cedulaError').style.display = 'none';
     }
 
     function prepararEdicionUsuario(btn) {
         document.getElementById('formUsuario').action = "{{ url_for('editar_usuario') }}";
         document.getElementById('user_id').value = btn.getAttribute('data-id');
+        document.getElementById('user_tipo_id').value = btn.getAttribute('data-tipo-id');
+        document.getElementById('user_ced').value = btn.getAttribute('data-cedula');
         document.getElementById('user_name').value = btn.getAttribute('data-usuario');
         document.getElementById('user_pass').required = false;
-        document.getElementById('user_suc').value = btn.getAttribute('data-sucursal-id');
-        document.getElementById('user_rol').value = btn.getAttribute('data-rol');
+        document.getElementById('edit_sucursal_id').value = btn.getAttribute('data-sucursal-id');
+        document.getElementById('edit_rol').value = btn.getAttribute('data-rol');
         document.getElementById('user_act').value = btn.getAttribute('data-activo');
         document.getElementById('passHelp').style.display = 'block';
         document.getElementById('divActivo').style.display = 'block';
         document.getElementById('modalUsuarioTitle').innerText = 'Editar Usuario';
+        document.getElementById('cedulaError').style.display = 'none';
     }
+
+    function validarCedula(cedula) {
+        if (cedula.length !== 10) return false;
+        const digito_region = parseInt(cedula.substring(0, 2));
+        if (digito_region < 1 || digito_region > 24) return false;
+        const ultimo_digito = parseInt(cedula.substring(9, 10));
+        let pares = 0, impares = 0;
+        for (let i = 0; i < 9; i++) {
+            let mult = (i % 2 === 0) ? parseInt(cedula[i]) * 2 : parseInt(cedula[i]);
+            if (mult > 9) mult -= 9;
+            if (i % 2 === 0) impares += mult; else pares += mult;
+        }
+        const suma_total = pares + impares;
+        const decena_superior = Math.ceil(suma_total / 10) * 10;
+        let digito_validador = decena_superior - suma_total;
+        if (digito_validador === 10) digito_validador = 0;
+        return digito_validador === ultimo_digito;
+    }
+
+    document.getElementById('formUsuario').addEventListener('submit', function(e) {
+        const tipo = document.getElementById('user_tipo_id').value;
+        const cedula = document.getElementById('user_ced').value;
+        if (tipo === "1") { // 1 es ID para CÉDULA en tipos_identificacion
+            if (!validarCedula(cedula)) {
+                e.preventDefault();
+                document.getElementById('cedulaError').style.display = 'block';
+                reinaAlert('Error de Validación', 'El número de cédula ingresado no es válido para Ecuador.', 'danger');
+            }
+        }
+    });
+
+    document.getElementById('user_ced').addEventListener('input', function() {
+        document.getElementById('cedulaError').style.display = 'none';
+    });
 </script>
 {% endblock %}
 {% endblock %}
