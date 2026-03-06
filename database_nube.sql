@@ -1,4 +1,4 @@
--- database_nube.sql (VERSIÓN PRO PLUS - MULTITARIFAS Y BI)
+-- database_nube.sql (VERSIÓN PRO PLUS - MULTITARIFAS, BI Y FACTURACIÓN ELECTRÓNICA)
 SET FOREIGN_KEY_CHECKS=0;
 DROP TABLE IF EXISTS auditoria, detalles_ventas, ventas, clientes, detalles_compras, compras, recetas, insumos, producto_precios, plataformas, productos, categorias, proveedores, usuarios, roles, sucursales, empresa, tipos_identificacion, tipos_comprobantes, unidades_medida, ajustes_inventario;
 SET FOREIGN_KEY_CHECKS=1;
@@ -35,6 +35,8 @@ CREATE TABLE plataformas (
 CREATE TABLE sucursales (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
+    establecimiento VARCHAR(3) DEFAULT '001',
+    punto_emision VARCHAR(3) DEFAULT '001',
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
@@ -49,8 +51,11 @@ CREATE TABLE empresa (
     direccion_matriz VARCHAR(255) NOT NULL,
     iva_porcentaje DECIMAL(5,2) DEFAULT 15.00,
     obligado_contabilidad VARCHAR(2) DEFAULT 'NO',
+    agente_retencion VARCHAR(50),
+    contribuyente_especial VARCHAR(50),
     ambiente INT DEFAULT 1, -- 1: Pruebas, 2: Produccion
     color_tema VARCHAR(7) DEFAULT '#008938',
+    firma_password VARCHAR(255),
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
@@ -104,7 +109,7 @@ CREATE TABLE productos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(50) UNIQUE,
     nombre VARCHAR(150) NOT NULL,
-    precio DECIMAL(10,2) NOT NULL,
+    precio DECIMAL(10,2) NOT NULL, -- Precio base (Local)
     categoria_id INT,
     imagen LONGBLOB,
     mimetype VARCHAR(50),
@@ -157,8 +162,8 @@ CREATE TABLE compras (
     id INT AUTO_INCREMENT PRIMARY KEY,
     fecha DATE NOT NULL,
     proveedor_id INT,
-    establecimiento VARCHAR(3),
-    punto_emision VARCHAR(3),
+    establecimiento VARCHAR(3) DEFAULT '001',
+    punto_emision VARCHAR(3) DEFAULT '001',
     sucursal_id INT,
     numero_comprobante VARCHAR(50),
     clave_acceso VARCHAR(49),
@@ -214,7 +219,13 @@ CREATE TABLE ventas (
     total DECIMAL(10,2),
     forma_pago VARCHAR(50),
     clave_acceso_sri VARCHAR(49),
-    estado_sri VARCHAR(20) DEFAULT 'PENDIENTE',
+    numero_autorizacion VARCHAR(50),
+    xml_autorizado LONGTEXT,
+    estado_sri VARCHAR(500) DEFAULT 'PENDIENTE',
+    autorizado_sri TINYINT(1) DEFAULT 0,
+    establecimiento VARCHAR(3) DEFAULT '001',
+    punto_emision VARCHAR(3) DEFAULT '001',
+    secuencial VARCHAR(9),
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
@@ -277,13 +288,13 @@ INSERT INTO roles (id, nombre) VALUES (1, 'ADMIN'), (2, 'USER');
 
 INSERT INTO plataformas (id, nombre) VALUES (1, 'LOCAL'), (2, 'PEDIDOS YA'), (3, 'UBER EATS');
 
-INSERT INTO sucursales (id, nombre) VALUES 
-(1, 'REINA VICTORIA PRINCIPAL'), (2, 'GRANADOS NORTE');
+INSERT INTO sucursales (id, nombre, establecimiento, punto_emision) VALUES 
+(1, 'REINA VICTORIA PRINCIPAL', '001', '001'), (2, 'GRANADOS NORTE', '002', '001');
 
--- USUARIOS (Passwords encriptados con scrypt)
+-- USUARIOS (Passwords encriptados reales del local)
 INSERT INTO usuarios (id, cedula, tipo_identificacion_id, usuario, password, sucursal_id, rol_id, activo) VALUES 
 (1, '1002597886', 1, 'CHRISTIAN DEFAZ', 'scrypt:32768:8:1$aMgnwvz2kmlCAbeU$0faa2b09d46b93a49b127171fbdafea440fc6ffb652887fdaf39a9a3f1329d75f47ad43b21fe519fb6b5df5f087173d70cdcd0b2a03423e19386ffbcc72eb330', 1, 1, 1),
 (2, '1714990726', 1, 'LILANA TADAY', 'scrypt:32768:8:1$yNbECha0koWV3lez$3718b2aa226db0a915a130292f3631bd7f52a8f7ef510311b521d83067873a572bcb1fe58348d14910c7c9d7e7505cc418de43aa907dc234190b3eb0d106d2f7', 1, 1, 1);
 
-INSERT INTO empresa (id, ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema) VALUES 
-(1, '1793023118001', 'ALIMENTOS LA REINA', 'SANDUCHES LA REINA', 'AV. PRINCIPAL Y SECUNDARIA', 15.00, 2, '#008a4e');
+INSERT INTO empresa (id, ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, obligado_contabilidad) VALUES 
+(1, '1768041140001', 'SERVICIO ECUATORIANO DE CAPACITACION PROFESIONAL', 'SANDUCHES LA REINA', 'QUITO', 15.00, 1, '#008a4e', 'NO');

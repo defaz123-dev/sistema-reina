@@ -34,6 +34,8 @@
                     <tr class="small text-muted text-uppercase">
                         <th>ID</th>
                         <th>Nombre de Sucursal</th>
+                        <th class="text-center">Estab.</th>
+                        <th class="text-center">Pto. Emi.</th>
                         <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -42,12 +44,16 @@
                     <tr>
                         <td>{{ s.id }}</td>
                         <td class="fw-bold">{{ s.nombre }}</td>
+                        <td class="text-center"><span class="badge bg-light text-dark border">{{ s.establecimiento }}</span></td>
+                        <td class="text-center"><span class="badge bg-light text-dark border">{{ s.punto_emision }}</span></td>
                         <td class="text-center">
                             <button class="btn btn-outline-primary border-0" 
                                     data-bs-toggle="modal" 
                                     data-bs-target="#modalSucursal"
                                     data-id="{{ s.id }}"
                                     data-nombre="{{ s.nombre }}"
+                                    data-estab="{{ s.establecimiento }}"
+                                    data-pto="{{ s.punto_emision }}"
                                     onclick="prepararEdicionSucursal(this)">
                                 <i class="fas fa-edit fa-lg action-icon"></i>
                             </button>
@@ -75,6 +81,16 @@
                         <label class="small fw-bold text-muted">Nombre</label>
                         <input type="text" name="nombre" id="suc_nom" class="form-control bg-light border-0 force-upper" required>
                     </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="small fw-bold text-muted">Establecimiento (3 dgt)</label>
+                            <input type="text" name="establecimiento" id="suc_est" class="form-control bg-light border-0" maxlength="3" required placeholder="001">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="small fw-bold text-muted">Punto Emisión (3 dgt)</label>
+                            <input type="text" name="punto_emision" id="suc_pto" class="form-control bg-light border-0" maxlength="3" required placeholder="001">
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer border-0 p-4 pt-0">
                     <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
@@ -98,11 +114,15 @@
     function nuevaSucursal() {
         document.getElementById('suc_id').value = '';
         document.getElementById('suc_nom').value = '';
+        document.getElementById('suc_est').value = '001';
+        document.getElementById('suc_pto').value = '001';
         document.getElementById('modalSucursalTitle').innerText = 'Nueva Sucursal';
     }
     function prepararEdicionSucursal(btn) {
         document.getElementById('suc_id').value = btn.getAttribute('data-id');
         document.getElementById('suc_nom').value = btn.getAttribute('data-nombre');
+        document.getElementById('suc_est').value = btn.getAttribute('data-estab');
+        document.getElementById('suc_pto').value = btn.getAttribute('data-pto');
         document.getElementById('modalSucursalTitle').innerText = 'Editar Sucursal';
     }
 </script>
