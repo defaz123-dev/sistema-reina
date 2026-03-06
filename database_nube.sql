@@ -214,7 +214,7 @@ CREATE TABLE ventas (
     total DECIMAL(10,2),
     forma_pago VARCHAR(50),
     clave_acceso_sri VARCHAR(49),
-    estado_sri VARCHAR(20) DEFAULT 'AUTORIZADO',
+    estado_sri VARCHAR(20) DEFAULT 'PENDIENTE',
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,

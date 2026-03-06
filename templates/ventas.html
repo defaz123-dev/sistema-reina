@@ -27,29 +27,49 @@
                 <thead class="table-light">
                     <tr class="small text-muted text-uppercase">
                         <th>Fecha y Hora</th>
-                        <th>Nombres</th>
-                        <th>Apellidos</th>
-                        <th>Sucursal</th>
+                        <th>Cliente</th>
                         <th>Vendedor</th>
                         <th>Forma Pago</th>
                         <th class="text-end">Total</th>
+                        <th class="text-center">Estado SRI</th>
                         <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for v in ventas %}
                     <tr>
-                        <td class="small">{{ v.fecha.strftime('%Y-%m-%d %H:%M') }}</td>
-                        <td class="fw-bold">{{ v.nombres }}</td>
-                        <td class="fw-bold">{{ v.apellidos }}</td>
-                        <td><span class="badge bg-light text-dark border">{{ session['sucursal_nombre'] }}</span></td>
+                        <td>
+                            <div class="small fw-bold">{{ v.fecha.strftime('%Y-%m-%d %H:%M') }}</div>
+                            <div class="extra-small text-muted font-monospace">{{ v.clave_acceso_sri }}</div>
+                        </td>
+                        <td>
+                            <div class="fw-bold small">{{ v.nombres }}</div>
+                            <div class="extra-small text-muted">{{ v.apellidos }}</div>
+                        </td>
                         <td><small>{{ v.usuario }}</small></td>
                         <td><span class="badge bg-info text-dark">{{ v.forma_pago }}</span></td>
                         <td class="text-end fw-bold text-success">${{ "%.2f"|format(v.total) }}</td>
                         <td class="text-center">
-                            <a href="{{ url_for('ver_ticket', id=v.id) }}" target="_blank" class="btn btn-outline-secondary border-0">
+                            {% if v.autorizado_sri %}
+                                <span class="badge bg-success rounded-pill px-3" title="Autorización: {{ v.numero_autorizacion }}">
+                                    <i class="fas fa-check-circle me-1"></i> AUTORIZADO
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark rounded-pill px-3" title="{{ v.estado_sri }}">
+                                    <i class="fas fa-clock me-1"></i> {{ v.estado_sri if v.estado_sri else 'PENDIENTE' }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <a href="{{ url_for('ver_ticket', id=v.id) }}" target="_blank" class="btn btn-outline-secondary border-0" title="Imprimir Ticket">
                                 <i class="fas fa-print fa-lg action-icon"></i>
                             </a>
+                            
+                            {% if not v.autorizado_sri %}
+                            <a href="{{ url_for('reintentar_sri', id=v.id) }}" class="btn btn-outline-primary border-0" title="Reintentar envío al SRI">
+                                <i class="fas fa-cloud-upload-alt fa-lg action-icon"></i>
+                            </a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

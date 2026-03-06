@@ -735,13 +735,37 @@ def configuracion_empresa():
 @login_required
 @admin_required
 def guardar_empresa():
+    from security_utils import cifrar_password
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
     ruc, razon, nom, dir = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion_matriz'].upper()
     iva = d.get('iva_porcentaje', 15.00)
     color = d.get('color_tema', '#008938')
-    if d.get('id'): cur.execute("UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, iva, d['ambiente'], color, u_id, d['id']))
-    else: cur.execute("INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (ruc, razon, nom, dir, iva, d['ambiente'], color, u_id, u_id))
-    mysql.connection.commit(); cur.close(); flash('Datos guardados', 'success'); return redirect(url_for('configuracion_empresa'))
+    
+    # CIFRAR CONTRASEÑA ANTES DE GUARDAR
+    f_pass = cifrar_password(d.get('firma_password', ''))
+    
+    # Procesar archivo de firma si se subió uno nuevo
+    firma_file = request.files.get('firma_file')
+    if firma_file and firma_file.filename != '':
+        # Asegurar que existe la carpeta certs
+        certs_dir = os.path.join(os.path.dirname(__file__), 'certs')
+        if not os.path.exists(certs_dir): os.makedirs(certs_dir)
+        # Guardar como firma.p12 (sobreescribir)
+        firma_file.save(os.path.join(certs_dir, 'firma.p12'))
+
+    if d.get('id'): 
+        cur.execute("""UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, 
+                       iva_porcentaje=%s, ambiente=%s, color_tema=%s, firma_password=%s, usuario_modificacion_id=%s 
+                       WHERE id=%s""", 
+                    (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, u_id, d['id']))
+    else: 
+        cur.execute("""INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, 
+                       ambiente, color_tema, firma_password, usuario_creacion_id, usuario_modificacion_id) 
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
+                    (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, u_id, u_id))
+    
+    mysql.connection.commit(); cur.close(); flash('Datos de empresa y firma actualizados', 'success')
+    return redirect(url_for('configuracion_empresa'))
 
 @app.route('/pos')
 @login_required
@@ -808,7 +832,7 @@ def procesar_venta_v2():
         # 2. Insertar Cabecera (con plataforma_id)
         cur.execute("""INSERT INTO ventas 
             (usuario_id, sucursal_id, cliente_id, plataforma_id, subtotal_0, subtotal_15, iva_valor, total, forma_pago, clave_acceso_sri, estado_sri, usuario_creacion_id, usuario_modificacion_id) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'AUTORIZADO', %s, %s)""", 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'PENDIENTE', %s, %s)""", 
             (u_id, s_id, c_id, plat_id, data.get('subtotal_0', 0), data.get('subtotal_15', 0), 
              data.get('iva_valor', 0), data['total'], fpago, clave, u_id, u_id))
         v_id = cur.lastrowid
@@ -827,6 +851,11 @@ def procesar_venta_v2():
                             (float(ing['cantidad_requerida']) * int(i['cantidad']), ing['insumo_id'], s_id))
         
         mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta registrada ID: {v_id} por ${data['total']}")
+        
+        # 4. Procesar Facturación Electrónica SRI (Background / Síncrono)
+        import facturacion_sri
+        facturacion_sri.procesar_factura_electronica(v_id, mysql)
+        
         return jsonify({'success': True, 'venta_id': v_id})
     except Exception as e:
         mysql.connection.rollback(); return jsonify({'success': False, 'message': str(e)})
@@ -848,6 +877,21 @@ def ver_ticket(id):
     cur.execute("SELECT dv.*, p.nombre FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id WHERE dv.venta_id=%s", (id,)); det = cur.fetchall()
     cur.execute("SELECT * FROM empresa LIMIT 1"); emp = cur.fetchone(); cur.close()
     return render_template('ticket.html', venta=v, cliente=c, sucursal=s, usuario=u, detalles=det, empresa=emp)
+
+@app.route('/ventas/reintentar_sri/<int:id>')
+@login_required
+@admin_required
+def reintentar_sri(id):
+    import facturacion_sri
+    try:
+        exito = facturacion_sri.procesar_factura_electronica(id, mysql)
+        if exito:
+            flash(f'Proceso SRI ejecutado para la venta #{id}. Verifique el estado.', 'info')
+        else:
+            flash(f'El proceso SRI reportó errores para la venta #{id}.', 'warning')
+    except Exception as e:
+        flash(f'Error al conectar con SRI: {str(e)}', 'danger')
+    return redirect(url_for('historial_ventas'))
 
 @app.route('/reportes')
 @login_required

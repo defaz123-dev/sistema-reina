@@ -20,7 +20,7 @@
 
 <div class="card border-0 shadow-sm rounded-4">
     <div class="card-body p-4">
-        <form action="{{ url_for('guardar_empresa') }}" method="POST">
+        <form action="{{ url_for('guardar_empresa') }}" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="id" value="{{ empresa.id if empresa else '' }}">
             
             <div class="row g-4">
@@ -34,11 +34,31 @@
                         <small class="text-muted extra-small">Aparecerá en barras de navegación y títulos.</small>
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="small fw-bold text-muted">Color Primario del Tema</label>
                         <div class="d-flex gap-2">
                             <input type="color" name="color_tema" class="form-control form-control-color border-0 p-1" value="{{ empresa.color_tema if empresa and empresa.color_tema else '#008938' }}" title="Elige el color del sistema">
                             <input type="text" class="form-control bg-light border-0 small font-monospace" value="{{ empresa.color_tema if empresa and empresa.color_tema else '#008938' }}" readonly style="width: 100px;">
+                        </div>
+                    </div>
+
+                    <!-- NUEVA SECCIÓN: FIRMA ELECTRÓNICA -->
+                    <h5 class="fw-bold border-bottom pb-2 mb-3 text-dark"><i class="fas fa-key me-2 text-muted"></i>Firma Electrónica</h5>
+                    
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Archivo de Firma (.p12)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0"><i class="fas fa-file-signature text-muted"></i></span>
+                            <input type="file" name="firma_file" class="form-control bg-light border-0" accept=".p12">
+                        </div>
+                        <small class="text-muted extra-small">Solo suba si desea actualizar la firma actual.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Contraseña de la Firma</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0"><i class="fas fa-lock text-muted"></i></span>
+                            <input type="password" name="firma_password" class="form-control bg-light border-0" value="{{ empresa.firma_password if empresa else '' }}" placeholder="Contraseña de certificado">
                         </div>
                     </div>
                 </div>

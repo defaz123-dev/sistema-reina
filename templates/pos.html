@@ -69,6 +69,14 @@
     .card-body-scroll::-webkit-scrollbar-thumb:hover, .carrito-scroll-container::-webkit-scrollbar-thumb:hover {
         background: var(--reina-green);
     }
+
+    /* Fix para botones de método de pago seleccionados */
+    .btn-check:checked + .btn-outline-success {
+        color: #fff !important;
+    }
+    .btn-check:checked + .btn-outline-success i {
+        color: #fff !important;
+    }
 </style>
 
 <div class="pos-layout">
@@ -375,8 +383,8 @@ function buscarCliente() {
 async function guardarClienteRapido() {
     const tipo = document.getElementById('new_tipo_id').value;
     const doc = document.getElementById('new_cedula').value.trim();
-    const nom = document.getElementById('new_nombres').value.trim();
-    const ape = document.getElementById('new_apellidos').value.trim();
+    const nom = document.getElementById('new_nombres').value.trim().toUpperCase();
+    const ape = document.getElementById('new_apellidos').value.trim().toUpperCase();
     if (!doc || !nom || !ape) return reinaAlert('Aviso', 'Faltan datos', 'warning');
     if (!validarIdEcuador(doc, tipo)) return reinaAlert('Error', 'Identificación no válida', 'danger');
     
@@ -386,9 +394,9 @@ async function guardarClienteRapido() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             cedula_ruc: doc, tipo_identificacion_id: tipo, nombres: nom, apellidos: ape,
-            direccion: document.getElementById('new_direccion').value,
+            direccion: document.getElementById('new_direccion').value.toUpperCase(),
             telefono: document.getElementById('new_telefono').value,
-            email: document.getElementById('new_email').value
+            email: document.getElementById('new_email').value.toUpperCase()
         })
     });
     const data = await res.json();
