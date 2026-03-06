@@ -33,22 +33,21 @@
             <table class="table table-hover align-middle" id="tablaInventario">
                 <thead class="table-light">
                     <tr class="small text-muted text-uppercase">
+                        <th>ID</th>
                         <th>Insumo</th>
                         <th>Sucursal</th>
                         <th class="text-center">Stock Actual</th>
                         <th class="text-center">Stock Mínimo</th>
                         <th>U. Medida</th>
                         <th>Estado</th>
-                        <th class="text-end">Acciones</th>
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for i in insumos %}
                     <tr class="{% if i.stock_actual < i.stock_minimo %}table-danger{% endif %}">
-                        <td>
-                            <div class="fw-bold text-dark">{{ i.nombre }}</div>
-                            <small class="text-muted">ID: {{ i.id }}</small>
-                        </td>
+                        <td class="text-muted small">{{ i.id }}</td>
+                        <td class="fw-bold text-dark">{{ i.nombre }}</td>
                         <td><span class="badge bg-light text-dark border">{{ i.sucursal_nombre }}</span></td>
                         <td class="text-center fw-bold {% if i.stock_actual < i.stock_minimo %}text-danger{% else %}text-success{% endif %}">
                             {{ i.stock_actual }}
@@ -62,8 +61,8 @@
                                 <span class="badge bg-success rounded-pill">Normal</span>
                             {% endif %}
                         </td>
-                        <td class="text-end">
-                            <button class="btn btn-sm btn-outline-primary border-0 btn-edit" 
+                        <td class="text-center">
+                            <button class="btn btn-outline-primary border-0 btn-edit" 
                                     data-id="{{ i.id }}"
                                     data-nombre="{{ i.nombre }}"
                                     data-stock="{{ i.stock_actual }}"
@@ -71,7 +70,7 @@
                                     data-unidad-id="{{ i.unidad_medida_id }}"
                                     data-sucursal-id="{{ i.sucursal_id }}"
                                     onclick="prepararEdicion(this)">
-                                <i class="fas fa-edit action-icon"></i>
+                                <i class="fas fa-edit fa-lg action-icon"></i>
                             </button>
                         </td>
                     </tr>

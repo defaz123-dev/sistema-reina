@@ -36,8 +36,10 @@
                         <th>Código</th>
                         <th>Nombre</th>
                         <th>Categoría</th>
-                        <th class="text-end">Precio</th>
-                        <th class="text-end">Acciones</th>
+                        {% for plat in plataformas %}
+                        <th class="text-end">{{ plat.nombre }}</th>
+                        {% endfor %}
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -49,21 +51,31 @@
                         <td class="fw-bold">{{ p.codigo }}</td>
                         <td>{{ p.nombre }}</td>
                         <td><span class="badge bg-light text-dark border">{{ p.categoria_nombre }}</span></td>
-                        <td class="text-end fw-bold text-success">${{ "%.2f"|format(p.precio) }}</td>
-                        <td class="text-end">
-                            <a href="{{ url_for('ver_receta', producto_id=p.id) }}" class="btn btn-sm btn-outline-warning border-0 me-1" title="Ver Receta">
-                                <i class="fas fa-utensils action-icon"></i>
+                        
+                        {% for plat in plataformas %}
+                        <td class="text-end fw-bold {{ 'text-success' if plat.nombre == 'LOCAL' else 'text-primary' }}">
+                            {% if p.precios_json[plat.id|string] or p.precios_json[plat.id] %}
+                                ${{ "%.2f"|format(p.precios_json[plat.id|string] or p.precios_json[plat.id]) }}
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+
+                        <td class="text-center">
+                            <a href="{{ url_for('ver_receta', producto_id=p.id) }}" class="btn btn-outline-warning border-0 me-1" title="Ver Receta">
+                                <i class="fas fa-utensils fa-lg action-icon"></i>
                             </a>
-                            <button class="btn btn-sm btn-outline-primary border-0 btn-edit" 
+                            <button class="btn btn-outline-primary border-0 btn-edit" 
                                     data-bs-toggle="modal" 
                                     data-bs-target="#modalProducto"
                                     data-id="{{ p.id }}"
                                     data-codigo="{{ p.codigo }}"
                                     data-nombre="{{ p.nombre }}"
-                                    data-precio="{{ p.precio }}"
                                     data-cat-id="{{ p.categoria_id }}"
+                                    data-precios='{{ p.precios_json | tojson | safe }}'
                                     onclick="prepararEdicionProducto(this)">
-                                <i class="fas fa-edit action-icon"></i>
+                                <i class="fas fa-edit fa-lg action-icon"></i>
                             </button>
                         </td>
                     </tr>
@@ -76,47 +88,93 @@
 
 <!-- Modal Producto -->
 <div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="modalProducto" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <form action="{{ url_for('guardar_producto') }}" method="POST" enctype="multipart/form-data">
-                <div class="modal-header bg-success text-white border-0">
-                    <h5 class="fw-bold mb-0" id="modalProductoTitle">Datos del Producto</h5>
+                <div class="modal-header bg-success text-white border-0 px-4 py-3">
+                    <h5 class="fw-bold mb-0" id="modalProductoTitle"><i class="fas fa-box-open me-2"></i>Datos del Producto</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4">
+                <div class="modal-body p-4 bg-light">
                     <input type="hidden" name="id" id="prod_id">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="small fw-bold text-muted">Código</label>
-                            <input type="text" name="codigo" id="prod_cod" class="form-control bg-light border-0 force-upper" required>
+                    
+                    <div class="row g-4">
+                        <!-- COLUMNA IZQUIERDA: DATOS GENERALES -->
+                        <div class="col-md-7">
+                            <div class="card border-0 shadow-sm rounded-4 h-100">
+                                <div class="card-body p-4">
+                                    <h6 class="fw-bold text-success mb-4 border-bottom pb-2">
+                                        <i class="fas fa-info-circle me-2"></i>Información General
+                                    </h6>
+                                    
+                                    <div class="mb-3">
+                                        <label class="small fw-bold text-muted mb-1">Nombre del Producto</label>
+                                        <input type="text" name="nombre" id="prod_nom" class="form-control border-0 bg-light py-2 fw-bold force-upper" placeholder="EJ. HAMBURGUESA ESPECIAL" required>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="small fw-bold text-muted mb-1">Código / SKU</label>
+                                            <input type="text" name="codigo" id="prod_cod" class="form-control border-0 bg-light py-2 force-upper" placeholder="EJ. PROD-001" required>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="small fw-bold text-muted mb-1">Categoría</label>
+                                            <select name="categoria_id" id="prod_cat" class="form-select border-0 bg-light py-2" required>
+                                                <option value="" disabled selected>-- SELECCIONE --</option>
+                                                {% for c in categorias %}
+                                                <option value="{{ c.id }}">{{ c.nombre }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-0">
+                                        <label class="small fw-bold text-muted mb-1">Imagen del Producto</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-light border-0"><i class="fas fa-image text-muted"></i></span>
+                                            <input type="file" name="imagen" id="prod_img" class="form-control border-0 bg-light" accept="image/*">
+                                        </div>
+                                        <div class="extra-small text-muted mt-2">
+                                            <i class="fas fa-magic me-1"></i>Optimización automática habilitada.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="small fw-bold text-muted">Precio</label>
-                            <input type="number" step="0.01" name="precio" id="prod_pre" class="form-control bg-light border-0" required>
+
+                        <!-- COLUMNA DERECHA: PRECIOS POR PLATAFORMA -->
+                        <div class="col-md-5">
+                            <div class="card border-0 shadow-sm rounded-4 h-100">
+                                <div class="card-body p-4">
+                                    <h6 class="fw-bold text-primary mb-4 border-bottom pb-2">
+                                        <i class="fas fa-tags me-2"></i>Precios por Canal
+                                    </h6>
+                                    
+                                    <div class="plats-container">
+                                        {% for plat in plataformas %}
+                                        <div class="mb-3 p-3 bg-light rounded-3 border-start border-4 {{ 'border-success' if plat.nombre == 'LOCAL' else 'border-warning' }}">
+                                            <label class="extra-small fw-bold text-muted text-uppercase d-block mb-1">{{ plat.nombre }}</label>
+                                            <div class="input-group shadow-sm">
+                                                <span class="input-group-text bg-white border-0 fw-bold text-muted">$</span>
+                                                <input type="number" step="0.01" name="precio_{{ plat.id }}" id="prod_pre_{{ plat.id }}" class="form-control border-0 fw-bold text-dark" placeholder="0.00" required>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="alert alert-info border-0 rounded-4 extra-small mt-3 mb-0">
+                                        <i class="fas fa-lightbulb me-2"></i> Configure el precio para cada plataforma para que se actualice automáticamente en el POS.
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="small fw-bold text-muted">Nombre del Producto</label>
-                        <input type="text" name="nombre" id="prod_nom" class="form-control bg-light border-0 force-upper" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="small fw-bold text-muted">Categoría</label>
-                        <select name="categoria_id" id="prod_cat" class="form-select bg-light border-0" required>
-                            <option value="" disabled selected>-- SELECCIONE CATEGORÍA --</option>
-                            {% for c in categorias %}
-                            <option value="{{ c.id }}">{{ c.nombre }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="small fw-bold text-muted">Imagen del Producto</label>
-                        <input type="file" name="imagen" id="prod_img" class="form-control bg-light border-0" accept="image/*">
-                        <div class="extra-small text-muted mt-1">Se redimensionará y optimizará automáticamente.</div>
                     </div>
                 </div>
-                <div class="modal-footer border-0 p-4 pt-0">
-                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-reina rounded-pill px-4">Guardar Producto</button>
+                <div class="modal-footer border-0 p-4 pt-0 bg-light">
+                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" data-bs-dismiss="modal">CANCELAR</button>
+                    <button type="submit" class="btn btn-reina rounded-pill px-5 fw-bold shadow-sm">
+                        <i class="fas fa-save me-2"></i>GUARDAR CAMBIOS
+                    </button>
                 </div>
             </form>
         </div>
@@ -136,19 +194,29 @@
     function prepararNuevoProducto() {
         document.getElementById('prod_id').value = '';
         document.getElementById('prod_cod').value = '';
-        document.getElementById('prod_pre').value = '';
         document.getElementById('prod_nom').value = '';
-        document.getElementById('prod_cat').value = ''; // Resetear categoría
+        document.getElementById('prod_cat').value = '';
         document.getElementById('modalProductoTitle').innerText = 'Nuevo Producto';
+        
+        // Limpiar todos los campos de precio por plataforma
+        document.querySelectorAll('input[id^="prod_pre_"]').forEach(input => {
+            input.value = '';
+        });
     }
 
     function prepararEdicionProducto(btn) {
         document.getElementById('prod_id').value = btn.getAttribute('data-id');
         document.getElementById('prod_cod').value = btn.getAttribute('data-codigo');
-        document.getElementById('prod_pre').value = btn.getAttribute('data-precio');
         document.getElementById('prod_nom').value = btn.getAttribute('data-nombre');
         document.getElementById('prod_cat').value = btn.getAttribute('data-cat-id');
         document.getElementById('modalProductoTitle').innerText = 'Editar Producto';
+
+        // Cargar precios por plataforma desde el JSON
+        const precios = JSON.parse(btn.getAttribute('data-precios') || '{}');
+        Object.keys(precios).forEach(platId => {
+            const input = document.getElementById(`prod_pre_${platId}`);
+            if (input) input.value = precios[platId];
+        });
     }
 </script>
 {% endblock %}

@@ -91,7 +91,10 @@
                 <div class="card-body-scroll">
                     <div class="row g-2" id="gridProductos">
                         {% for p in productos %}
-                        <div class="col-6 col-md-4 col-xl-3 item-producto mb-2" data-categoria="{{ p.categoria_id }}" data-nombre="{{ p.nombre.lower() }}" data-codigo="{{ p.codigo.lower() if p.codigo else '' }}">
+                        <div class="col-6 col-md-4 col-xl-3 item-producto mb-2" 
+                             data-categoria="{{ p.categoria_id }}" 
+                             data-nombre="{{ p.nombre.lower() }}" 
+                             data-codigo="{{ p.codigo.lower() if p.codigo else '' }}">
                             <div class="card border-0 shadow-sm rounded-3 product-card {{ 'out-of-stock' if p.stock_disponible <= 0 or p.stock_disponible == 999 else '' }}" 
                                  onclick='agregarAlCarrito({{ p | tojson | safe }})'>
                                 {% if p.codigo %}<div class="code-badge">{{ p.codigo }}</div>{% endif %}
@@ -113,7 +116,7 @@
                                 </div>
                                 <div class="card-body text-center p-2">
                                     <h6 class="fw-bold mb-0 small text-truncate">{{ p.nombre }}</h6>
-                                    <div class="text-success fw-bold small">$ {{ p.precio }}</div>
+                                    <div class="text-success fw-bold small product-price-display" data-product-id="{{ p.id }}">$ {{ p.precio }}</div>
                                 </div>
                             </div>
                         </div>
@@ -127,11 +130,22 @@
     <!-- ORDEN / CARRITO (DERECHA) -->
     <div class="panel-facturacion">
         <div class="card border-0 shadow-sm rounded-4 h-100 d-flex flex-column">
-            <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center flex-shrink-0">
-                <h5 class="fw-bold mb-0 text-success"><i class="fas fa-shopping-cart me-2"></i> Mi Orden</h5>
-                <button class="btn btn-sm btn-outline-danger border-0 rounded-circle" onclick="vaciarCarrito()" title="Vaciar Carrito">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
+            <div class="card-header bg-white border-0 py-3 d-flex flex-column gap-2 flex-shrink-0">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0 text-success"><i class="fas fa-shopping-cart me-2"></i> Mi Orden</h5>
+                    <button class="btn btn-sm btn-outline-danger border-0 rounded-circle" onclick="vaciarCarrito()" title="Vaciar Carrito">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+                <!-- Selector de Plataforma -->
+                <div>
+                    <label class="extra-small fw-bold text-muted text-uppercase d-block mb-1">Plataforma de Venta</label>
+                    <select id="ventaPlataforma" class="form-select form-select-sm border-0 bg-light fw-bold text-success" onchange="cambiarPlataforma()">
+                        {% for plat in plataformas %}
+                        <option value="{{ plat.id }}">{{ plat.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
             <div class="carrito-scroll-container">
                 <div id="carritoItems">
@@ -162,7 +176,7 @@
     </div>
 </div>
 
-<!-- MODALES (CON CLASE FADE RESTAURADA) -->
+<!-- MODALES -->
 <div class="modal fade" id="modalFinalizar" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg">
@@ -266,7 +280,6 @@ let modalClienteInstance;
 const productosData = {{ productos | tojson | safe }};
 const IVA_P = {{ iva_porcentaje or 15.0 }};
 
-// FUNCIÓN DE LIMPIEZA TOTAL (Previene bloqueos de pantalla gris)
 function cleanupModals() {
     $('.modal-backdrop').remove();
     $('body').removeClass('modal-open').css('overflow', '').css('padding-right', '');
@@ -294,6 +307,9 @@ function validarIdEcuador(numero, tipo) {
 document.addEventListener('DOMContentLoaded', () => {
     modalFinalizarInstance = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     modalClienteInstance = new bootstrap.Modal(document.getElementById('modalCliente'));
+    
+    // Al cargar, actualizar precios visuales según plataforma LOCAL (asumiendo ID 1)
+    actualizarPreciosVisuales();
     renderizarCarrito();
 
     $('.filter-btn').on('click', function() {
@@ -307,6 +323,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+function cambiarPlataforma() {
+    actualizarPreciosVisuales();
+    
+    // Actualizar precios de productos ya en el carrito
+    const platId = document.getElementById('ventaPlataforma').value;
+    carrito.forEach(item => {
+        const prod = productosData.find(p => String(p.id) === String(item.id));
+        if (prod && prod.precios_json && prod.precios_json[platId]) {
+            item.precio = parseFloat(prod.precios_json[platId]);
+        }
+    });
+    renderizarCarrito();
+}
+
+function actualizarPreciosVisuales() {
+    const platId = document.getElementById('ventaPlataforma').value;
+    document.querySelectorAll('.product-price-display').forEach(span => {
+        const pId = span.getAttribute('data-product-id');
+        const prod = productosData.find(p => String(p.id) === String(pId));
+        if (prod && prod.precios_json && prod.precios_json[platId]) {
+            span.textContent = `$ ${parseFloat(prod.precios_json[platId]).toFixed(2)}`;
+        }
+    });
+}
 
 function buscarPorCodigo(codigo) {
     const term = codigo.trim().toLowerCase();
@@ -357,14 +398,9 @@ async function guardarClienteRapido() {
         document.getElementById('clienteId').value = data.id;
         document.getElementById('clienteNombre').textContent = `${nom} ${ape}`;
         document.getElementById('clienteCedula').value = doc;
-        
-        // Cierre y limpieza total para evitar pantalla gris
         modalClienteInstance.hide();
         cleanupModals();
-        
-        setTimeout(() => {
-            reinaAlert('¡Éxito!', `Cliente registrado y seleccionado.`);
-        }, 300);
+        setTimeout(() => { reinaAlert('¡Éxito!', `Cliente registrado y seleccionado.`); }, 300);
     } else {
         reinaAlert('Error', data.message || 'No se pudo guardar el cliente', 'danger');
     }
@@ -379,12 +415,17 @@ function setConsumidorFinal() {
 function agregarAlCarrito(p) {
     if (p.stock_disponible == 999) return reinaAlert('Falta Receta', 'Este producto no tiene ingredientes asociados.', 'warning');
     if (p.stock_disponible <= 0) return reinaAlert('Sin Stock', 'No hay ingredientes.', 'danger');
+    
+    const platId = document.getElementById('ventaPlataforma').value;
+    const precioPlat = (p.precios_json && p.precios_json[platId]) ? parseFloat(p.precios_json[platId]) : parseFloat(p.precio);
+    
     const exist = carrito.find(i => String(i.id) === String(p.id));
     if(exist) {
         if (exist.cantidad + 1 > p.stock_disponible) return reinaAlert('Límite', 'No hay más stock.', 'warning');
         exist.cantidad++;
+        exist.precio = precioPlat; // Actualizar precio por si cambió la plataforma
     } else {
-        carrito.push({ id: String(p.id), nombre: p.nombre, precio: parseFloat(p.precio), cantidad: 1, stock_max: p.stock_disponible });
+        carrito.push({ id: String(p.id), nombre: p.nombre, precio: precioPlat, cantidad: 1, stock_max: p.stock_disponible });
     }
     renderizarCarrito();
 }
@@ -462,6 +503,7 @@ function abrirModalFinalizar() {
 async function confirmarOrden() {
     const c_id = document.getElementById('clienteId').value;
     const f_pago = document.querySelector('input[name="formaPago"]:checked').value;
+    const plat_id = document.getElementById('ventaPlataforma').value;
     const total = carrito.reduce((s, i) => s + (i.precio * i.cantidad), 0);
     const base15 = total / 1.15;
     const ivaVal = total - base15;
@@ -479,16 +521,14 @@ async function confirmarOrden() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            items: carrito, subtotal_0: 0, subtotal_15: base15, iva_valor: ivaVal, total: total, cliente_id: c_id, forma_pago: f_pago
+            items: carrito, subtotal_0: 0, subtotal_15: base15, iva_valor: ivaVal, total: total, cliente_id: c_id, forma_pago: f_pago, plataforma_id: plat_id
         })
     });
     const data = await res.json();
     if (data.success) {
         hideLoading();
         cleanupModals();
-        reinaAlert('Orden Generada', `<p class="mb-3">La venta se registró correctamente.</p><a href="/venta/ticket/${data.venta_id}" target="_blank" class="btn btn-reina w-100 py-3"><i class="fas fa-print me-2"></i> IMPRIMIR TICKET</a>`).then(() => {
-            window.location.reload();
-        });
+        reinaAlert('Orden Generada', `<p class="mb-3">La venta se registró correctamente.</p><a href="/venta/ticket/${data.venta_id}" target="_blank" class="btn btn-reina w-100 py-3"><i class="fas fa-print me-2"></i> IMPRIMIR TICKET</a>`).then(() => { window.location.reload(); });
     } else { 
         hideLoading();
         reinaAlert('Error', data.message, 'danger'); 

@@ -27,26 +27,28 @@
                 <thead class="table-light">
                     <tr class="small text-muted text-uppercase">
                         <th>Fecha y Hora</th>
-                        <th>Cliente</th>
+                        <th>Nombres</th>
+                        <th>Apellidos</th>
                         <th>Sucursal</th>
                         <th>Vendedor</th>
                         <th>Forma Pago</th>
                         <th class="text-end">Total</th>
-                        <th class="text-end">Acciones</th>
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for v in ventas %}
                     <tr>
                         <td class="small">{{ v.fecha.strftime('%Y-%m-%d %H:%M') }}</td>
-                        <td class="fw-bold">{{ v.nombres }} {{ v.apellidos }}</td>
+                        <td class="fw-bold">{{ v.nombres }}</td>
+                        <td class="fw-bold">{{ v.apellidos }}</td>
                         <td><span class="badge bg-light text-dark border">{{ session['sucursal_nombre'] }}</span></td>
                         <td><small>{{ v.usuario }}</small></td>
                         <td><span class="badge bg-info text-dark">{{ v.forma_pago }}</span></td>
                         <td class="text-end fw-bold text-success">${{ "%.2f"|format(v.total) }}</td>
-                        <td class="text-end">
-                            <a href="{{ url_for('ver_ticket', id=v.id) }}" target="_blank" class="btn btn-sm btn-light border rounded-pill">
-                                <i class="fas fa-print action-icon"></i>
+                        <td class="text-center">
+                            <a href="{{ url_for('ver_ticket', id=v.id) }}" target="_blank" class="btn btn-outline-secondary border-0">
+                                <i class="fas fa-print fa-lg action-icon"></i>
                             </a>
                         </td>
                     </tr>

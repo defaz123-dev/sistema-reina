@@ -34,7 +34,7 @@
                         <th>N° Comprobante</th>
                         <th>Sucursal</th>
                         <th class="text-end">Total</th>
-                        <th class="text-end">Acciones</th>
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -45,12 +45,12 @@
                         <td><span class="badge bg-light text-dark border">{{ c.establecimiento }}-{{ c.punto_emision }}-{{ c.numero_comprobante }}</span></td>
                         <td><span class="badge bg-secondary">{{ c.sucursal_nombre }}</span></td>
                         <td class="text-end fw-bold text-success">${{ "%.2f"|format(c.total) }}</td>
-                        <td class="text-end">
-                            <a href="{{ url_for('editar_compra', id=c.id) }}" class="btn btn-sm btn-outline-primary border-0" title="Editar">
-                                <i class="fas fa-edit action-icon"></i>
+                        <td class="text-center">
+                            <a href="{{ url_for('editar_compra', id=c.id) }}" class="btn btn-outline-primary border-0" title="Editar">
+                                <i class="fas fa-edit fa-lg action-icon"></i>
                             </a>
-                            <button class="btn btn-sm btn-outline-danger border-0" onclick="confirmarEliminarCompra({{ c.id }}, '{{ c.numero_comprobante }}')" title="Eliminar">
-                                <i class="fas fa-trash-alt action-icon"></i>
+                            <button class="btn btn-outline-danger border-0" onclick="confirmarEliminarCompra({{ c.id }}, '{{ c.numero_comprobante }}')" title="Eliminar">
+                                <i class="fas fa-trash-alt fa-lg action-icon"></i>
                             </button>
                         </td>
                     </tr>

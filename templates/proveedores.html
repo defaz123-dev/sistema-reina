@@ -28,13 +28,14 @@
         </div>
         <div class="card shadow-sm border-0 rounded-4 p-3">
             <table class="table table-hover align-middle mb-0" id="tablaProveedores">
-                <thead class="bg-light">
+                <thead class="bg-light text-uppercase small text-muted">
                     <tr>
                         <th class="ps-4">RUC</th>
                         <th>Razón Social</th>
-                        <th>Teléfono / Email</th>
+                        <th>Teléfono</th>
+                        <th>Email</th>
                         <th>Comprobante</th>
-                        <th class="text-end pe-4">Acciones</th>
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -42,23 +43,21 @@
                     <tr>
                         <td class="ps-4 text-muted">{{ p.ruc }}</td>
                         <td class="fw-bold">{{ p.razon_social }}</td>
-                        <td>
-                            <div class="small"><i class="fas fa-phone me-1 text-muted"></i> {{ p.telefono }}</div>
-                            <div class="extra-small text-muted"><i class="fas fa-envelope me-1"></i> {{ p.email }}</div>
-                        </td>
+                        <td>{{ p.telefono }}</td>
+                        <td class="small">{{ p.email }}</td>
                         <td><span class="badge bg-secondary">{{ p.tipo_comprobante_nombre }}</span></td>
-                        <td class="text-end pe-4">
-                            <button class="btn btn-sm btn-light rounded-pill px-3 btn-edit" 
+                        <td class="text-center">
+                            <button class="btn btn-outline-primary border-0 btn-edit" 
                                     data-bs-toggle="modal" data-bs-target="#modalProv"
                                     data-id="{{ p.id }}" data-ruc="{{ p.ruc }}" 
                                     data-rs="{{ p.razon_social }}" data-nc="{{ p.nombre_comercial }}"
                                     data-dir="{{ p.direccion }}" data-tel="{{ p.telefono }}"
                                     data-eml="{{ p.email }}" data-tipo="{{ p.tipo_comprobante_id }}">
-                                <i class="fas fa-edit text-primary"></i>
+                                <i class="fas fa-edit fa-lg action-icon"></i>
                             </button>
-                            <button class="btn btn-sm btn-light rounded-pill px-3" 
+                            <button class="btn btn-outline-danger border-0" 
                                     onclick="confirmarBajaProveedor({{ p.id }}, '{{ p.razon_social }}')">
-                                <i class="fas fa-trash text-danger"></i>
+                                <i class="fas fa-trash fa-lg action-icon"></i>
                             </button>
                         </td>
                     </tr>

@@ -34,7 +34,7 @@
                     <tr class="small text-muted text-uppercase">
                         <th>ID</th>
                         <th>Nombre de Sucursal</th>
-                        <th class="text-end">Acciones</th>
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -42,14 +42,14 @@
                     <tr>
                         <td>{{ s.id }}</td>
                         <td class="fw-bold">{{ s.nombre }}</td>
-                        <td class="text-end">
-                            <button class="btn btn-sm btn-outline-primary border-0" 
+                        <td class="text-center">
+                            <button class="btn btn-outline-primary border-0" 
                                     data-bs-toggle="modal" 
                                     data-bs-target="#modalSucursal"
                                     data-id="{{ s.id }}"
                                     data-nombre="{{ s.nombre }}"
                                     onclick="prepararEdicionSucursal(this)">
-                                <i class="fas fa-edit action-icon"></i>
+                                <i class="fas fa-edit fa-lg action-icon"></i>
                             </button>
                         </td>
                     </tr>

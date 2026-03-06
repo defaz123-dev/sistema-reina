@@ -34,11 +34,12 @@
                     <tr class="small text-muted text-uppercase">
                         <th>Tipo</th>
                         <th>Identificación</th>
-                        <th>Nombres y Apellidos</th>
+                        <th>Nombres</th>
+                        <th>Apellidos</th>
                         <th>Dirección</th>
                         <th>Teléfono</th>
                         <th>Email</th>
-                        <th class="text-end">Acciones</th>
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -46,12 +47,13 @@
                     <tr>
                         <td><span class="badge bg-light text-dark border small">{{ c.tipo_id_nombre }}</span></td>
                         <td class="fw-bold">{{ c.cedula_ruc }}</td>
-                        <td>{{ c.nombres }} {{ c.apellidos }}</td>
+                        <td>{{ c.nombres }}</td>
+                        <td>{{ c.apellidos }}</td>
                         <td class="small text-muted">{{ c.direccion }}</td>
                         <td>{{ c.telefono }}</td>
                         <td class="small">{{ c.email }}</td>
-                        <td class="text-end">
-                            <button class="btn btn-sm btn-outline-primary border-0" 
+                        <td class="text-center">
+                            <button class="btn btn-outline-primary border-0" 
                                     data-bs-toggle="modal" 
                                     data-bs-target="#modalCliente"
                                     data-id="{{ c.id }}"
@@ -63,7 +65,7 @@
                                     data-tel="{{ c.telefono }}"
                                     data-eml="{{ c.email }}"
                                     onclick="prepararEdicionCliente(this)">
-                                <i class="fas fa-edit action-icon"></i>
+                                <i class="fas fa-edit fa-lg action-icon"></i>
                             </button>
                         </td>
                     </tr>

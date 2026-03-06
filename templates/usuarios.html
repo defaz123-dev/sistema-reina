@@ -32,24 +32,23 @@
             <table class="table table-hover align-middle" id="tablaUsuarios">
                 <thead class="table-light">
                     <tr class="small text-muted text-uppercase">
+                        <th>Tipo</th>
                         <th>Identificación</th>
                         <th>Usuario</th>
-                        <th>Sucursal Asignada</th>
+                        <th>Sucursal</th>
                         <th>Rol</th>
                         <th>Estado</th>
-                        <th class="text-end">Acciones</th>
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for u in usuarios %}
                     <tr>
-                        <td>
-                            <div class="fw-bold text-dark">{{ u.cedula }}</div>
-                            <div class="extra-small text-muted text-uppercase">{{ u.tipo_id_nombre }}</div>
-                        </td>
+                        <td><span class="extra-small fw-bold text-muted text-uppercase">{{ u.tipo_id_nombre }}</span></td>
+                        <td class="fw-bold text-dark">{{ u.cedula }}</td>
                         <td class="fw-bold"><i class="fas fa-user-circle me-2 text-primary"></i> {{ u.usuario }}</td>
                         <td><span class="badge bg-light text-dark border">{{ u.sucursal_nombre }}</span></td>
-                        <td><span class="badge {{ 'bg-success' if u.rol == 'ADMIN' else 'bg-secondary' }}">{{ u.rol }}</span></td>
+                        <td><span class="badge {{ 'bg-success' if u.rol_nombre == 'ADMIN' else 'bg-secondary' }}">{{ u.rol_nombre }}</span></td>
                         <td>
                             {% if u.activo %}
                             <span class="badge bg-info text-dark rounded-pill">ACTIVO</span>
@@ -57,8 +56,8 @@
                             <span class="badge bg-danger rounded-pill">INACTIVO</span>
                             {% endif %}
                         </td>
-                        <td class="text-end">
-                            <button class="btn btn-sm btn-outline-primary border-0" 
+                        <td class="text-center">
+                            <button class="btn btn-outline-primary border-0" 
                                     data-bs-toggle="modal" 
                                     data-bs-target="#modalUsuario"
                                     data-id="{{ u.id }}"
@@ -66,10 +65,10 @@
                                     data-tipo-id="{{ u.tipo_identificacion_id }}"
                                     data-usuario="{{ u.usuario }}"
                                     data-sucursal-id="{{ u.sucursal_id }}"
-                                    data-rol="{{ u.rol }}"
+                                    data-rol-id="{{ u.rol_id }}"
                                     data-activo="{{ u.activo }}"
                                     onclick="prepararEdicionUsuario(this)">
-                                <i class="fas fa-edit action-icon"></i>
+                                <i class="fas fa-edit fa-lg action-icon"></i>
                             </button>
                         </td>
                     </tr>
@@ -126,10 +125,11 @@
                         </div>
                         <div class="col-6 mb-3">
                             <label class="extra-small fw-bold text-muted text-uppercase">Rol</label>
-                            <select name="rol" id="edit_rol" class="form-select form-select-sm bg-light border-0" required>
+                            <select name="rol_id" id="edit_rol_id" class="form-select form-select-sm bg-light border-0" required>
                                 <option value="" disabled>-- ROL --</option>
-                                <option value="ADMIN">ADMINISTRADOR</option>
-                                <option value="USER">CAJERO</option>
+                                {% for r in roles %}
+                                <option value="{{ r.id }}">{{ r.descripcion }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>
@@ -175,7 +175,7 @@
         document.getElementById('user_name').value = '';
         document.getElementById('user_pass').required = true;
         document.getElementById('edit_sucursal_id').value = '';
-        document.getElementById('edit_rol').value = '';
+        document.getElementById('edit_rol_id').value = '';
         document.getElementById('passHelp').style.display = 'none';
         document.getElementById('divActivo').style.display = 'none';
         document.getElementById('modalUsuarioTitle').innerText = 'Nuevo Usuario';
@@ -190,7 +190,7 @@
         document.getElementById('user_name').value = btn.getAttribute('data-usuario');
         document.getElementById('user_pass').required = false;
         document.getElementById('edit_sucursal_id').value = btn.getAttribute('data-sucursal-id');
-        document.getElementById('edit_rol').value = btn.getAttribute('data-rol');
+        document.getElementById('edit_rol_id').value = btn.getAttribute('data-rol-id');
         document.getElementById('user_act').value = btn.getAttribute('data-activo');
         document.getElementById('passHelp').style.display = 'block';
         document.getElementById('divActivo').style.display = 'block';

@@ -49,27 +49,29 @@
         <!-- Lista de Insumos de la Receta -->
         <div class="card border-0 shadow-sm rounded-4">
             <table class="table align-middle mb-0">
-                <thead class="bg-light">
+                <thead class="bg-light text-uppercase small text-muted">
                     <tr>
                         <th class="ps-4">Insumo</th>
-                        <th>Cantidad requerida</th>
-                        <th class="text-end pe-4">Acción</th>
+                        <th class="text-center">Cantidad</th>
+                        <th class="text-center">U. Medida</th>
+                        <th class="text-center">Acción</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for r in receta %}
                     <tr>
                         <td class="ps-4 fw-bold">{{ r.nombre }}</td>
-                        <td>{{ r.cantidad_requerida }} {{ r.unidad_medida }}</td>
-                        <td class="text-end pe-4">
-                            <a href="{{ url_for('eliminar_insumo_receta', id=r.id, p_id=producto.id) }}" class="btn btn-sm btn-outline-danger border-0">
-                                <i class="fas fa-trash-alt action-icon"></i>
+                        <td class="text-center">{{ r.cantidad_requerida }}</td>
+                        <td class="text-center small text-muted">{{ r.unidad_medida }}</td>
+                        <td class="text-center">
+                            <a href="{{ url_for('eliminar_insumo_receta', id=r.id, p_id=producto.id) }}" class="btn btn-outline-danger border-0">
+                                <i class="fas fa-trash-alt fa-lg action-icon"></i>
                             </a>
                         </td>
                     </tr>
                     {% endfor %}
                     {% if not receta %}
-                    <tr><td colspan="3" class="text-center py-4 text-muted small">Esta receta no tiene insumos configurados aún.</td></tr>
+                    <tr><td colspan="4" class="text-center py-4 text-muted small">Esta receta no tiene insumos configurados aún.</td></tr>
                     {% endif %}
                 </tbody>
             </table>

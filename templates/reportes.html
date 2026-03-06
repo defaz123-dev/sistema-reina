@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% block title %}Reportes - {{ config_empresa.nombre_comercial }}{% endblock %}
+{% block title %}Reportes Estratégicos - {{ config_empresa.nombre_comercial }}{% endblock %}
 
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
@@ -15,51 +15,85 @@
 <div class="row mb-4">
     <div class="col-12 d-flex justify-content-between align-items-center">
         <div>
-            <h2 class="fw-bold mb-0">Reportes y Estadísticas</h2>
-            <p class="text-muted small">Análisis de ventas y toma de decisiones.</p>
+            <h2 class="brand-logo"><i class="fas fa-chart-line me-2"></i>Reportes Estratégicos</h2>
+            <p class="text-muted small">Análisis inteligente para la toma de decisiones.</p>
         </div>
-    </div>
-</div>
-
-<!-- SECCIÓN GRÁFICOS -->
-<div class="row g-4 mb-5">
-    <div class="col-md-6">
-        <div class="card p-4 h-100">
-            <h6 class="fw-bold mb-3"><i class="fas fa-chart-bar me-2 text-primary"></i> Top 5 Productos más Vendidos</h6>
-            <canvas id="chartProductos" height="200"></canvas>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card p-4 h-100">
-            <h6 class="fw-bold mb-3"><i class="fas fa-chart-line me-2 text-success"></i> Tendencia de Ventas ($)</h6>
-            <canvas id="chartVentas" height="200"></canvas>
-        </div>
-    </div>
-</div>
-
-<!-- TABLA: FACTURAS EMITIDAS -->
-<div class="row mb-5">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm overflow-hidden">
-            <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                <h5 class="fw-bold mb-0 text-dark">Facturas Emitidas</h5>
-                <button class="btn btn-sm btn-reina px-3 rounded-pill" onclick="exportTableToExcel('tableVentas', 'Reporte_Ventas_Reina')">
-                    <i class="fas fa-file-excel me-1"></i> Exportar a Excel
-                </button>
+        <div class="d-flex gap-3">
+            <div class="text-end">
+                <div class="extra-small fw-bold text-muted text-uppercase">Ticket Promedio</div>
+                <div class="h4 fw-bold text-success mb-0">$ {{ "%.2f"|format(stats.ticket_promedio or 0) }}</div>
             </div>
-            <div class="table-responsive" style="max-height: 400px;">
+            <div class="text-end border-start ps-3">
+                <div class="extra-small fw-bold text-muted text-uppercase">Ventas Totales</div>
+                <div class="h4 fw-bold text-dark mb-0">{{ stats.total_ventas or 0 }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NAVEGACIÓN POR PESTAÑAS -->
+<div class="table-responsive mb-4">
+    <ul class="nav nav-pills flex-nowrap bg-white p-2 rounded-4 shadow-sm" id="pills-tab" role="tablist" style="width: max-content;">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-pill fw-bold" id="pills-graficos-tab" data-bs-toggle="pill" data-bs-target="#pills-graficos" type="button" role="tab"><i class="fas fa-chart-pie me-2"></i>Gráficos</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-ventas-tab" data-bs-toggle="pill" data-bs-target="#pills-ventas" type="button" role="tab"><i class="fas fa-file-invoice-dollar me-2"></i>Ventas</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-rentabilidad-tab" data-bs-toggle="pill" data-bs-target="#pills-rentabilidad" type="button" role="tab"><i class="fas fa-hand-holding-usd me-2"></i>Rentabilidad</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-horarios-tab" data-bs-toggle="pill" data-bs-target="#pills-horarios" type="button" role="tab"><i class="fas fa-clock me-2"></i>Horarios</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-criticos-tab" data-bs-toggle="pill" data-bs-target="#pills-criticos" type="button" role="tab"><i class="fas fa-exclamation-triangle me-2"></i>Insumos Críticos</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-pagos-tab" data-bs-toggle="pill" data-bs-target="#pills-pagos" type="button" role="tab"><i class="fas fa-credit-card me-2"></i>Formas de Pago</button>
+        </li>
+    </ul>
+</div>
+
+<div class="tab-content" id="pills-tabContent">
+    <!-- PESTAÑA: GRÁFICOS -->
+    <div class="tab-pane fade show active" id="pills-graficos" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm p-4 h-100 rounded-4">
+                    <h6 class="fw-bold mb-3">Top 5 Productos más Vendidos</h6>
+                    <canvas id="chartProductos" height="200"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm p-4 h-100 rounded-4">
+                    <h6 class="fw-bold mb-3">Tendencia de Ventas (Últimos registros)</h6>
+                    <canvas id="chartVentas" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA: VENTAS -->
+    <div class="tab-pane fade" id="pills-ventas" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">Listado de Ventas</h5>
+                <button class="btn btn-sm btn-reina px-3 rounded-pill" onclick="exportTableToExcel('tableVentas', 'Ventas_Reina')"><i class="fas fa-file-excel me-1"></i> Excel</button>
+            </div>
+            <div class="table-responsive" style="max-height: 500px;">
                 <table class="table table-hover align-middle mb-0" id="tableVentas">
-                    <thead class="table-light">
-                        <tr><th>ID</th><th>Fecha</th><th>Cliente</th><th>Cajero</th><th>Total</th></tr>
+                    <thead class="table-light text-uppercase small text-muted">
+                        <tr><th>ID</th><th>Fecha</th><th>Cliente</th><th>Cajero</th><th class="text-end pe-4">Total</th></tr>
                     </thead>
                     <tbody>
                         {% for v in ventas %}
                         <tr>
                             <td>#{{ v.id }}</td>
-                            <td>{{ v.fecha.strftime('%d/%m/%Y') }}</td>
-                            <td>{{ v.nombres }} {{ v.apellidos }}</td>
-                            <td>{{ v.usuario }}</td>
-                            <td class="fw-bold text-success">$ {{ v.total }}</td>
+                            <td>{{ v.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="fw-bold">{{ v.nombres }} {{ v.apellidos }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ v.usuario }}</span></td>
+                            <td class="fw-bold text-success text-end pe-4">$ {{ "%.2f"|format(v.total) }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -67,32 +101,143 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- TABLA: PRODUCTOS MÁS VENDIDOS -->
-<div class="row">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm overflow-hidden">
-            <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                <h5 class="fw-bold mb-0 text-dark">Ranking de Productos</h5>
-                <button class="btn btn-sm btn-reina px-3 rounded-pill" onclick="exportTableToExcel('tableTopProds', 'Ranking_Productos_Reina')">
-                    <i class="fas fa-file-excel me-1"></i> Exportar a Excel
-                </button>
+    <!-- PESTAÑA: RENTABILIDAD -->
+    <div class="tab-pane fade" id="pills-rentabilidad" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="fw-bold mb-0">Margen de Ganancia por Producto</h5>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="tableTopProds">
-                    <thead class="table-light">
-                        <tr><th>Producto</th><th>Cantidad Vendida</th></tr>
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-uppercase small text-muted">
+                        <tr>
+                            <th class="ps-4">Producto</th>
+                            <th class="text-center">Precio Venta</th>
+                            <th class="text-center">Costo Receta</th>
+                            <th class="text-center">Margen ($)</th>
+                            <th class="text-center">Margen (%)</th>
+                        </tr>
                     </thead>
                     <tbody>
-                        {% for p in top_productos %}
+                        {% for p in rentabilidad %}
+                        {% set margen = p.precio - (p.costo_receta or 0) %}
+                        {% set porc = (margen / p.precio * 100) if p.precio > 0 else 0 %}
                         <tr>
-                            <td class="fw-bold">{{ p.nombre }}</td>
-                            <td><span class="badge bg-primary rounded-pill">{{ p.total_vendido }} unidades</span></td>
+                            <td class="ps-4 fw-bold">{{ p.nombre }}</td>
+                            <td class="text-center">$ {{ "%.2f"|format(p.precio) }}</td>
+                            <td class="text-center text-muted">$ {{ "%.2f"|format(p.costo_receta or 0) }}</td>
+                            <td class="text-center fw-bold text-success">$ {{ "%.2f"|format(margen) }}</td>
+                            <td class="text-center">
+                                <span class="badge {{ 'bg-success' if porc > 40 else 'bg-warning' if porc > 20 else 'bg-danger' }} rounded-pill px-3">
+                                    {{ "%.1f"|format(porc) }}%
+                                </span>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA: HORARIOS -->
+    <div class="tab-pane fade" id="pills-horarios" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-md-7">
+                <div class="card border-0 shadow-sm rounded-4 p-4">
+                    <h6 class="fw-bold mb-3">Distribución de Ventas por Hora</h6>
+                    <canvas id="chartHorarios" height="250"></canvas>
+                </div>
+            </div>
+            <div class="col-md-5">
+                <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-uppercase small text-muted">
+                            <tr><th>Hora</th><th class="text-center">Ventas</th><th class="text-end pe-3">Monto</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for h in franja_horaria %}
+                            <tr>
+                                <td class="fw-bold">{{ h.hora }}:00</td>
+                                <td class="text-center">{{ h.cantidad }}</td>
+                                <td class="text-end pe-3 text-success fw-bold">$ {{ "%.2f"|format(h.total) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA: CRITICOS -->
+    <div class="tab-pane fade" id="pills-criticos" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-danger text-white border-0 py-3">
+                <h5 class="fw-bold mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Insumos con Stock Bajo o Agotado</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-uppercase small text-muted">
+                        <tr><th class="ps-4">Insumo</th><th>Sucursal</th><th class="text-center">Stock Actual</th><th class="text-center">Stock Mínimo</th><th class="text-center">Estado</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for i in insumos_criticos %}
+                        <tr>
+                            <td class="ps-4 fw-bold">{{ i.nombre }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ i.sucursal }}</span></td>
+                            <td class="text-center fw-bold text-danger">{{ i.stock_actual }} {{ i.unidad_medida }}</td>
+                            <td class="text-center text-muted">{{ i.stock_minimo }} {{ i.unidad_medida }}</td>
+                            <td class="text-center">
+                                {% if i.stock_actual <= 0 %}
+                                <span class="badge bg-dark rounded-pill">AGOTADO</span>
+                                {% else %}
+                                <span class="badge bg-danger rounded-pill">CRÍTICO</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not insumos_criticos %}
+                        <tr><td colspan="5" class="text-center py-5 text-muted">No hay insumos críticos. ¡Buen trabajo!</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA: PAGOS -->
+    <div class="tab-pane fade" id="pills-pagos" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 p-4 text-center">
+                    <h6 class="fw-bold mb-4">Uso de Métodos de Pago</h6>
+                    <div class="mx-auto" style="max-width: 300px;">
+                        <canvas id="chartPagos"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 overflow-hidden h-100">
+                    <table class="table table-hover align-middle mb-0 h-100">
+                        <thead class="table-light text-uppercase small text-muted">
+                            <tr><th class="ps-4">Método</th><th class="text-center">Transacciones</th><th class="text-end pe-4">Total Recaudado</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for f in formas_pago %}
+                            <tr>
+                                <td class="ps-4 fw-bold">
+                                    <i class="fas {{ 'fa-money-bill-wave text-success' if f.forma_pago == 'EFECTIVO' else 'fa-credit-card text-primary' if f.forma_pago == 'TARJETA' else 'fa-university text-info' }} me-2"></i>
+                                    {{ f.forma_pago }}
+                                </td>
+                                <td class="text-center">{{ f.cantidad }}</td>
+                                <td class="text-end pe-4 fw-bold text-dark">$ {{ "%.2f"|format(f.total) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -102,17 +247,14 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Datos para Gráfico de Productos
-    const labelsProds = [{% for p in top_productos %}"{{ p.nombre }}",{% endfor %}];
-    const dataProds = [{% for p in top_productos %}{{ p.total_vendido }},{% endfor %}];
-
+    // 1. Gráfico Top Productos
     new Chart(document.getElementById('chartProductos'), {
         type: 'bar',
         data: {
-            labels: labelsProds,
+            labels: [{% for p in top_productos %}"{{ p.nombre }}",{% endfor %}],
             datasets: [{
-                label: 'Unidades Vendidas',
-                data: dataProds,
+                label: 'Unidades',
+                data: [{% for p in top_productos %}{{ p.total_vendido }},{% endfor %}],
                 backgroundColor: '#008938',
                 borderRadius: 8
             }]
@@ -120,21 +262,43 @@ document.addEventListener('DOMContentLoaded', function() {
         options: { responsive: true, plugins: { legend: { display: false } } }
     });
 
-    // Datos para Gráfico de Ventas (Simulado con los últimos registros)
-    const labelsVentas = [{% for v in ventas[:7]|reverse %}"{{ v.fecha.strftime('%d/%m') }}",{% endfor %}];
-    const dataVentas = [{% for v in ventas[:7]|reverse %}{{ v.total }},{% endfor %}];
-
+    // 2. Gráfico Tendencia Ventas
     new Chart(document.getElementById('chartVentas'), {
         type: 'line',
         data: {
-            labels: labelsVentas,
+            labels: [{% for v in ventas[:10]|reverse %}"{{ v.fecha.strftime('%d/%m') }}",{% endfor %}],
             datasets: [{
                 label: 'Venta $',
-                data: dataVentas,
+                data: [{% for v in ventas[:10]|reverse %}{{ v.total }},{% endfor %}],
                 borderColor: '#ffc20e',
                 backgroundColor: 'rgba(255, 194, 14, 0.1)',
                 fill: true,
                 tension: 0.4
+            }]
+        }
+    });
+
+    // 3. Gráfico Horarios
+    new Chart(document.getElementById('chartHorarios'), {
+        type: 'bar',
+        data: {
+            labels: [{% for h in franja_horaria %}"{{ h.hora }}:00",{% endfor %}],
+            datasets: [{
+                label: 'Monto $',
+                data: [{% for h in franja_horaria %}{{ h.total }},{% endfor %}],
+                backgroundColor: '#008938'
+            }]
+        }
+    });
+
+    // 4. Gráfico Formas de Pago
+    new Chart(document.getElementById('chartPagos'), {
+        type: 'doughnut',
+        data: {
+            labels: [{% for f in formas_pago %}"{{ f.forma_pago }}",{% endfor %}],
+            datasets: [{
+                data: [{% for f in formas_pago %}{{ f.total }},{% endfor %}],
+                backgroundColor: ['#008938', '#ffc20e', '#0d6efd', '#6c757d']
             }]
         }
     });

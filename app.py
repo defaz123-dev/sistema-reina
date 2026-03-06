@@ -122,8 +122,14 @@ def login():
     if request.method == 'POST':
         c, p, s = request.form['usuario'].strip(), request.form['password'], int(request.form['sucursal'])
         cur = mysql.connection.cursor()
-        # Buscamos el usuario por su Cédula (Identificador único)
-        cur.execute("SELECT u.*, s.nombre as sucursal_nombre FROM usuarios u JOIN sucursales s ON u.sucursal_id = s.id WHERE u.cedula=%s", (c,))
+        # Buscamos el usuario por su Cédula y unimos con la tabla roles
+        cur.execute("""
+            SELECT u.*, s.nombre as sucursal_nombre, r.nombre as rol_nombre 
+            FROM usuarios u 
+            JOIN sucursales s ON u.sucursal_id = s.id 
+            JOIN roles r ON u.rol_id = r.id
+            WHERE u.cedula=%s
+        """, (c,))
         user = cur.fetchone(); cur.close()
         
         if user:
@@ -134,7 +140,7 @@ def login():
             
             # 2. Verificar contraseña
             if check_password_hash(user['password'], p):
-                session.update({'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol'], 'sucursal_id': s, 'sucursal_nombre': user['sucursal_nombre']})
+                session.update({'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol_nombre'], 'sucursal_id': s, 'sucursal_nombre': user['sucursal_nombre']})
                 registrar_auditoria('LOGIN', f"Usuario {user['usuario']} (Cédula: {user['cedula']}) inició sesión en sucursal ID: {s}")
                 return redirect(url_for('dashboard'))
         
@@ -475,7 +481,26 @@ def ajustar_inventario():
 @login_required
 @admin_required
 def productos():
-    cur = mysql.connection.cursor(); cur.execute("SELECT p.*, c.nombre as categoria_nombre FROM productos p JOIN categorias c ON p.categoria_id = c.id"); p = cur.fetchall(); cur.execute("SELECT * FROM categorias"); cats = cur.fetchall(); cur.close(); return render_template('productos.html', productos=p, categorias=cats)
+    cur = mysql.connection.cursor()
+    # Obtenemos productos con sus categorías
+    cur.execute("SELECT p.*, c.nombre as categoria_nombre FROM productos p JOIN categorias c ON p.categoria_id = c.id")
+    prods = cur.fetchall()
+    
+    # Obtenemos plataformas para el modal
+    cur.execute("SELECT * FROM plataformas")
+    plats = cur.fetchall()
+    
+    # Para cada producto, obtenemos sus precios por plataforma en un formato fácil de usar
+    for p in prods:
+        cur.execute("SELECT plataforma_id, precio FROM producto_precios WHERE producto_id = %s", (p['id'],))
+        precios = cur.fetchall()
+        # Convertimos a un diccionario {plataforma_id: precio} para pasarlo como JSON al frontend
+        p['precios_json'] = {item['plataforma_id']: float(item['precio']) for item in precios}
+
+    cur.execute("SELECT * FROM categorias")
+    cats = cur.fetchall()
+    cur.close()
+    return render_template('productos.html', productos=prods, categorias=cats, plataformas=plats)
 
 @app.route('/productos/guardar', methods=['POST'])
 @login_required
@@ -484,14 +509,37 @@ def guardar_producto():
     d = request.form; img_file = request.files.get('imagen'); cur = mysql.connection.cursor(); u_id = session['user_id']
     cod, nom = d['codigo'].upper(), d['nombre'].upper()
     
+    # El precio 'base' será el de la plataforma LOCAL (ID 1 usualmente)
+    precio_base = d.get('precio_1', 0) # Fallback al precio LOCAL
+    
     if img_file and img_file.filename != '':
-        # Procesar imagen con Pillow (Redimensión y Compresión)
         ib, mt = procesar_imagen(img_file)
-        if d.get('id'): cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, imagen=%s, mimetype=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, d['precio'], d['categoria_id'], ib, mt, u_id, d['id']))
-        else: cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, imagen, mimetype, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (cod, nom, d['precio'], d['categoria_id'], ib, mt, u_id, u_id))
+        if d.get('id'): 
+            cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, imagen=%s, mimetype=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, precio_base, d['categoria_id'], ib, mt, u_id, d['id']))
+            p_id = d['id']
+        else: 
+            cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, imagen, mimetype, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (cod, nom, precio_base, d['categoria_id'], ib, mt, u_id, u_id))
+            p_id = cur.lastrowid
     else:
-        if d.get('id'): cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, d['precio'], d['categoria_id'], u_id, d['id']))
-        else: cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s)", (cod, nom, d['precio'], d['categoria_id'], u_id, u_id))
+        if d.get('id'): 
+            cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, precio_base, d['categoria_id'], u_id, d['id']))
+            p_id = d['id']
+        else: 
+            cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s)", (cod, nom, precio_base, d['categoria_id'], u_id, u_id))
+            p_id = cur.lastrowid
+    
+    # GUARDAR PRECIOS POR PLATAFORMA
+    cur.execute("SELECT id FROM plataformas")
+    plataformas = cur.fetchall()
+    for plat in plataformas:
+        field_name = f"precio_{plat['id']}"
+        if field_name in d:
+            precio_plat = d[field_name]
+            cur.execute("""
+                INSERT INTO producto_precios (producto_id, plataforma_id, precio) 
+                VALUES (%s, %s, %s) 
+                ON DUPLICATE KEY UPDATE precio = %s
+            """, (p_id, plat['id'], precio_plat, precio_plat))
     
     mysql.connection.commit(); cur.close(); return redirect(url_for('productos'))
 
@@ -547,24 +595,33 @@ def ver_auditoria():
 @admin_required
 def usuarios():
     cur = mysql.connection.cursor()
-    cur.execute("SELECT u.*, s.nombre as sucursal_nombre, t.nombre as tipo_id_nombre FROM usuarios u LEFT JOIN sucursales s ON u.sucursal_id=s.id JOIN tipos_identificacion t ON u.tipo_identificacion_id = t.id")
+    cur.execute("""
+        SELECT u.*, s.nombre as sucursal_nombre, t.nombre as tipo_id_nombre, r.nombre as rol_nombre 
+        FROM usuarios u 
+        LEFT JOIN sucursales s ON u.sucursal_id=s.id 
+        JOIN tipos_identificacion t ON u.tipo_identificacion_id = t.id
+        JOIN roles r ON u.rol_id = r.id
+    """)
     u = cur.fetchall()
     cur.execute("SELECT * FROM sucursales")
     s = cur.fetchall()
     # Excluir RUC (ID 2) y Consumidor Final (ID 4) para el registro de usuarios
     cur.execute("SELECT * FROM tipos_identificacion WHERE id NOT IN (2, 4)")
     t = cur.fetchall()
+    # Obtener roles del catálogo
+    cur.execute("SELECT * FROM roles")
+    roles = cur.fetchall()
     cur.close()
-    return render_template('usuarios.html', usuarios=u, sucursales=s, tipos_id=t)
+    return render_template('usuarios.html', usuarios=u, sucursales=s, tipos_id=t, roles=roles)
 
 @app.route('/usuarios/crear', methods=['POST'])
 @login_required
 @admin_required
 def crear_usuario():
-    c, u, p, s, r, tid = request.form['cedula'].strip(), request.form['usuario'].upper().strip(), request.form['password'], request.form['sucursal_id'], request.form['rol'], request.form['tipo_identificacion_id']
+    c, u, p, s, rid, tid = request.form['cedula'].strip(), request.form['usuario'].upper().strip(), request.form['password'], request.form['sucursal_id'], request.form['rol_id'], request.form['tipo_identificacion_id']
     hp = generate_password_hash(p); cur = mysql.connection.cursor()
     try:
-        cur.execute("INSERT INTO usuarios (cedula, usuario, password, sucursal_id, rol, activo, tipo_identificacion_id) VALUES (%s, %s, %s, %s, %s, 1, %s)", (c, u, hp, s, r, tid)); mysql.connection.commit()
+        cur.execute("INSERT INTO usuarios (cedula, usuario, password, sucursal_id, rol_id, activo, tipo_identificacion_id) VALUES (%s, %s, %s, %s, %s, 1, %s)", (c, u, hp, s, rid, tid)); mysql.connection.commit()
     except Exception as e: flash(f"Error al crear: {str(e)}", 'danger')
     cur.close(); return redirect(url_for('usuarios'))
 
@@ -572,11 +629,11 @@ def crear_usuario():
 @login_required
 @admin_required
 def editar_usuario():
-    id_u, c, u, p, s, r, a, tid = request.form['id'], request.form['cedula'].strip(), request.form['usuario'].upper().strip(), request.form['password'], request.form['sucursal_id'], request.form['rol'], request.form['activo'], request.form['tipo_identificacion_id']
+    id_u, c, u, p, s, rid, a, tid = request.form['id'], request.form['cedula'].strip(), request.form['usuario'].upper().strip(), request.form['password'], request.form['sucursal_id'], request.form['rol_id'], request.form['activo'], request.form['tipo_identificacion_id']
     cur = mysql.connection.cursor()
     try:
-        if p: hp = generate_password_hash(p); cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, password=%s, sucursal_id=%s, rol=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, hp, s, r, a, tid, id_u))
-        else: cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, sucursal_id=%s, rol=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, s, r, a, tid, id_u))
+        if p: hp = generate_password_hash(p); cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, password=%s, sucursal_id=%s, rol_id=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, hp, s, rid, a, tid, id_u))
+        else: cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, sucursal_id=%s, rol_id=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, s, rid, a, tid, id_u))
         mysql.connection.commit()
     except Exception as e: flash(f"Error al editar: {str(e)}", 'danger')
     cur.close(); return redirect(url_for('usuarios'))
@@ -698,6 +755,10 @@ def pos():
     emp = cur.fetchone()
     iva_p = emp['iva_porcentaje'] if emp else 15.00
     
+    # Obtener Plataformas
+    cur.execute("SELECT * FROM plataformas")
+    plats = cur.fetchall()
+    
     query_productos = """
         SELECT p.id, p.codigo, p.nombre, p.precio, p.categoria_id, IF(p.imagen IS NOT NULL, 1, 0) as tiene_foto,
         (
@@ -709,23 +770,24 @@ def pos():
         FROM productos p
     """
     cur.execute(query_productos, (session['sucursal_id'],))
-    p = cur.fetchall()
-    cur.close()
+    prods = cur.fetchall()
     
-    for prod in p:
+    # Para cada producto, adjuntar sus precios por plataforma
+    for prod in prods:
+        cur.execute("SELECT plataforma_id, precio FROM producto_precios WHERE producto_id = %s", (prod['id'],))
+        precios = cur.fetchall()
+        prod['precios_json'] = {item['plataforma_id']: float(item['precio']) for item in precios}
+        
         if prod['stock_disponible'] is None:
-            cur = mysql.connection.cursor()
             cur.execute("SELECT COUNT(*) as cuenta FROM recetas WHERE producto_id = %s", (prod['id'],))
             tiene_receta = cur.fetchone()['cuenta'] > 0
-            cur.close()
             prod['stock_disponible'] = 0 if tiene_receta else 999
 
-    cur = mysql.connection.cursor()
     cur.execute("SELECT * FROM tipos_identificacion")
     ti = cur.fetchall()
     cur.close()
 
-    return render_template('pos.html', categorias=c, productos=p, tipos_id=ti, iva_porcentaje=iva_p)
+    return render_template('pos.html', categorias=c, productos=prods, tipos_id=ti, iva_porcentaje=iva_p, plataformas=plats)
 
 @app.route('/pos/venta', methods=['POST'])
 @login_required
@@ -734,6 +796,7 @@ def procesar_venta_v2():
     try:
         c_id = data.get('cliente_id'); fpago = data.get('forma_pago', 'EFECTIVO').upper()
         s_id = session['sucursal_id']
+        plat_id = data.get('plataforma_id') # RECIBIR PLATAFORMA
         
         # 1. Obtener datos de empresa e IVA dinámico
         cur.execute("SELECT ruc, ambiente, iva_porcentaje FROM empresa LIMIT 1"); emp = cur.fetchone()
@@ -742,11 +805,11 @@ def procesar_venta_v2():
         divisor_iva = 1 + (iva_p / 100)
         clave = generar_clave_acceso_sri(datetime.now(), ruc, amb)
 
-        # 2. Insertar Cabecera
+        # 2. Insertar Cabecera (con plataforma_id)
         cur.execute("""INSERT INTO ventas 
-            (usuario_id, sucursal_id, cliente_id, subtotal_0, subtotal_15, iva_valor, total, forma_pago, clave_acceso_sri, estado_sri, usuario_creacion_id, usuario_modificacion_id) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'AUTORIZADO', %s, %s)""", 
-            (u_id, s_id, c_id, data.get('subtotal_0', 0), data.get('subtotal_15', 0), 
+            (usuario_id, sucursal_id, cliente_id, plataforma_id, subtotal_0, subtotal_15, iva_valor, total, forma_pago, clave_acceso_sri, estado_sri, usuario_creacion_id, usuario_modificacion_id) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'AUTORIZADO', %s, %s)""", 
+            (u_id, s_id, c_id, plat_id, data.get('subtotal_0', 0), data.get('subtotal_15', 0), 
              data.get('iva_valor', 0), data['total'], fpago, clave, u_id, u_id))
         v_id = cur.lastrowid
 
@@ -790,8 +853,71 @@ def ver_ticket(id):
 @login_required
 @admin_required
 def reportes():
-    cur = mysql.connection.cursor(); cur.execute("SELECT v.*, c.nombres, c.apellidos, u.usuario FROM ventas v JOIN clientes c ON v.cliente_id=c.id JOIN usuarios u ON v.usuario_id=u.id ORDER BY v.fecha DESC"); v = cur.fetchall()
-    cur.execute("SELECT p.nombre, SUM(dv.cantidad) as total_vendido FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id GROUP BY p.id ORDER BY total_vendido DESC LIMIT 5"); t = cur.fetchall(); cur.close(); return render_template('reportes.html', ventas=v, top_productos=t)
+    cur = mysql.connection.cursor()
+    
+    # 1. Ventas Detalladas
+    cur.execute("SELECT v.*, c.nombres, c.apellidos, u.usuario FROM ventas v JOIN clientes c ON v.cliente_id=c.id JOIN usuarios u ON v.usuario_id=u.id ORDER BY v.fecha DESC")
+    v = cur.fetchall()
+    
+    # 2. Top Productos (Gráfico)
+    cur.execute("SELECT p.nombre, SUM(dv.cantidad) as total_vendido FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id GROUP BY p.id ORDER BY total_vendido DESC LIMIT 5")
+    t = cur.fetchall()
+    
+    # 3. Rentabilidad por Producto
+    # Calculamos el costo basado en el último precio de compra de cada insumo en la receta
+    query_rentabilidad = """
+        SELECT 
+            p.nombre, 
+            p.precio,
+            (
+                SELECT SUM(r.cantidad_requerida * IFNULL(
+                    (SELECT dc.costo_unitario FROM detalles_compras dc WHERE dc.insumo_id = r.insumo_id ORDER BY dc.id DESC LIMIT 1), 
+                    0)
+                )
+                FROM recetas r WHERE r.producto_id = p.id
+            ) as costo_receta
+        FROM productos p
+        ORDER BY (p.precio - IFNULL(costo_receta, 0)) DESC
+    """
+    cur.execute(query_rentabilidad)
+    rentabilidad = cur.fetchall()
+    
+    # 4. Ventas por Franja Horaria
+    cur.execute("""
+        SELECT HOUR(fecha) as hora, COUNT(*) as cantidad, SUM(total) as total 
+        FROM ventas 
+        GROUP BY hora 
+        ORDER BY hora
+    """)
+    franja_horaria = cur.fetchall()
+    
+    # 5. Formas de Pago
+    cur.execute("SELECT forma_pago, COUNT(*) as cantidad, SUM(total) as total FROM ventas GROUP BY forma_pago")
+    formas_pago = cur.fetchall()
+    
+    # 6. Insumos Críticos
+    cur.execute("""
+        SELECT i.nombre, i.stock_actual, i.stock_minimo, u.nombre as unidad_medida, s.nombre as sucursal 
+        FROM insumos i 
+        JOIN unidades_medida u ON i.unidad_medida_id = u.id 
+        JOIN sucursales s ON i.sucursal_id = s.id
+        WHERE i.stock_actual <= i.stock_minimo
+    """)
+    insumos_criticos = cur.fetchall()
+    
+    # 7. Estadísticas Generales (Ticket Promedio)
+    cur.execute("SELECT COUNT(*) as total_ventas, SUM(total) as monto_total, AVG(total) as ticket_promedio FROM ventas")
+    stats = cur.fetchone()
+    
+    cur.close()
+    return render_template('reportes.html', 
+                           ventas=v, 
+                           top_productos=t, 
+                           rentabilidad=rentabilidad,
+                           franja_horaria=franja_horaria,
+                           formas_pago=formas_pago,
+                           insumos_criticos=insumos_criticos,
+                           stats=stats)
 
 @app.route('/producto/imagen/<int:id>')
 def producto_imagen(id):
