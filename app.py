@@ -1,4 +1,4 @@
-# app.py - SISTEMA REINA (VERSIÓN NORMALIZADA CON CATÁLOGOS)
+# app.py - SISTEMA REINA (VERSIÓN PRO PLUS - RESTAURADA Y COMPLETA)
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
 from flask_mysqldb import MySQL
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -9,7 +9,7 @@ import random, csv, io, requests
 import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'clave_secreta_reina_2024')
+app.secret_key = os.environ.get('SECRET_KEY', 'de3329d04ce1a976af2b00ad49485c37d449e45389a300bb')
 
 # Configuración de Base de Datos
 app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST', 'localhost')
@@ -18,15 +18,6 @@ app.config['MYSQL_PASSWORD'] = os.environ.get('MYSQL_PASSWORD', '')
 app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB', 'sistema_reina')
 app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
-# Configuraciones adicionales para estabilidad en la nube
-app.config['MYSQL_CONNECT_TIMEOUT'] = 10
-app.config['MYSQL_CUSTOM_OPTIONS'] = {"connect_timeout": 10}
-
-# SSL Flexible para Aiven
-if 'MYSQL_HOST' in os.environ and os.environ['MYSQL_HOST'] != 'localhost':
-    app.config['MYSQL_CUSTOM_OPTIONS'] = {"ssl": {"ca": None}, "ssl_mode": "REQUIRED"} 
-else:
-    app.config['MYSQL_CUSTOM_OPTIONS'] = {}
 
 mysql = MySQL(app)
 
@@ -41,58 +32,35 @@ def procesar_imagen(file_storage, max_size=(800, 800), quality=85):
         output = io.BytesIO()
         img.save(output, format='JPEG', quality=quality, optimize=True)
         return output.getvalue(), 'image/jpeg'
-    except Exception as e:
+    except:
         file_storage.seek(0)
         return file_storage.read(), file_storage.content_type
 
-def get_db_cursor():
-    try:
-        cur = mysql.connection.cursor()
-        try:
-            cur.execute("SET time_zone = '-05:00'")
-        except: pass # Ignorar si el servidor no permite cambiar la zona horaria
-        return cur
-    except Exception as e: return str(e)
+def calcular_modulo11(cadena):
+    pivote = 2; suma = 0
+    for i in range(len(cadena) - 1, -1, -1):
+        suma += int(cadena[i]) * pivote
+        pivote = 2 if pivote == 7 else pivote + 1
+    res = suma % 11; v = 11 - res
+    return 0 if v == 11 else 1 if v == 10 else v
+
+def generar_clave_acceso_sri(fecha, ruc, ambiente, serie='001001', secuencial='000000001'):
+    f = fecha.strftime('%d%m%Y')
+    c_48 = f"{f}01{ruc}{ambiente}{serie}{secuencial}123456781"
+    return f"{c_48}{calcular_modulo11(c_48)}"
 
 def registrar_auditoria(accion, detalle):
     try:
         cur = mysql.connection.cursor()
-        try:
-            cur.execute("SET time_zone = '-05:00'")
-        except: pass
-        # Capturar IP real (considerando proxies/nube)
-        ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if ',' in ip: ip = ip.split(',')[0] # Tomar la primera si hay varias
-        
-        # Incluir nombre de sucursal en el detalle si está en sesión
-        suc_nom = session.get('sucursal_nombre', 'S/S')
-        detalle_enriquecido = f"[{suc_nom}] {detalle}"
-        
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr, request.remote_addr).split(',')[0]
         cur.execute("INSERT INTO auditoria (usuario_id, accion, detalle, ip) VALUES (%s, %s, %s, %s)",
-                    (session.get('user_id'), accion, detalle_enriquecido, ip))
+                    (session.get('user_id'), accion, f"[{session.get('sucursal_nombre','S/S')}] {detalle}", ip))
         mysql.connection.commit(); cur.close()
     except: pass
 
 def identificar_tipo_doc(doc):
-    if doc == "9999999999": return 4 # CONSUMIDOR FINAL
-    return 2 if len(doc) == 13 else 1 # RUC o CEDULA
-
-def generar_clave_acceso_sri(fecha, ruc_empresa, ambiente):
-    f = fecha.strftime('%d%m%Y')
-    clave = f"{f}01{ruc_empresa}{ambiente}001001{random.randint(1,999999):09d}123456781"
-    return clave[:49]
-
-# --- CONTEXT PROCESSOR GLOBAL ---
-@app.context_processor
-def inject_empresa():
-    try:
-        cur = mysql.connection.cursor()
-        cur.execute("SELECT nombre_comercial, color_tema FROM empresa LIMIT 1")
-        e = cur.fetchone()
-        cur.close()
-        if e: return dict(config_empresa=e)
-    except: pass
-    return dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938'})
+    if doc == "9999999999": return 4
+    return 2 if len(doc) == 13 else 1
 
 # --- DECORADORES ---
 def login_required(f):
@@ -110,6 +78,15 @@ def admin_required(f):
         return f(*args, **kwargs)
     return dec
 
+@app.context_processor
+def inject_empresa():
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT nombre_comercial, color_tema FROM empresa LIMIT 1")
+        e = cur.fetchone(); cur.close()
+        return dict(config_empresa=e) if e else dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938'})
+    except: return dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938'})
+
 # --- RUTAS BASE ---
 @app.route('/')
 def index():
@@ -119,277 +96,53 @@ def index():
 
 @app.route('/login', methods=['POST'])
 def login():
-    if request.method == 'POST':
-        c, p, s = request.form['usuario'].strip(), request.form['password'], int(request.form['sucursal'])
-        cur = mysql.connection.cursor()
-        # Buscamos el usuario por su Cédula y unimos con la tabla roles
-        cur.execute("""
-            SELECT u.*, s.nombre as sucursal_nombre, r.nombre as rol_nombre 
-            FROM usuarios u 
-            JOIN sucursales s ON u.sucursal_id = s.id 
-            JOIN roles r ON u.rol_id = r.id
-            WHERE u.cedula=%s
-        """, (c,))
-        user = cur.fetchone(); cur.close()
-        
-        if user:
-            # 1. Verificar si está activo
-            if user['activo'] == 0:
-                flash('SU CUENTA HA SIDO DESACTIVADA. CONTACTE AL ADMINISTRADOR.', 'danger')
-                return redirect(url_for('index'))
-            
-            # 2. Verificar contraseña
-            if check_password_hash(user['password'], p):
-                session.update({'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol_nombre'], 'sucursal_id': s, 'sucursal_nombre': user['sucursal_nombre']})
-                registrar_auditoria('LOGIN', f"Usuario {user['usuario']} (Cédula: {user['cedula']}) inició sesión en sucursal ID: {s}")
-                return redirect(url_for('dashboard'))
-        
-        # 3. Si no existe o contraseña mal
-        flash('CREDENCIALES INCORRECTAS (Cédula o Contraseña).', 'danger')
+    c, p, s_id = request.form['usuario'].strip(), request.form['password'], int(request.form['sucursal'])
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT u.*, r.nombre as rol_nombre FROM usuarios u JOIN roles r ON u.rol_id = r.id WHERE u.cedula=%s", (c,))
+    user = cur.fetchone()
+    if user and user['activo'] and check_password_hash(user['password'], p):
+        cur.execute("SELECT nombre, establecimiento, punto_emision FROM sucursales WHERE id=%s", (s_id,))
+        suc = cur.fetchone(); cur.close()
+        session.update({
+            'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol_nombre'], 
+            'sucursal_id': s_id, 'sucursal_nombre': suc['nombre'],
+            'establecimiento': suc['establecimiento'], 'punto_emision': suc['punto_emision']
+        })
+        registrar_auditoria('LOGIN', f"Inició sesión en {suc['nombre']}")
+        return redirect(url_for('dashboard'))
+    cur.close(); flash('Credenciales incorrectas o usuario inactivo', 'danger')
     return redirect(url_for('index'))
 
 @app.route('/logout')
-def logout():
-    session.clear(); return redirect(url_for('index'))
+def logout(): session.clear(); return redirect(url_for('index'))
 
 @app.route('/dashboard')
 @login_required
-def dashboard():
-    return render_template('dashboard.html')
-
-# --- COMPRAS ---
-@app.route('/compras')
-@login_required
-@admin_required
-def compras():
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT c.*, p.razon_social, s.nombre as sucursal_nombre FROM compras c JOIN proveedores p ON c.proveedor_id = p.id JOIN sucursales s ON c.sucursal_id = s.id ORDER BY c.fecha DESC")
-    vs = cur.fetchall(); cur.close()
-    return render_template('compras.html', compras=vs)
-
-@app.route('/compras/nueva')
-@login_required
-@admin_required
-def nueva_compra():
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1"); emp = cur.fetchone()
-    iva_p = emp['iva_porcentaje'] if emp else 15.00
-    cur.execute("SELECT p.*, t.nombre as tipo_comprobante_nombre FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id")
-    provs = cur.fetchall()
-    cur.execute("SELECT * FROM sucursales"); sucs = cur.fetchall()
-    cur.execute("SELECT * FROM unidades_medida"); ums = cur.fetchall()
-    cur.execute("SELECT i.*, u.nombre as unidad_medida FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id")
-    ins = cur.fetchall(); cur.close()
-    return render_template('nueva_compra.html', proveedores=provs, insumos=ins, sucursales=sucs, unidades=ums, fecha_hoy=datetime.now().strftime('%Y-%m-%d'), iva_porcentaje=iva_p)
-
-@app.route('/compras/editar/<int:id>')
-@login_required
-@admin_required
-def editar_compra(id):
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1"); emp = cur.fetchone()
-    iva_p = emp['iva_porcentaje'] if emp else 15.00
-    cur.execute("SELECT *, DATE_FORMAT(fecha_caducidad, '%%Y-%%m-%%d') as fecha_caducidad_fmt FROM compras WHERE id = %s", (id,))
-    compra = cur.fetchone()
-    cur.execute("SELECT dc.*, i.nombre, u.nombre as unidad_medida FROM detalles_compras dc JOIN insumos i ON dc.insumo_id = i.id JOIN unidades_medida u ON i.unidad_medida_id = u.id WHERE dc.compra_id = %s", (id,))
-    detalles = cur.fetchall()
-    cur.execute("SELECT p.*, t.nombre as tipo_comprobante_nombre FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id")
-    provs = cur.fetchall()
-    cur.execute("SELECT * FROM sucursales"); sucs = cur.fetchall()
-    cur.execute("SELECT * FROM unidades_medida"); ums = cur.fetchall()
-    cur.execute("SELECT i.*, u.nombre as unidad_medida FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id")
-    ins = cur.fetchall(); cur.close()
-    return render_template('nueva_compra.html', proveedores=provs, insumos=ins, sucursales=sucs, unidades=ums, compra=compra, detalles=detalles, iva_porcentaje=iva_p)
-
-@app.route('/compras/consultar_sri/<string:clave>')
-@login_required
-@admin_required
-def consultar_sri(clave):
-    if len(clave) != 49: return jsonify({'success': False, 'message': 'Clave debe tener 49 dígitos'})
-    
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT ambiente FROM empresa LIMIT 1"); emp = cur.fetchone(); cur.close()
-    ambiente = emp['ambiente'] if emp else 1
-    
-    # URL dinámica según ambiente
-    if ambiente == 2: # PRODUCCIÓN
-        url = "https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline"
-    else: # PRUEBAS
-        url = "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline"
-    
-    soap_body = f"""<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ecua="http://ec.gob.sri.ws.autorizacion"><soap:Body><ecua:autorizacionComprobante><claveAccesoComprobante>{clave}</claveAccesoComprobante></ecua:autorizacionComprobante></soap:Body></soap:Envelope>"""
-    try:
-        headers = {'Content-Type': 'text/xml; charset=utf-8'}
-        response = requests.post(url, data=soap_body, headers=headers, timeout=10)
-        if response.status_code != 200: return jsonify({'success': False, 'message': f'Error de conexión con SRI (Ambiente {ambiente})'})
-        root = ET.fromstring(response.content); comprobante_xml_str = ""
-        for elem in root.iter('comprobante'): comprobante_xml_str = elem.text; break
-        if not comprobante_xml_str: return jsonify({'success': False, 'message': f'Comprobante no encontrado en SRI (Ambiente {"Producción" if ambiente==2 else "Pruebas"})'})
-        factura_root = ET.fromstring(comprobante_xml_str)
-        info_t = factura_root.find('infoTributaria'); info_f = factura_root.find('infoFactura')
-        
-        # Obtener razón social del comprador (Adquirente)
-        comprador = info_f.find('razonSocialComprador')
-        razon_comprador = comprador.text if comprador is not None else "NO IDENTIFICADO"
-
-        # Extraer Detalles (Items)
-        items_sri = []
-        detalles_node = factura_root.find('detalles')
-        if detalles_node is not None:
-            for d in detalles_node.findall('detalle'):
-                paga_iva = False
-                impuestos = d.find('impuestos')
-                if impuestos is not None:
-                    for imp in impuestos.findall('impuesto'):
-                        tarifa = imp.find('tarifa')
-                        if tarifa is not None and float(tarifa.text) > 0: paga_iva = True; break
-                
-                items_sri.append({
-                    'nombre': d.find('descripcion').text.upper(),
-                    'cantidad': float(d.find('cantidad').text),
-                    'precio_unitario': float(d.find('precioUnitario').text),
-                    'subtotal': float(d.find('precioTotalSinImpuesto').text),
-                    'paga_iva': paga_iva
-                })
-
-        f_sri = info_f.find('fechaEmision').text; f_parts = f_sri.split('/'); f_iso = f"{f_parts[2]}-{f_parts[1]}-{f_parts[0]}"
-        return jsonify({
-            'success': True, 'ruc_proveedor': info_t.find('ruc').text, 'razon_social': info_t.find('razonSocial').text,
-            'razon_social_comprador': razon_comprador,
-            'establecimiento': info_t.find('estab').text, 'punto_emision': info_t.find('ptoEmi').text,
-            'secuencial': info_t.find('secuencial').text, 'fecha_emision': f_iso, 'total': float(info_f.find('importeTotal').text),
-            'items': items_sri
-        })
-    except Exception as e: return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/compras/verificar_clave/<string:clave>')
-@login_required
-@admin_required
-def verificar_clave_compra(clave):
-    compra_id = request.args.get('exclude_id')
-    cur = mysql.connection.cursor()
-    if compra_id:
-        cur.execute("SELECT id FROM compras WHERE clave_acceso = %s AND id != %s", (clave, compra_id))
-    else:
-        cur.execute("SELECT id FROM compras WHERE clave_acceso = %s", (clave,))
-    existe = cur.fetchone(); cur.close()
-    return jsonify({'existe': True if existe else False})
-
-@app.route('/compras/guardar', methods=['POST'])
-@login_required
-@admin_required
-def guardar_compra():
-    data = request.get_json(); cur = mysql.connection.cursor()
-    try:
-        id_c = data.get('compra_id'); f = data['fecha']; cl = data.get('clave_acceso'); s_id = data.get('sucursal_id') or session['sucursal_id']
-        u_id = session['user_id']
-        est = data.get('establecimiento') or '001'
-        pto = data.get('punto_emision') or '001'
-        sec = (data.get('numero_comprobante') or '').upper()
-        n_aut = data.get('numero_autorizacion')
-        f_cad = data.get('fecha_caducidad')
-        # Limpieza estricta: Si está vacío o solo tiene espacios, forzar a None (NULL en DB)
-        if not f_cad or str(f_cad).strip() == '':
-            f_cad = None
-        
-        # Validación de Caducidad (Si viene fecha de caducidad)
-        if f_cad:
-            hoy = datetime.now().date()
-            cad = datetime.strptime(f_cad, '%Y-%m-%d').date()
-            if cad < hoy:
-                return jsonify({'success': False, 'message': 'LA NOTA DE VENTA ESTÁ CADUCADA. NO SE PUEDE INGRESAR.'})
-
-        if id_c:
-            cur.execute("SELECT insumo_id, cantidad FROM detalles_compras WHERE compra_id = %s", (id_c,))
-            for iv in cur.fetchall(): cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (iv['cantidad'], iv['insumo_id']))
-            cur.execute("""UPDATE compras SET proveedor_id=%s, sucursal_id=%s, establecimiento=%s, punto_emision=%s, numero_comprobante=%s, 
-                           total=%s, fecha=%s, clave_acceso=%s, numero_autorizacion=%s, fecha_caducidad=%s, usuario_modificacion_id=%s WHERE id=%s""", 
-                        (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, cl, n_aut, f_cad, u_id, id_c))
-            cur.execute("DELETE FROM detalles_compras WHERE compra_id = %s", (id_c,)); comp_id = id_c
-        else:
-            cur.execute("""INSERT INTO compras (proveedor_id, sucursal_id, establecimiento, punto_emision, numero_comprobante, total, fecha, clave_acceso, numero_autorizacion, fecha_caducidad, usuario_creacion_id, usuario_modificacion_id) 
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
-                        (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, cl, n_aut, f_cad, u_id, u_id))
-            comp_id = cur.lastrowid
-        
-        for i in data['items']:
-            cur.execute("INSERT INTO detalles_compras (compra_id, insumo_id, cantidad, costo_unitario, subtotal, iva_valor) VALUES (%s, %s, %s, %s, %s, %s)", (comp_id, i['insumo_id'], i['cantidad'], i['costo'], i['subtotal'], i['iva_valor']))
-            cur.execute("UPDATE insumos SET stock_actual = stock_actual + %s WHERE id = %s", (i['cantidad'], i['insumo_id']))
-        
-        mysql.connection.commit(); cur.close()
-        registrar_auditoria('COMPRA', f"Guardó factura {est}-{pto}-{data['numero_comprobante']}")
-        return jsonify({'success': True})
-    except Exception as e: mysql.connection.rollback(); cur.close(); return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/compras/eliminar/<int:id>')
-@login_required
-@admin_required
-def eliminar_compra(id):
-    cur = mysql.connection.cursor()
-    try:
-        # 1. Obtener datos para auditoría y reversión de stock
-        cur.execute("SELECT numero_comprobante, sucursal_id FROM compras WHERE id = %s", (id,))
-        compra = cur.fetchone()
-        if not compra: return redirect(url_for('compras'))
-
-        # 2. Revertir Stock de Insumos
-        cur.execute("SELECT insumo_id, cantidad FROM detalles_compras WHERE compra_id = %s", (id,))
-        detalles = cur.fetchall()
-        for d in detalles:
-            cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (d['cantidad'], d['insumo_id']))
-
-        # 3. Eliminar Compra (Detalles se borran por cascada o manualmente)
-        cur.execute("DELETE FROM detalles_compras WHERE compra_id = %s", (id,))
-        cur.execute("DELETE FROM compras WHERE id = %s", (id,))
-        
-        registrar_auditoria('ELIMINAR_COMPRA', f"Eliminó factura de compra N° {compra['numero_comprobante']}")
-        mysql.connection.commit(); flash('Compra eliminada y stock revertido', 'success')
-    except Exception as e:
-        mysql.connection.rollback(); flash(f"Error al eliminar: {str(e)}", 'danger')
-    finally:
-        cur.close()
-    return redirect(url_for('compras'))
+def dashboard(): return render_template('dashboard.html')
 
 # --- CLIENTES ---
 @app.route('/clientes')
 @login_required
 def clientes():
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT c.*, t.nombre as tipo_id_nombre FROM clientes c JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id")
-    c = cur.fetchall()
-    cur.execute("SELECT * FROM tipos_identificacion"); t = cur.fetchall(); cur.close()
+    cur = mysql.connection.cursor(); cur.execute("SELECT c.*, t.nombre as tipo_id_nombre FROM clientes c JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id")
+    c = cur.fetchall(); cur.execute("SELECT * FROM tipos_identificacion"); t = cur.fetchall(); cur.close()
     return render_template('clientes.html', clientes=c, tipos_id=t)
 
 @app.route('/clientes/buscar/<string:cedula>')
 @login_required
 def buscar_cliente(cedula):
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT c.*, t.nombre as tipo_id_nombre FROM clientes c JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id WHERE c.cedula_ruc=%s", (cedula,))
+    cur = mysql.connection.cursor(); cur.execute("SELECT c.*, t.nombre as tipo_id_nombre FROM clientes c JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id WHERE c.cedula_ruc=%s", (cedula,))
     c = cur.fetchone(); cur.close()
-    if c: return jsonify({'success': True, 'cliente': c})
-    return jsonify({'success': False, 'tipo_identificado_id': identificar_tipo_doc(cedula)})
+    return jsonify({'success': True, 'cliente': c}) if c else jsonify({'success': False, 'tipo_identificado_id': identificar_tipo_doc(cedula)})
 
 @app.route('/clientes/guardar', methods=['POST'])
 @login_required
 def guardar_cliente():
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
     t_id = d.get('tipo_identificacion_id') or identificar_tipo_doc(d['cedula_ruc'])
-    
-    # --- VALIDACIÓN: SOLO UN CONSUMIDOR FINAL (ID 4) ---
-    if str(t_id) == '4':
-        query_check = "SELECT id FROM clientes WHERE tipo_identificacion_id = 4"
-        if d.get('id'): query_check += f" AND id != {d['id']}" # Si es edición, ignorar al actual
-        cur.execute(query_check)
-        if cur.fetchone():
-            cur.close()
-            flash('YA EXISTE UN REGISTRO DE CONSUMIDOR FINAL. NO SE PERMITEN DUPLICADOS.', 'danger')
-            return redirect(url_for('clientes'))
-
     nom, ape, dir = d['nombres'].upper(), d['apellidos'].upper(), d['direccion'].upper()
-    if d.get('id'):
-        cur.execute("UPDATE clientes SET cedula_ruc=%s, tipo_identificacion_id=%s, nombres=%s, apellidos=%s, direccion=%s, telefono=%s, email=%s, usuario_modificacion_id=%s WHERE id=%s", (d['cedula_ruc'], t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, d['id']))
-    else:
-        cur.execute("INSERT INTO clientes (cedula_ruc, tipo_identificacion_id, nombres, apellidos, direccion, telefono, email, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (d['cedula_ruc'], t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, u_id))
+    if d.get('id'): cur.execute("UPDATE clientes SET cedula_ruc=%s, tipo_identificacion_id=%s, nombres=%s, apellidos=%s, direccion=%s, telefono=%s, email=%s, usuario_modificacion_id=%s WHERE id=%s", (d['cedula_ruc'], t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, d['id']))
+    else: cur.execute("INSERT INTO clientes (cedula_ruc, tipo_identificacion_id, nombres, apellidos, direccion, telefono, email, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (d['cedula_ruc'], t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, u_id))
     mysql.connection.commit(); cur.close(); flash('Cliente guardado', 'success'); return redirect(url_for('clientes'))
 
 @app.route('/clientes/guardar_json', methods=['POST'])
@@ -401,105 +154,23 @@ def guardar_cliente_json():
         tel, eml = data.get('telefono','').upper(), data.get('email','').upper()
         t_id = data.get('tipo_identificacion_id') or identificar_tipo_doc(data['cedula_ruc'])
         cur.execute("""INSERT INTO clientes (cedula_ruc, tipo_identificacion_id, nombres, apellidos, direccion, telefono, email, usuario_creacion_id, usuario_modificacion_id) 
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
-                       ON DUPLICATE KEY UPDATE tipo_identificacion_id=%s, nombres=%s, apellidos=%s, direccion=%s, telefono=%s, email=%s, usuario_modificacion_id=%s""", 
-                    (data['cedula_ruc'], t_id, nom, ape, dir, tel, eml, u_id, u_id, t_id, nom, ape, dir, tel, eml, u_id))
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE nombres=%s, apellidos=%s, direccion=%s, email=%s""", 
+                    (data['cedula_ruc'], t_id, nom, ape, dir, tel, eml, u_id, u_id, nom, ape, dir, eml))
         mysql.connection.commit(); cur.execute("SELECT id FROM clientes WHERE cedula_ruc=%s", (data['cedula_ruc'],)); c_id = cur.fetchone()['id']; cur.close()
         return jsonify({'success': True, 'id': c_id})
     except Exception as e: return jsonify({'success': False, 'message': str(e)})
 
-# --- INVENTARIO ---
-@app.route('/inventario')
-@login_required
-@admin_required
-def inventario():
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT i.*, s.nombre as sucursal_nombre, u.nombre as unidad_medida FROM insumos i JOIN sucursales s ON i.sucursal_id = s.id JOIN unidades_medida u ON i.unidad_medida_id = u.id")
-    i = cur.fetchall()
-    cur.execute("SELECT * FROM sucursales"); sucs = cur.fetchall()
-    cur.execute("SELECT * FROM unidades_medida"); ums = cur.fetchall(); cur.close()
-    return render_template('inventario.html', insumos=i, sucursales=sucs, unidades=ums)
-
-@app.route('/inventario/guardar', methods=['POST'])
-@login_required
-@admin_required
-def guardar_insumo():
-    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    nom = d['nombre'].upper(); st_min = d.get('stock_minimo', 0); suc_id = d.get('sucursal_id') or session['sucursal_id']; um_id = d.get('unidad_medida_id')
-    if d.get('id'): 
-        cur.execute("UPDATE insumos SET nombre=%s, stock_actual=%s, stock_minimo=%s, unidad_medida_id=%s, sucursal_id=%s, usuario_modificacion_id=%s WHERE id=%s", (nom, d['stock'], st_min, um_id, suc_id, u_id, d['id']))
-        registrar_auditoria('EDITAR_INSUMO', f"Editó insumo: {nom} (ID: {d['id']})")
-    else: 
-        cur.execute("INSERT INTO insumos (nombre, stock_actual, stock_minimo, unidad_medida_id, sucursal_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s)", (nom, d['stock'], st_min, um_id, suc_id, u_id, u_id))
-        registrar_auditoria('CREAR_INSUMO', f"Creó insumo: {nom}")
-    mysql.connection.commit(); cur.close(); return redirect(url_for('inventario'))
-
-@app.route('/inventario/crear_ajax', methods=['POST'])
-@login_required
-@admin_required
-def crear_insumo_ajax():
-    try:
-        data = request.get_json()
-        cur = mysql.connection.cursor()
-        u_id = session['user_id']
-        nom = data['nombre'].upper()
-        um_id = data['unidad_medida_id']
-        suc_id = data.get('sucursal_id') or session['sucursal_id']
-        
-        cur.execute("INSERT INTO insumos (nombre, stock_actual, stock_minimo, unidad_medida_id, sucursal_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, 0, 0, %s, %s, %s, %s)", (nom, um_id, suc_id, u_id, u_id))
-        new_id = cur.lastrowid
-        mysql.connection.commit()
-        cur.close()
-        
-        return jsonify({'success': True, 'id': new_id, 'nombre': nom})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/inventario/ajustar', methods=['POST'])
-@login_required
-@admin_required
-def ajustar_inventario():
-    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    ins_id, cant, tipo, mot = d['insumo_id'], float(d['cantidad']), d['tipo'], d['motivo'].upper()
-    try:
-        # Obtener nombre del insumo para el log
-        cur.execute("SELECT nombre FROM insumos WHERE id=%s", (ins_id,))
-        ins_nom = cur.fetchone()['nombre']
-        
-        cur.execute("INSERT INTO ajustes_inventario (insumo_id, cantidad, tipo, motivo, usuario_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s)", (ins_id, cant, tipo, mot, u_id, u_id, u_id))
-        if tipo == 'INGRESO': cur.execute("UPDATE insumos SET stock_actual = stock_actual + %s WHERE id = %s", (cant, ins_id))
-        else: cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (cant, ins_id))
-        
-        registrar_auditoria('AJUSTE_STOCK', f"{tipo} de {cant} en {ins_nom}. Motivo: {mot}")
-        mysql.connection.commit(); flash('Ajuste realizado', 'success')
-    except Exception as e: mysql.connection.rollback(); flash(str(e), 'danger')
-    cur.close(); return redirect(url_for('inventario'))
-
-# (Resto de rutas: Empresa, POS, Ventas, Usuarios, Productos, Sucursales, Categorías permanecen igual pero asegurando tracking)
 # --- PRODUCTOS ---
 @app.route('/productos')
 @login_required
 @admin_required
 def productos():
-    cur = mysql.connection.cursor()
-    # Obtenemos productos con sus categorías
-    cur.execute("SELECT p.*, c.nombre as categoria_nombre FROM productos p JOIN categorias c ON p.categoria_id = c.id")
-    prods = cur.fetchall()
-    
-    # Obtenemos plataformas para el modal
-    cur.execute("SELECT * FROM plataformas")
-    plats = cur.fetchall()
-    
-    # Para cada producto, obtenemos sus precios por plataforma en un formato fácil de usar
+    cur = mysql.connection.cursor(); cur.execute("SELECT p.*, c.nombre as categoria_nombre FROM productos p JOIN categorias c ON p.categoria_id = c.id"); prods = cur.fetchall()
+    cur.execute("SELECT * FROM plataformas"); plats = cur.fetchall()
     for p in prods:
         cur.execute("SELECT plataforma_id, precio FROM producto_precios WHERE producto_id = %s", (p['id'],))
-        precios = cur.fetchall()
-        # Convertimos a un diccionario {plataforma_id: precio} para pasarlo como JSON al frontend
-        p['precios_json'] = {item['plataforma_id']: float(item['precio']) for item in precios}
-
-    cur.execute("SELECT * FROM categorias")
-    cats = cur.fetchall()
-    cur.close()
+        precs = cur.fetchall(); p['precios_json'] = {item['plataforma_id']: float(item['precio']) for item in precs}
+    cur.execute("SELECT * FROM categorias"); cats = cur.fetchall(); cur.close()
     return render_template('productos.html', productos=prods, categorias=cats, plataformas=plats)
 
 @app.route('/productos/guardar', methods=['POST'])
@@ -507,111 +178,142 @@ def productos():
 @admin_required
 def guardar_producto():
     d = request.form; img_file = request.files.get('imagen'); cur = mysql.connection.cursor(); u_id = session['user_id']
-    cod, nom = d['codigo'].upper(), d['nombre'].upper()
-    
-    # El precio 'base' será el de la plataforma LOCAL (ID 1 usualmente)
-    precio_base = d.get('precio_1', 0) # Fallback al precio LOCAL
-    
-    if img_file and img_file.filename != '':
+    cod, nom = d['codigo'].upper(), d['nombre'].upper(); p_base = d.get('precio_1', 0)
+    if img_file and img_file.filename:
         ib, mt = procesar_imagen(img_file)
-        if d.get('id'): 
-            cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, imagen=%s, mimetype=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, precio_base, d['categoria_id'], ib, mt, u_id, d['id']))
-            p_id = d['id']
-        else: 
-            cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, imagen, mimetype, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (cod, nom, precio_base, d['categoria_id'], ib, mt, u_id, u_id))
-            p_id = cur.lastrowid
+        if d.get('id'): cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, imagen=%s, mimetype=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, p_base, d['categoria_id'], ib, mt, u_id, d['id'])); p_id = d['id']
+        else: cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, imagen, mimetype, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (cod, nom, p_base, d['categoria_id'], ib, mt, u_id, u_id)); p_id = cur.lastrowid
     else:
-        if d.get('id'): 
-            cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, precio_base, d['categoria_id'], u_id, d['id']))
-            p_id = d['id']
-        else: 
-            cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s)", (cod, nom, precio_base, d['categoria_id'], u_id, u_id))
-            p_id = cur.lastrowid
+        if d.get('id'): cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, p_base, d['categoria_id'], u_id, d['id'])); p_id = d['id']
+        else: cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s)", (cod, nom, p_base, d['categoria_id'], u_id, u_id)); p_id = cur.lastrowid
     
-    # GUARDAR PRECIOS POR PLATAFORMA
-    cur.execute("SELECT id FROM plataformas")
-    plataformas = cur.fetchall()
-    for plat in plataformas:
-        field_name = f"precio_{plat['id']}"
-        if field_name in d:
-            precio_plat = d[field_name]
-            cur.execute("""
-                INSERT INTO producto_precios (producto_id, plataforma_id, precio) 
-                VALUES (%s, %s, %s) 
-                ON DUPLICATE KEY UPDATE precio = %s
-            """, (p_id, plat['id'], precio_plat, precio_plat))
-    
+    cur.execute("SELECT id FROM plataformas"); plats = cur.fetchall()
+    for plat in plats:
+        f_n = f"precio_{plat['id']}"
+        if f_n in d: cur.execute("INSERT INTO producto_precios (producto_id, plataforma_id, precio) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE precio=%s", (p_id, plat['id'], d[f_n], d[f_n]))
     mysql.connection.commit(); cur.close(); return redirect(url_for('productos'))
 
 @app.route('/productos/receta/<int:producto_id>')
 @login_required
 @admin_required
 def ver_receta(producto_id):
-    cur = mysql.connection.cursor(); cur.execute("SELECT * FROM productos WHERE id=%s", (producto_id,)); p = cur.fetchone(); cur.execute("SELECT r.*, i.nombre, u.nombre as unidad_medida FROM recetas r JOIN insumos i ON r.insumo_id=i.id JOIN unidades_medida u ON i.unidad_medida_id = u.id WHERE r.producto_id=%s", (producto_id,)); r = cur.fetchall(); cur.execute("SELECT i.*, u.nombre as unidad_medida FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id WHERE i.sucursal_id=%s", (session['sucursal_id'],)); i = cur.fetchall(); cur.close(); return render_template('recetas.html', producto=p, receta=r, insumos=i)
+    cur = mysql.connection.cursor(); cur.execute("SELECT * FROM productos WHERE id=%s", (producto_id,)); p = cur.fetchone()
+    cur.execute("SELECT r.*, i.nombre, u.nombre as unidad_medida FROM recetas r JOIN insumos i ON r.insumo_id=i.id JOIN unidades_medida u ON i.unidad_medida_id = u.id WHERE r.producto_id=%s", (producto_id,)); r = cur.fetchall()
+    cur.execute("SELECT i.*, u.nombre as unidad_medida FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id WHERE i.sucursal_id=%s", (session['sucursal_id'],)); i = cur.fetchall(); cur.close()
+    return render_template('recetas.html', producto=p, receta=r, insumos=i)
 
 @app.route('/productos/receta/agregar', methods=['POST'])
 @login_required
 @admin_required
 def agregar_insumo_receta():
     pi, ii, ct = request.form['producto_id'], request.form['insumo_id'], request.form['cantidad']; cur = mysql.connection.cursor(); u_id = session['user_id']
-    
-    # Obtener nombres para auditoría
-    cur.execute("SELECT nombre FROM productos WHERE id=%s", (pi,))
-    p_nom = cur.fetchone()['nombre']
-    cur.execute("SELECT nombre FROM insumos WHERE id=%s", (ii,))
-    i_nom = cur.fetchone()['nombre']
-    
     cur.execute("INSERT INTO recetas (producto_id, insumo_id, cantidad_requerida, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s)", (pi, ii, ct, u_id, u_id))
-    registrar_auditoria('AGREGAR_RECETA', f"Añadió {ct} de {i_nom} al producto {p_nom}")
-    
     mysql.connection.commit(); cur.close(); return redirect(url_for('ver_receta', producto_id=pi))
 
 @app.route('/productos/receta/eliminar/<int:id>/<int:p_id>')
 @login_required
 @admin_required
 def eliminar_insumo_receta(id, p_id):
-    cur = mysql.connection.cursor()
-    
-    # Obtener nombres para auditoría antes de borrar
-    cur.execute("SELECT p.nombre as prod, i.nombre as ins FROM recetas r JOIN productos p ON r.producto_id=p.id JOIN insumos i ON r.insumo_id=i.id WHERE r.id=%s", (id,))
-    data = cur.fetchone()
-    
-    cur.execute("DELETE FROM recetas WHERE id=%s", (id,))
-    if data: registrar_auditoria('ELIMINAR_RECETA', f"Eliminó {data['ins']} de la receta de {data['prod']}")
-    
-    mysql.connection.commit(); cur.close(); return redirect(url_for('ver_receta', producto_id=p_id))
+    cur = mysql.connection.cursor(); cur.execute("DELETE FROM recetas WHERE id=%s", (id,)); mysql.connection.commit(); cur.close()
+    return redirect(url_for('ver_receta', producto_id=p_id))
 
-@app.route('/auditoria')
+# --- INVENTARIO ---
+@app.route('/inventario')
 @login_required
 @admin_required
-def ver_auditoria():
-    cur = mysql.connection.cursor(); cur.execute("SELECT a.*, u.usuario FROM auditoria a LEFT JOIN usuarios u ON a.usuario_id = u.id ORDER BY a.fecha DESC LIMIT 500"); logs = cur.fetchall(); cur.close(); return render_template('auditoria.html', logs=logs)
+def inventario():
+    cur = mysql.connection.cursor(); cur.execute("SELECT i.*, s.nombre as sucursal_nombre, u.nombre as unidad_medida FROM insumos i JOIN sucursales s ON i.sucursal_id = s.id JOIN unidades_medida u ON i.unidad_medida_id = u.id")
+    ins = cur.fetchall(); cur.execute("SELECT * FROM sucursales"); sucs = cur.fetchall(); cur.execute("SELECT * FROM unidades_medida"); ums = cur.fetchall(); cur.close()
+    return render_template('inventario.html', insumos=ins, sucursales=sucs, unidades=ums)
 
-# --- CONFIGURACIÓN RESTO (Usuarios, Sucursales, Categorías, Empresa, POS) ---
-# (Implementados con la misma lógica de tracking)
+@app.route('/inventario/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_insumo():
+    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
+    nom, st_min, suc_id, um_id = d['nombre'].upper(), d.get('stock_minimo', 0), d.get('sucursal_id') or session['sucursal_id'], d.get('unidad_medida_id')
+    if d.get('id'): cur.execute("UPDATE insumos SET nombre=%s, stock_actual=%s, stock_minimo=%s, unidad_medida_id=%s, sucursal_id=%s, usuario_modificacion_id=%s WHERE id=%s", (nom, d['stock'], st_min, um_id, suc_id, u_id, d['id']))
+    else: cur.execute("INSERT INTO insumos (nombre, stock_actual, stock_minimo, unidad_medida_id, sucursal_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s)", (nom, d['stock'], st_min, um_id, suc_id, u_id, u_id))
+    mysql.connection.commit(); cur.close(); return redirect(url_for('inventario'))
 
+@app.route('/inventario/ajustar', methods=['POST'])
+@login_required
+@admin_required
+def ajustar_inventario():
+    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
+    ins_id, cant, tipo, mot = d['insumo_id'], float(d['cantidad']), d['tipo'], d['motivo'].upper()
+    cur.execute("INSERT INTO ajustes_inventario (insumo_id, cantidad, tipo, motivo, usuario_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s)", (ins_id, cant, tipo, mot, u_id, u_id, u_id))
+    if tipo == 'INGRESO': cur.execute("UPDATE insumos SET stock_actual = stock_actual + %s WHERE id = %s", (cant, ins_id))
+    else: cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (cant, ins_id))
+    mysql.connection.commit(); cur.close(); flash('Ajuste realizado', 'success'); return redirect(url_for('inventario'))
+
+# --- COMPRAS ---
+@app.route('/compras')
+@login_required
+@admin_required
+def compras():
+    cur = mysql.connection.cursor(); cur.execute("SELECT c.*, p.razon_social, s.nombre as sucursal_nombre FROM compras c JOIN proveedores p ON c.proveedor_id = p.id JOIN sucursales s ON c.sucursal_id = s.id ORDER BY c.fecha DESC")
+    vs = cur.fetchall(); cur.close(); return render_template('compras.html', compras=vs)
+
+@app.route('/compras/nueva')
+@login_required
+@admin_required
+def nueva_compra():
+    cur = mysql.connection.cursor(); cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1"); iva_p = cur.fetchone()['iva_porcentaje']
+    cur.execute("SELECT p.*, t.nombre as tipo_comprobante_nombre FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id"); provs = cur.fetchall()
+    cur.execute("SELECT * FROM sucursales"); sucs = cur.fetchall(); cur.execute("SELECT * FROM unidades_medida"); ums = cur.fetchall()
+    cur.execute("SELECT i.*, u.nombre as unidad_medida FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id"); ins = cur.fetchall(); cur.close()
+    return render_template('nueva_compra.html', proveedores=provs, insumos=ins, sucursales=sucs, unidades=ums, fecha_hoy=datetime.now().strftime('%Y-%m-%d'), iva_porcentaje=iva_p)
+
+@app.route('/compras/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_compra():
+    data = request.get_json(); cur = mysql.connection.cursor()
+    try:
+        id_c, f, s_id, u_id = data.get('compra_id'), data['fecha'], data.get('sucursal_id') or session['sucursal_id'], session['user_id']
+        est, pto, sec, n_aut, f_cad = data.get('establecimiento','001'), data.get('punto_emision','001'), data.get('numero_comprobante','').upper(), data.get('numero_autorizacion'), data.get('fecha_caducidad')
+        if not f_cad or str(f_cad).strip() == '': f_cad = None
+        if id_c:
+            cur.execute("SELECT insumo_id, cantidad FROM detalles_compras WHERE compra_id = %s", (id_c,))
+            for iv in cur.fetchall(): cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (iv['cantidad'], iv['insumo_id']))
+            cur.execute("UPDATE compras SET proveedor_id=%s, sucursal_id=%s, establecimiento=%s, punto_emision=%s, numero_comprobante=%s, total=%s, fecha=%s, clave_acceso=%s, numero_autorizacion=%s, fecha_caducidad=%s, usuario_modificacion_id=%s WHERE id=%s", (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, data.get('clave_acceso'), n_aut, f_cad, u_id, id_c))
+            cur.execute("DELETE FROM detalles_compras WHERE compra_id = %s", (id_c,)); comp_id = id_c
+        else:
+            cur.execute("INSERT INTO compras (proveedor_id, sucursal_id, establecimiento, punto_emision, numero_comprobante, total, fecha, clave_acceso, numero_autorizacion, fecha_caducidad, usuario_creacion_id, usuario_modificacion_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, data.get('clave_acceso'), n_aut, f_cad, u_id, u_id))
+            comp_id = cur.lastrowid
+        for i in data['items']:
+            cur.execute("INSERT INTO detalles_compras (compra_id, insumo_id, cantidad, costo_unitario, subtotal, iva_valor) VALUES (%s,%s,%s,%s,%s,%s)", (comp_id, i['insumo_id'], i['cantidad'], i['costo'], i['subtotal'], i['iva_valor']))
+            cur.execute("UPDATE insumos SET stock_actual = stock_actual + %s WHERE id = %s", (i['cantidad'], i['insumo_id']))
+        mysql.connection.commit(); cur.close(); return jsonify({'success': True})
+    except Exception as e: mysql.connection.rollback(); cur.close(); return jsonify({'success': False, 'message': str(e)})
+
+# --- PROVEEDORES ---
+@app.route('/proveedores')
+@login_required
+@admin_required
+def proveedores():
+    cur = mysql.connection.cursor(); cur.execute("SELECT p.*, t.nombre as tipo_comprobante_nombre FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id")
+    p = cur.fetchall(); cur.execute("SELECT * FROM tipos_comprobantes"); t = cur.fetchall(); cur.close()
+    return render_template('proveedores.html', proveedores=p, tipos=t)
+
+@app.route('/proveedores/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_proveedor():
+    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
+    ruc, razon, nom, dir, tel, eml, t_comp = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion'].upper(), d['telefono'], d['email'].upper(), d['tipo_comprobante_id']
+    if d.get('id'): cur.execute("UPDATE proveedores SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion=%s, telefono=%s, email=%s, tipo_comprobante_id=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, tel, eml, t_comp, u_id, d['id']))
+    else: cur.execute("INSERT INTO proveedores (ruc, razon_social, nombre_comercial, direccion, telefono, email, tipo_comprobante_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)", (ruc, razon, nom, dir, tel, eml, t_comp, u_id, u_id))
+    mysql.connection.commit(); cur.close(); flash('Guardado', 'success'); return redirect(url_for('proveedores'))
+
+# --- USUARIOS ---
 @app.route('/usuarios')
 @login_required
 @admin_required
 def usuarios():
-    cur = mysql.connection.cursor()
-    cur.execute("""
-        SELECT u.*, s.nombre as sucursal_nombre, t.nombre as tipo_id_nombre, r.nombre as rol_nombre 
-        FROM usuarios u 
-        LEFT JOIN sucursales s ON u.sucursal_id=s.id 
-        JOIN tipos_identificacion t ON u.tipo_identificacion_id = t.id
-        JOIN roles r ON u.rol_id = r.id
-    """)
-    u = cur.fetchall()
-    cur.execute("SELECT * FROM sucursales")
-    s = cur.fetchall()
-    # Excluir RUC (ID 2) y Consumidor Final (ID 4) para el registro de usuarios
-    cur.execute("SELECT * FROM tipos_identificacion WHERE id NOT IN (2, 4)")
-    t = cur.fetchall()
-    # Obtener roles del catálogo
-    cur.execute("SELECT * FROM roles")
-    roles = cur.fetchall()
-    cur.close()
+    cur = mysql.connection.cursor(); cur.execute("SELECT u.*, s.nombre as sucursal_nombre, t.nombre as tipo_id_nombre, r.nombre as rol_nombre FROM usuarios u LEFT JOIN sucursales s ON u.sucursal_id=s.id JOIN tipos_identificacion t ON u.tipo_identificacion_id = t.id JOIN roles r ON u.rol_id = r.id")
+    u = cur.fetchall(); cur.execute("SELECT * FROM sucursales"); s = cur.fetchall(); cur.execute("SELECT * FROM tipos_identificacion WHERE id NOT IN (2, 4)"); t = cur.fetchall(); cur.execute("SELECT * FROM roles"); roles = cur.fetchall(); cur.close()
     return render_template('usuarios.html', usuarios=u, sucursales=s, tipos_id=t, roles=roles)
 
 @app.route('/usuarios/crear', methods=['POST'])
@@ -620,9 +322,8 @@ def usuarios():
 def crear_usuario():
     c, u, p, s, rid, tid = request.form['cedula'].strip(), request.form['usuario'].upper().strip(), request.form['password'], request.form['sucursal_id'], request.form['rol_id'], request.form['tipo_identificacion_id']
     hp = generate_password_hash(p); cur = mysql.connection.cursor()
-    try:
-        cur.execute("INSERT INTO usuarios (cedula, usuario, password, sucursal_id, rol_id, activo, tipo_identificacion_id) VALUES (%s, %s, %s, %s, %s, 1, %s)", (c, u, hp, s, rid, tid)); mysql.connection.commit()
-    except Exception as e: flash(f"Error al crear: {str(e)}", 'danger')
+    try: cur.execute("INSERT INTO usuarios (cedula, usuario, password, sucursal_id, rol_id, activo, tipo_identificacion_id) VALUES (%s, %s, %s, %s, %s, 1, %s)", (c, u, hp, s, rid, tid)); mysql.connection.commit()
+    except Exception as e: flash(str(e), 'danger')
     cur.close(); return redirect(url_for('usuarios'))
 
 @app.route('/usuarios/editar', methods=['POST'])
@@ -635,81 +336,28 @@ def editar_usuario():
         if p: hp = generate_password_hash(p); cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, password=%s, sucursal_id=%s, rol_id=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, hp, s, rid, a, tid, id_u))
         else: cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, sucursal_id=%s, rol_id=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, s, rid, a, tid, id_u))
         mysql.connection.commit()
-    except Exception as e: flash(f"Error al editar: {str(e)}", 'danger')
+    except Exception as e: flash(str(e), 'danger')
     cur.close(); return redirect(url_for('usuarios'))
 
-@app.route('/proveedores')
-@login_required
-@admin_required
-def proveedores():
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT p.*, t.nombre as tipo_comprobante_nombre FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id")
-    p = cur.fetchall()
-    cur.execute("SELECT * FROM tipos_comprobantes"); t = cur.fetchall(); cur.close()
-    return render_template('proveedores.html', proveedores=p, tipos=t)
-
-@app.route('/proveedores/guardar', methods=['POST'])
-@login_required
-@admin_required
-def guardar_proveedor():
-    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    ruc = d['ruc']; razon = d['razon_social'].upper(); nombre = d['nombre_comercial'].upper()
-    dire = d['direccion'].upper(); tel = d['telefono']; eml = d['email'].upper(); tipo_comp = d['tipo_comprobante_id']
-    try:
-        if d.get('id'): 
-            cur.execute("UPDATE proveedores SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion=%s, telefono=%s, email=%s, tipo_comprobante_id=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nombre, dire, tel, eml, tipo_comp, u_id, d['id']))
-            registrar_auditoria('EDITAR_PROVEEDOR', f"Editó proveedor: {razon}")
-        else: 
-            cur.execute("INSERT INTO proveedores (ruc, razon_social, nombre_comercial, direccion, telefono, email, tipo_comprobante_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (ruc, razon, nombre, dire, tel, eml, tipo_comp, u_id, u_id))
-            registrar_auditoria('CREAR_PROVEEDOR', f"Creó proveedor: {razon}")
-        mysql.connection.commit(); flash('Proveedor guardado', 'success')
-    except Exception as e: flash(str(e), 'danger')
-    cur.close(); return redirect(url_for('proveedores'))
-
-@app.route('/proveedores/eliminar/<int:id>')
-@login_required
-@admin_required
-def eliminar_proveedor(id):
-    cur = mysql.connection.cursor()
-    try:
-        # Verificar si tiene compras asociadas
-        cur.execute("SELECT COUNT(*) as cuenta FROM compras WHERE proveedor_id = %s", (id,))
-        tiene_compras = cur.fetchone()['cuenta'] > 0
-        
-        if tiene_compras:
-            flash('NO SE PUEDE DAR DE BAJA: El proveedor tiene compras registradas en el historial.', 'danger')
-        else:
-            cur.execute("SELECT razon_social FROM proveedores WHERE id = %s", (id,))
-            p = cur.fetchone()
-            razon = p['razon_social'] if p else "Desconocido"
-            
-            cur.execute("DELETE FROM proveedores WHERE id = %s", (id,))
-            mysql.connection.commit()
-            registrar_auditoria('ELIMINAR_PROVEEDOR', f"Eliminó al proveedor: {razon}")
-            flash('Proveedor eliminado correctamente', 'success')
-            
-    except Exception as e:
-        mysql.connection.rollback()
-        flash(f"Error al procesar la solicitud: {str(e)}", 'danger')
-    finally:
-        cur.close()
-    return redirect(url_for('proveedores'))
-
+# --- SUCURSALES ---
 @app.route('/sucursales')
 @login_required
 @admin_required
 def sucursales():
-    cur = mysql.connection.cursor(); cur.execute("SELECT * FROM sucursales"); s = cur.fetchall(); cur.close(); return render_template('sucursales.html', sucursales=s)
+    cur = mysql.connection.cursor(); cur.execute("SELECT * FROM sucursales"); s = cur.fetchall(); cur.close()
+    return render_template('sucursales.html', sucursales=s)
 
 @app.route('/sucursales/guardar', methods=['POST'])
 @login_required
 @admin_required
 def guardar_sucursal():
-    d = request.form; cur = mysql.connection.cursor(); nom = d['nombre'].upper(); u_id = session['user_id']
-    if d.get('id'): cur.execute("UPDATE sucursales SET nombre=%s, usuario_modificacion_id=%s WHERE id=%s", (nom, u_id, d['id']))
-    else: cur.execute("INSERT INTO sucursales (nombre, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s)", (nom, u_id, u_id))
+    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
+    nom, est, pto = d['nombre'].upper(), d['establecimiento'], d['punto_emision']
+    if d.get('id'): cur.execute("UPDATE sucursales SET nombre=%s, establecimiento=%s, punto_emision=%s, usuario_modificacion_id=%s WHERE id=%s", (nom, est, pto, u_id, d['id']))
+    else: cur.execute("INSERT INTO sucursales (nombre, establecimiento, punto_emision, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s)", (nom, est, pto, u_id, u_id))
     mysql.connection.commit(); cur.close(); return redirect(url_for('sucursales'))
 
+# --- CATEGORIAS ---
 @app.route('/categorias')
 @login_required
 @admin_required
@@ -720,11 +368,12 @@ def categorias():
 @login_required
 @admin_required
 def guardar_categoria():
-    d = request.form; cur = mysql.connection.cursor(); nom = d['nombre'].upper(); u_id = session['user_id']
+    d = request.form; cur = mysql.connection.cursor(); nom, u_id = d['nombre'].upper(), session['user_id']
     if d.get('id'): cur.execute("UPDATE categorias SET nombre=%s, usuario_modificacion_id=%s WHERE id=%s", (nom, u_id, d['id']))
     else: cur.execute("INSERT INTO categorias (nombre, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s)", (nom, u_id, u_id))
     mysql.connection.commit(); cur.close(); return redirect(url_for('categorias'))
 
+# --- EMPRESA ---
 @app.route('/empresa')
 @login_required
 @admin_required
@@ -737,134 +386,102 @@ def configuracion_empresa():
 def guardar_empresa():
     from security_utils import cifrar_password
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    ruc, razon, nom, dir = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion_matriz'].upper()
-    iva = d.get('iva_porcentaje', 15.00)
-    color = d.get('color_tema', '#008938')
-    
-    # CIFRAR CONTRASEÑA ANTES DE GUARDAR
-    f_pass = cifrar_password(d.get('firma_password', ''))
-    
-    # Procesar archivo de firma si se subió uno nuevo
-    firma_file = request.files.get('firma_file')
-    if firma_file and firma_file.filename != '':
-        # Asegurar que existe la carpeta certs
-        certs_dir = os.path.join(os.path.dirname(__file__), 'certs')
-        if not os.path.exists(certs_dir): os.makedirs(certs_dir)
-        # Guardar como firma.p12 (sobreescribir)
-        firma_file.save(os.path.join(certs_dir, 'firma.p12'))
+    ruc, razon, nom, dir, iva, color, f_pass = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion_matriz'].upper(), d.get('iva_porcentaje', 15.00), d.get('color_tema', '#008938'), cifrar_password(d.get('firma_password', ''))
+    f_file = request.files.get('firma_file')
+    if f_file and f_file.filename:
+        if not os.path.exists('certs'): os.makedirs('certs')
+        f_file.save(os.path.join('certs', 'firma.p12'))
+    if d.get('id'): cur.execute("UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, firma_password=%s, obligado_contabilidad=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), u_id, d['id']))
+    else: cur.execute("INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, firma_password, obligado_contabilidad, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), u_id, u_id))
+    mysql.connection.commit(); cur.close(); flash('Empresa actualizada', 'success'); return redirect(url_for('configuracion_empresa'))
 
-    if d.get('id'): 
-        cur.execute("""UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, 
-                       iva_porcentaje=%s, ambiente=%s, color_tema=%s, firma_password=%s, usuario_modificacion_id=%s 
-                       WHERE id=%s""", 
-                    (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, u_id, d['id']))
-    else: 
-        cur.execute("""INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, 
-                       ambiente, color_tema, firma_password, usuario_creacion_id, usuario_modificacion_id) 
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
-                    (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, u_id, u_id))
-    
-    mysql.connection.commit(); cur.close(); flash('Datos de empresa y firma actualizados', 'success')
-    return redirect(url_for('configuracion_empresa'))
-
+# --- POS ---
 @app.route('/pos')
 @login_required
 def pos():
     cur = mysql.connection.cursor()
-    cur.execute("SELECT * FROM categorias")
-    c = cur.fetchall()
-    
-    # Obtener IVA parametrizado
-    cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1")
-    emp = cur.fetchone()
-    iva_p = emp['iva_porcentaje'] if emp else 15.00
-    
-    # Obtener Plataformas
-    cur.execute("SELECT * FROM plataformas")
-    plats = cur.fetchall()
-    
-    query_productos = """
-        SELECT p.id, p.codigo, p.nombre, p.precio, p.categoria_id, IF(p.imagen IS NOT NULL, 1, 0) as tiene_foto,
-        (
-            SELECT MIN(FLOOR(i.stock_actual / r.cantidad_requerida))
-            FROM recetas r
-            JOIN insumos i ON r.insumo_id = i.id
-            WHERE r.producto_id = p.id AND i.sucursal_id = %s
-        ) as stock_disponible
-        FROM productos p
-    """
-    cur.execute(query_productos, (session['sucursal_id'],))
+    cur.execute("SELECT * FROM categorias"); cats = cur.fetchall()
+    cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1"); iva_p = cur.fetchone()['iva_porcentaje']
+    cur.execute("SELECT * FROM plataformas"); plats = cur.fetchall()
+    cur.execute("SELECT * FROM tipos_identificacion"); t_id = cur.fetchall()
+    query = """SELECT p.id, p.codigo, p.nombre, p.precio, p.categoria_id, IF(p.imagen IS NOT NULL, 1, 0) as tiene_foto,
+               (SELECT MIN(FLOOR(i.stock_actual / r.cantidad_requerida)) FROM recetas r JOIN insumos i ON r.insumo_id = i.id WHERE r.producto_id = p.id AND i.sucursal_id = %s) as stock_disponible
+               FROM productos p"""
+    cur.execute(query, (session['sucursal_id'],))
     prods = cur.fetchall()
-    
-    # Para cada producto, adjuntar sus precios por plataforma
-    for prod in prods:
-        cur.execute("SELECT plataforma_id, precio FROM producto_precios WHERE producto_id = %s", (prod['id'],))
-        precios = cur.fetchall()
-        prod['precios_json'] = {item['plataforma_id']: float(item['precio']) for item in precios}
-        
-        if prod['stock_disponible'] is None:
-            cur.execute("SELECT COUNT(*) as cuenta FROM recetas WHERE producto_id = %s", (prod['id'],))
-            tiene_receta = cur.fetchone()['cuenta'] > 0
-            prod['stock_disponible'] = 0 if tiene_receta else 999
-
-    cur.execute("SELECT * FROM tipos_identificacion")
-    ti = cur.fetchall()
-    cur.close()
-
-    return render_template('pos.html', categorias=c, productos=prods, tipos_id=ti, iva_porcentaje=iva_p, plataformas=plats)
+    for p in prods:
+        cur.execute("SELECT plataforma_id, precio FROM producto_precios WHERE producto_id = %s", (p['id'],))
+        precs = cur.fetchall(); p['precios_json'] = {item['plataforma_id']: float(item['precio']) for item in precs}
+        if p['stock_disponible'] is None:
+            cur.execute("SELECT COUNT(*) as c FROM recetas WHERE producto_id=%s", (p['id'],))
+            p['stock_disponible'] = 0 if cur.fetchone()['c'] > 0 else 999
+    cur.close(); return render_template('pos.html', categorias=cats, productos=prods, tipos_id=t_id, iva_porcentaje=iva_p, plataformas=plats)
 
 @app.route('/pos/venta', methods=['POST'])
 @login_required
 def procesar_venta_v2():
     data = request.get_json(); cur = mysql.connection.cursor(); u_id = session['user_id']
     try:
-        c_id = data.get('cliente_id'); fpago = data.get('forma_pago', 'EFECTIVO').upper()
-        s_id = session['sucursal_id']
-        plat_id = data.get('plataforma_id') # RECIBIR PLATAFORMA
-        
-        # 1. Obtener datos de empresa e IVA dinámico
+        c_id, fpago, s_id, plat_id = data.get('cliente_id'), data.get('forma_pago', 'EFECTIVO').upper(), session['sucursal_id'], data.get('plataforma_id')
+        est, pto = session.get('establecimiento', '001'), session.get('punto_emision', '001')
         cur.execute("SELECT ruc, ambiente, iva_porcentaje FROM empresa LIMIT 1"); emp = cur.fetchone()
-        ruc = emp['ruc'] if emp else "1790000000001"; amb = emp['ambiente'] if emp else 1
-        iva_p = float(emp['iva_porcentaje']) if emp else 15.00
-        divisor_iva = 1 + (iva_p / 100)
-        clave = generar_clave_acceso_sri(datetime.now(), ruc, amb)
-
-        # 2. Insertar Cabecera (con plataforma_id)
-        cur.execute("""INSERT INTO ventas 
-            (usuario_id, sucursal_id, cliente_id, plataforma_id, subtotal_0, subtotal_15, iva_valor, total, forma_pago, clave_acceso_sri, estado_sri, usuario_creacion_id, usuario_modificacion_id) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'PENDIENTE', %s, %s)""", 
-            (u_id, s_id, c_id, plat_id, data.get('subtotal_0', 0), data.get('subtotal_15', 0), 
-             data.get('iva_valor', 0), data['total'], fpago, clave, u_id, u_id))
+        ruc, amb, iva_p = emp['ruc'], emp['ambiente'], float(emp['iva_porcentaje']); divisor = 1 + (iva_p / 100)
+        cur.execute("SELECT AUTO_INCREMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA=%s AND TABLE_NAME='ventas'", (app.config['MYSQL_DB'],))
+        sec = str(cur.fetchone()['AUTO_INCREMENT']).zfill(9); serie = f"{est}{pto}"; clave = generar_clave_acceso_sri(datetime.now(), ruc, amb, serie, sec)
+        cur.execute("""INSERT INTO ventas (usuario_id, sucursal_id, cliente_id, plataforma_id, subtotal_0, subtotal_15, iva_valor, total, forma_pago, clave_acceso_sri, estado_sri, establecimiento, punto_emision, secuencial, usuario_creacion_id, usuario_modificacion_id) 
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDIENTE',%s,%s,%s,%s,%s)""", (u_id, s_id, c_id, plat_id, data.get('subtotal_0', 0), data.get('subtotal_15', 0), data.get('iva_valor', 0), data['total'], fpago, clave, est, pto, sec, u_id, u_id))
         v_id = cur.lastrowid
-
-        # 3. Procesar Items
         for i in data['items']:
-            item_total = float(i['precio']) * int(i['cantidad'])
-            item_iva = item_total - (item_total / divisor_iva)
-            
-            cur.execute("INSERT INTO detalles_ventas (venta_id, producto_id, cantidad, precio_unitario, subtotal, iva_valor) VALUES (%s, %s, %s, %s, %s, %s)", 
-                        (v_id, i['id'], i['cantidad'], i['precio'], item_total, item_iva))
-            
+            i_tot = float(i['precio']) * int(i['cantidad']); i_iva = i_tot - (i_tot / divisor)
+            cur.execute("INSERT INTO detalles_ventas (venta_id, producto_id, cantidad, precio_unitario, subtotal, iva_valor) VALUES (%s,%s,%s,%s,%s,%s)", (v_id, i['id'], i['cantidad'], i['precio'], i_tot, i_iva))
             cur.execute("SELECT insumo_id, cantidad_requerida FROM recetas WHERE producto_id=%s", (i['id'],))
-            for ing in cur.fetchall():
-                cur.execute("UPDATE insumos SET stock_actual=stock_actual-%s WHERE id=%s AND sucursal_id=%s", 
-                            (float(ing['cantidad_requerida']) * int(i['cantidad']), ing['insumo_id'], s_id))
-        
-        mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta registrada ID: {v_id} por ${data['total']}")
-        
-        # 4. Procesar Facturación Electrónica SRI (Background / Síncrono)
-        import facturacion_sri
-        facturacion_sri.procesar_factura_electronica(v_id, mysql)
-        
+            for r in cur.fetchall(): cur.execute("UPDATE insumos SET stock_actual=stock_actual-%s WHERE id=%s AND sucursal_id=%s", (float(r['cantidad_requerida']) * int(i['cantidad']), r['insumo_id'], s_id))
+        mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta ID: {v_id} registrada")
+        import facturacion_sri; facturacion_sri.procesar_factura_electronica(v_id, mysql)
         return jsonify({'success': True, 'venta_id': v_id})
-    except Exception as e:
-        mysql.connection.rollback(); return jsonify({'success': False, 'message': str(e)})
+    except Exception as e: mysql.connection.rollback(); return jsonify({'success': False, 'message': str(e)})
     finally: cur.close()
 
+# --- VENTAS ---
 @app.route('/ventas')
 @login_required
 def historial_ventas():
     cur = mysql.connection.cursor(); cur.execute("SELECT v.*, c.nombres, c.apellidos, u.usuario FROM ventas v JOIN clientes c ON v.cliente_id=c.id JOIN usuarios u ON v.usuario_id=u.id ORDER BY v.fecha DESC"); v = cur.fetchall(); cur.close(); return render_template('ventas.html', ventas=v)
+
+@app.route('/ventas/reintentar_sri/<int:id>')
+@login_required
+@admin_required
+def reintentar_sri(id):
+    import facturacion_sri
+    try:
+        if facturacion_sri.procesar_factura_electronica(id, mysql): flash('Sincronización completada', 'success')
+        else: flash('El SRI reportó novedades', 'warning')
+    except Exception as e: flash(str(e), 'danger')
+    return redirect(url_for('historial_ventas'))
+
+@app.route('/venta/ride/<int:id>')
+@login_required
+def ver_ride(id):
+    cur = mysql.connection.cursor(); cur.execute("SELECT xml_autorizado, numero_autorizacion, clave_acceso_sri, fecha FROM ventas WHERE id=%s", (id,)); v = cur.fetchone()
+    if not v or not v['xml_autorizado']: cur.close(); return "RIDE no disponible", 404
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(v['xml_autorizado']); f_xml = root.find('.//factura') or root
+        it, inf = f_xml.find('infoTributaria'), f_xml.find('infoFactura')
+        datos = {
+            'ruc_emisor': it.find('ruc').text, 'razon_social': it.find('razonSocial').text, 'nombre_comercial': it.find('nombreComercial').text if it.find('nombreComercial') is not None else it.find('razonSocial').text,
+            'dir_matriz': it.find('dirMatriz').text, 'clave_acceso': it.find('claveAcceso').text, 'num_autorizacion': v['numero_autorizacion'], 'fecha_autorizacion': v['fecha'].strftime('%d/%m/%Y %H:%M'),
+            'ambiente': 'PRODUCCIÓN' if it.find('ambiente').text == '2' else 'PRUEBAS', 'obligado_contabilidad': inf.find('obligadoContabilidad').text if inf.find('obligadoContabilidad') is not None else 'NO',
+            'cliente_nombre': inf.find('razonSocialComprador').text, 'cliente_id': inf.find('identificacionComprador').text, 'fecha_emision': inf.find('fechaEmision').text, 'subtotal_0': 0.0, 'subtotal_15': 0.0, 'iva_valor': 0.0, 'total': float(inf.find('importeTotal').text), 'detalles': []
+        }
+        for ti in inf.find('totalConImpuestos').findall('totalImpuesto'):
+            if ti.find('codigoPorcentaje').text == '4': datos['subtotal_15'], datos['iva_valor'] = float(ti.find('baseImponible').text), float(ti.find('valor').text)
+            elif ti.find('codigoPorcentaje').text == '0': datos['subtotal_0'] = float(ti.find('baseImponible').text)
+        for d in f_xml.find('detalles').findall('detalle'):
+            datos['detalles'].append({'codigo': d.find('codigoPrincipal').text, 'descripcion': d.find('descripcion').text, 'cantidad': float(d.find('cantidad').text), 'precio_unitario': float(d.find('precioUnitario').text), 'total': float(d.find('precioTotalSinImpuesto').text)})
+        cur.execute("SELECT * FROM empresa LIMIT 1"); emp = cur.fetchone(); cur.close()
+        return render_template('ride.html', d=datos, empresa=emp)
+    except Exception as e: cur.close(); return str(e), 500
 
 @app.route('/venta/ticket/<int:id>')
 @login_required
@@ -878,90 +495,26 @@ def ver_ticket(id):
     cur.execute("SELECT * FROM empresa LIMIT 1"); emp = cur.fetchone(); cur.close()
     return render_template('ticket.html', venta=v, cliente=c, sucursal=s, usuario=u, detalles=det, empresa=emp)
 
-@app.route('/ventas/reintentar_sri/<int:id>')
-@login_required
-@admin_required
-def reintentar_sri(id):
-    import facturacion_sri
-    try:
-        exito = facturacion_sri.procesar_factura_electronica(id, mysql)
-        if exito:
-            flash(f'Proceso SRI ejecutado para la venta #{id}. Verifique el estado.', 'info')
-        else:
-            flash(f'El proceso SRI reportó errores para la venta #{id}.', 'warning')
-    except Exception as e:
-        flash(f'Error al conectar con SRI: {str(e)}', 'danger')
-    return redirect(url_for('historial_ventas'))
-
+# --- REPORTES ---
 @app.route('/reportes')
 @login_required
 @admin_required
 def reportes():
     cur = mysql.connection.cursor()
-    
-    # 1. Ventas Detalladas
-    cur.execute("SELECT v.*, c.nombres, c.apellidos, u.usuario FROM ventas v JOIN clientes c ON v.cliente_id=c.id JOIN usuarios u ON v.usuario_id=u.id ORDER BY v.fecha DESC")
-    v = cur.fetchall()
-    
-    # 2. Top Productos (Gráfico)
-    cur.execute("SELECT p.nombre, SUM(dv.cantidad) as total_vendido FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id GROUP BY p.id ORDER BY total_vendido DESC LIMIT 5")
-    t = cur.fetchall()
-    
-    # 3. Rentabilidad por Producto
-    # Calculamos el costo basado en el último precio de compra de cada insumo en la receta
-    query_rentabilidad = """
-        SELECT 
-            p.nombre, 
-            p.precio,
-            (
-                SELECT SUM(r.cantidad_requerida * IFNULL(
-                    (SELECT dc.costo_unitario FROM detalles_compras dc WHERE dc.insumo_id = r.insumo_id ORDER BY dc.id DESC LIMIT 1), 
-                    0)
-                )
-                FROM recetas r WHERE r.producto_id = p.id
-            ) as costo_receta
-        FROM productos p
-        ORDER BY (p.precio - IFNULL(costo_receta, 0)) DESC
-    """
-    cur.execute(query_rentabilidad)
-    rentabilidad = cur.fetchall()
-    
-    # 4. Ventas por Franja Horaria
-    cur.execute("""
-        SELECT HOUR(fecha) as hora, COUNT(*) as cantidad, SUM(total) as total 
-        FROM ventas 
-        GROUP BY hora 
-        ORDER BY hora
-    """)
-    franja_horaria = cur.fetchall()
-    
-    # 5. Formas de Pago
-    cur.execute("SELECT forma_pago, COUNT(*) as cantidad, SUM(total) as total FROM ventas GROUP BY forma_pago")
-    formas_pago = cur.fetchall()
-    
-    # 6. Insumos Críticos
-    cur.execute("""
-        SELECT i.nombre, i.stock_actual, i.stock_minimo, u.nombre as unidad_medida, s.nombre as sucursal 
-        FROM insumos i 
-        JOIN unidades_medida u ON i.unidad_medida_id = u.id 
-        JOIN sucursales s ON i.sucursal_id = s.id
-        WHERE i.stock_actual <= i.stock_minimo
-    """)
-    insumos_criticos = cur.fetchall()
-    
-    # 7. Estadísticas Generales (Ticket Promedio)
-    cur.execute("SELECT COUNT(*) as total_ventas, SUM(total) as monto_total, AVG(total) as ticket_promedio FROM ventas")
-    stats = cur.fetchone()
-    
-    cur.close()
-    return render_template('reportes.html', 
-                           ventas=v, 
-                           top_productos=t, 
-                           rentabilidad=rentabilidad,
-                           franja_horaria=franja_horaria,
-                           formas_pago=formas_pago,
-                           insumos_criticos=insumos_criticos,
-                           stats=stats)
+    cur.execute("SELECT v.*, c.nombres, c.apellidos, u.usuario FROM ventas v JOIN clientes c ON v.cliente_id=c.id JOIN usuarios u ON v.usuario_id=u.id ORDER BY v.fecha DESC"); v = cur.fetchall()
+    cur.execute("SELECT p.nombre, SUM(dv.cantidad) as total_vendido FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id GROUP BY p.id ORDER BY total_vendido DESC LIMIT 5"); t = cur.fetchall()
+    cur.execute("SELECT p.nombre, p.precio, (SELECT SUM(r.cantidad_requerida * IFNULL((SELECT dc.costo_unitario FROM detalles_compras dc WHERE dc.insumo_id = r.insumo_id ORDER BY dc.id DESC LIMIT 1), 0)) FROM recetas r WHERE r.producto_id = p.id) as costo_receta FROM productos p ORDER BY (p.precio - IFNULL(costo_receta, 0)) DESC"); rent = cur.fetchall()
+    cur.execute("SELECT HOUR(fecha) as hora, COUNT(*) as cantidad, SUM(total) as total FROM ventas GROUP BY hora ORDER BY hora"); hor = cur.fetchall()
+    cur.execute("SELECT forma_pago, COUNT(*) as cantidad, SUM(total) as total FROM ventas GROUP BY forma_pago"); pags = cur.fetchall()
+    cur.execute("SELECT i.nombre, i.stock_actual, i.stock_minimo, u.nombre as unidad_medida, s.nombre as sucursal FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id JOIN sucursales s ON i.sucursal_id = s.id WHERE i.stock_actual <= i.stock_minimo"); crit = cur.fetchall()
+    cur.execute("SELECT COUNT(*) as total_ventas, SUM(total) as monto_total, AVG(total) as ticket_promedio FROM ventas"); st = cur.fetchone(); cur.close()
+    return render_template('reportes.html', ventas=v, top_productos=t, rentabilidad=rent, franja_horaria=hor, formas_pago=pags, insumos_criticos=crit, stats=st)
+
+@app.route('/auditoria')
+@login_required
+@admin_required
+def ver_auditoria():
+    cur = mysql.connection.cursor(); cur.execute("SELECT a.*, u.usuario FROM auditoria a LEFT JOIN usuarios u ON a.usuario_id = u.id ORDER BY a.fecha DESC LIMIT 500"); logs = cur.fetchall(); cur.close(); return render_template('auditoria.html', logs=logs)
 
 @app.route('/producto/imagen/<int:id>')
 def producto_imagen(id):

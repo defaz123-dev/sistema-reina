@@ -97,6 +97,14 @@
                         <label class="small fw-bold text-muted">Dirección Matriz</label>
                         <input type="text" name="direccion_matriz" class="form-control bg-light border-0 force-upper" value="{{ empresa.direccion_matriz if empresa else '' }}" required>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Obligado a llevar Contabilidad</label>
+                        <select name="obligado_contabilidad" class="form-select bg-light border-0">
+                            <option value="NO" {{ 'selected' if empresa and empresa.obligado_contabilidad == 'NO' else '' }}>NO</option>
+                            <option value="SI" {{ 'selected' if empresa and empresa.obligado_contabilidad == 'SI' else '' }}>SÍ</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>RIDE - {{ d.clave_acceso }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+        /* Estándar de Papel A4 */
+        @page { size: A4; margin: 0; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f0f0f0; 
+            margin: 0; 
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Contenedor tipo Hoja A4 */
+        .paper {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 15mm;
+            background-color: #fff;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            box-sizing: border-box;
+            color: #000;
+        }
+
+        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .header-table td { vertical-align: top; padding: 5px; }
+        
+        /* Cuadros principales */
+        .box { border: 1.5px solid #000; border-radius: 10px; padding: 15px; height: 100%; }
+        
+        .brand-name { font-size: 26px; font-weight: bold; color: #008938; margin-bottom: 10px; display: block; }
+        .razon-social { font-size: 14px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; display: block; }
+        
+        .label { font-weight: bold; font-size: 12px; }
+        .value { font-weight: normal; font-size: 12px; }
+        
+        /* Bloque SRI */
+        .ruc-text { font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+        .factura-text { font-size: 22px; font-weight: bold; margin-bottom: 10px; }
+        .num-doc { font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+        
+        .barcode-container { text-align: center; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
+        #barcode { width: 100%; height: 80px; }
+        .clave-acceso { font-size: 11px; font-family: 'Courier New', monospace; font-weight: bold; margin-top: 8px; }
+
+        /* Comprador */
+        .info-comprador { border: 1.5px solid #000; padding: 15px; margin-bottom: 20px; border-radius: 10px; }
+        .info-comprador table { width: 100%; }
+        .info-comprador td { padding: 3px 0; font-size: 12px; }
+        
+        /* Tabla de Items */
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+        .items-table th { border: 1.5px solid #000; background-color: #f2f2f2; padding: 8px; text-align: center; font-size: 11px; }
+        .items-table td { border: 1.5px solid #000; padding: 8px; font-size: 12px; }
+
+        /* Pie de Factura */
+        .footer-grid { display: flex; justify-content: space-between; gap: 30px; }
+        .footer-left { width: 60%; }
+        .footer-right { width: 35%; }
+
+        .info-adicional { border: 1.5px solid #000; padding: 15px; border-radius: 10px; font-size: 11px; }
+        .pago-table { width: 100%; border-collapse: collapse; margin-top: 15px; border: 1px solid #000; }
+        .pago-table th { border: 1px solid #000; background-color: #f2f2f2; padding: 5px; text-align: left; font-size: 10px; }
+        .pago-table td { border: 1px solid #000; padding: 5px; font-size: 11px; }
+
+        .totales-table { width: 100%; border-collapse: collapse; border: 1.5px solid #000; }
+        .totales-table td { border: 1.5px solid #000; padding: 6px 10px; font-size: 12px; }
+        
+        .text-end { text-align: right; }
+        .text-center { text-align: center; }
+        .fw-bold { font-weight: bold; }
+
+        /* Botón Flotante */
+        .btn-print { 
+            position: fixed; top: 30px; left: 30px; 
+            background: #008938; color: white; border: none; 
+            padding: 15px 30px; border-radius: 50px; cursor: pointer; 
+            font-weight: bold; font-size: 16px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); 
+            z-index: 999; 
+        }
+        
+        @media print { 
+            body { background-color: #fff; padding: 0; }
+            .paper { box-shadow: none; padding: 10mm; width: 100%; }
+            .btn-print { display: none; } 
+        }
+    </style>
+</head>
+<body>
+    <button class="btn-print" onclick="window.print()">🖨️ IMPRIMIR FACTURA</button>
+
+    <div class="paper">
+        <table class="header-table">
+            <tr>
+                <td style="width: 50%;">
+                    <div class="brand-name">{{ d.nombre_comercial }}</div>
+                    <div class="box">
+                        <span class="razon-social">{{ d.razon_social }}</span>
+                        <div><span class="label">Dirección Matriz:</span> <span class="value">{{ d.dir_matriz }}</span></div>
+                        <div><span class="label">Dirección Sucursal:</span> <span class="value">{{ d.dir_matriz }}</span></div>
+                        <div style="margin-top: 10px;"><span class="label">Obligado a llevar contabilidad:</span> <span class="value">{{ empresa.obligado_contabilidad|upper }}</span></div>
+                        {% if empresa.agente_retencion %}
+                        <div><span class="label">Agente de Retención Res. No.:</span> <span class="value">{{ empresa.agente_retencion }}</span></div>
+                        {% endif %}
+                    </div>
+                </td>
+                
+                <td style="width: 50%;">
+                    <div class="box">
+                        <div class="ruc-text">R.U.C.: {{ d.ruc_emisor }}</div>
+                        <div class="factura-text">FACTURA</div>
+                        <div class="num-doc">No. {{ d.clave_acceso[24:27] }}-{{ d.clave_acceso[27:30] }}-{{ d.clave_acceso[30:39] }}</div>
+                        
+                        <div style="margin-top: 10px;"><span class="label">NÚMERO DE AUTORIZACIÓN:</span></div>
+                        <div style="font-size: 11px; font-family: monospace; word-break: break-all; font-weight: bold;">{{ d.num_autorizacion }}</div>
+                        
+                        <div style="margin-top: 10px;"><span class="label">FECHA Y HORA DE AUTORIZACIÓN:</span> <span class="value">{{ d.fecha_autorizacion }}</span></div>
+                        <div><span class="label">AMBIENTE:</span> <span class="value">{{ d.ambiente }}</span></div>
+                        <div><span class="label">EMISIÓN:</span> <span class="value">NORMAL</span></div>
+                        
+                        <div class="barcode-container">
+                            <svg id="barcode"></svg>
+                            <div class="clave-acceso">{{ d.clave_acceso }}</div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="info-comprador">
+            <table>
+                <tr>
+                    <td style="width: 70%;"><span class="label">RAZÓN SOCIAL / NOMBRES Y APELLIDOS:</span> <span class="value">{{ d.cliente_nombre }}</span></td>
+                    <td><span class="label">IDENTIFICACIÓN:</span> <span class="value">{{ d.cliente_id }}</span></td>
+                </tr>
+                <tr>
+                    <td><span class="label">FECHA EMISIÓN:</span> <span class="value">{{ d.fecha_emision }}</span></td>
+                    <td><span class="label">GUÍA DE REMISIÓN:</span> <span class="value">N/A</span></td>
+                </tr>
+                {% if d.direccion %}
+                <tr>
+                    <td colspan="2"><span class="label">DIRECCIÓN:</span> <span class="value">{{ d.direccion }}</span></td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Cod. Principal</th>
+                    <th style="width: 60px;">Cant.</th>
+                    <th>Descripción</th>
+                    <th style="width: 100px;">P. Unitario</th>
+                    <th style="width: 80px;">Dscto.</th>
+                    <th style="width: 100px;">P. Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in d.detalles %}
+                <tr>
+                    <td class="text-center">{{ item.codigo }}</td>
+                    <td class="text-center">{{ "%.2f"|format(item.cantidad) }}</td>
+                    <td>{{ item.descripcion }}</td>
+                    <td class="text-end">{{ "%.2f"|format(item.precio_unitario) }}</td>
+                    <td class="text-end">0.00</td>
+                    <td class="text-end">{{ "%.2f"|format(item.total) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="footer-grid">
+            <div class="footer-left">
+                <div class="info-adicional">
+                    <div class="label" style="border-bottom: 1px solid #000; margin-bottom: 8px;">INFORMACIÓN ADICIONAL</div>
+                    <div><span class="label">Email:</span> <span class="value">{{ d.email or 'N/A' }}</span></div>
+                    <div><span class="label">Vendedor:</span> <span class="value">SISTEMA REINA</span></div>
+                    <div><span class="label">Punto de Emisión:</span> <span class="value">{{ d.clave_acceso[27:30] }}</span></div>
+                </div>
+
+                <table class="pago-table">
+                    <thead>
+                        <tr><th>FORMA DE PAGO</th><th style="width: 100px;">VALOR</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                {% if d.forma_pago == 'EFECTIVO' or not d.forma_pago %}
+                                    SIN UTILIZACION DEL SISTEMA FINANCIERO
+                                {% elif d.forma_pago == 'TARJETA' %}
+                                    TARJETA DE CRÉDITO / DÉBITO
+                                {% else %}
+                                    OTROS CON UTILIZACION DEL SISTEMA FINANCIERO
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-bold">$ {{ "%.2f"|format(d.total) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="footer-right">
+                <table class="totales-table">
+                    <tr><td class="label">SUBTOTAL 15%</td><td class="text-end">{{ "%.2f"|format(d.subtotal_15) }}</td></tr>
+                    <tr><td class="label">SUBTOTAL 0%</td><td class="text-end">{{ "%.2f"|format(d.subtotal_0) }}</td></tr>
+                    <tr><td class="label">SUBTOTAL SIN IMPUESTOS</td><td class="text-end">{{ "%.2f"|format(d.subtotal_0 + d.subtotal_15) }}</td></tr>
+                    <tr><td class="label">TOTAL DESCUENTO</td><td class="text-end">0.00</td></tr>
+                    <tr><td class="label">IVA 15%</td><td class="text-end">{{ "%.2f"|format(d.iva_valor) }}</td></tr>
+                    <tr style="background-color: #f2f2f2;">
+                        <td class="fw-bold" style="font-size: 14px;">VALOR TOTAL</td>
+                        <td class="text-end fw-bold" style="font-size: 14px;">$ {{ "%.2f"|format(d.total) }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        JsBarcode("#barcode", "{{ d.clave_acceso }}", {
+            format: "CODE128",
+            lineColor: "#000",
+            width: 2,
+            height: 60,
+            displayValue: false,
+            margin: 0
+        });
+    </script>
+</body>
+</html>
