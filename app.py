@@ -648,9 +648,13 @@ def enviar_comprobante_email(venta_id):
         part_xml.add_header('Content-Disposition', f"attachment; filename={v['clave_acceso_sri']}.xml")
         msg.attach(part_xml)
 
-        # 4. Enviar vía SMTP
-        server = smtplib.SMTP(emp['email_host'], emp['email_port'])
-        if emp['email_use_tls']: server.starttls()
+        # 4. Enviar vía SMTP con Timeout para evitar bloqueos en la nube
+        if int(emp['email_port']) == 465:
+            server = smtplib.SMTP_SSL(emp['email_host'], int(emp['email_port']), timeout=15)
+        else:
+            server = smtplib.SMTP(emp['email_host'], int(emp['email_port']), timeout=15)
+            if emp['email_use_tls']: server.starttls()
+        
         server.login(emp['email_user'], emp['email_pass'])
         server.send_message(msg)
         server.quit()
