@@ -21,6 +21,14 @@ app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 
 mysql = MySQL(app)
 
+@app.before_request
+def configurar_zona_horaria():
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("SET time_zone = '-05:00';")
+        cur.close()
+    except: pass
+
 # --- AYUDANTES ---
 from PIL import Image
 
