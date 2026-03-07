@@ -661,8 +661,11 @@ def enviar_comprobante_email(venta_id):
         
         cur.close(); return True
     except Exception as e:
-        print(f"Error enviando email: {str(e)}")
-        cur.close(); return False
+        import traceback
+        print(f"ERROR CRÍTICO ENVIANDO EMAIL: {str(e)}")
+        print(traceback.format_exc())
+        if cur: cur.close()
+        return False
 
 # --- POS ---
 @app.route('/pos')
