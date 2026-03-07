@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: A4; margin: 10mm; }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #000; margin: 0; padding: 0; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        td { vertical-align: top; }
+        
+        /* CALCO DEL DISEÑO ORIGINAL */
+        .box { border: 1.5pt solid #000; border-radius: 10px; padding: 15px; margin: 2px; }
+        
+        .brand-name { font-size: 26px; font-weight: bold; color: #008938; margin-bottom: 10px; }
+        .razon-social { font-size: 14px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; }
+        
+        .label { font-weight: bold; font-size: 12px; }
+        .value { font-weight: normal; font-size: 12px; }
+        
+        .ruc-text { font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+        .factura-text { font-size: 22px; font-weight: bold; margin-bottom: 10px; }
+        .num-doc { font-size: 16px; font-weight: bold; margin-bottom: 10px; }
+        
+        .items-table { margin-top: 20px; }
+        .items-table th { border: 1.5pt solid #000; background-color: #f2f2f2; padding: 8px; text-align: center; font-size: 11px; }
+        .items-table td { border: 1.5pt solid #000; padding: 8px; font-size: 12px; }
+        
+        .totales-table { border: 1.5pt solid #000; }
+        .totales-table td { border: 1.5pt solid #000; padding: 6px 10px; font-size: 12px; }
+        
+        .info-adicional { border: 1.5pt solid #000; border-radius: 10px; padding: 15px; font-size: 11px; min-height: 100px; }
+        .pago-table { border: 1pt solid #000; margin-top: 15px; width: 100%; }
+        .pago-table th { border: 1pt solid #000; background-color: #f2f2f2; padding: 5px; text-align: left; font-size: 10px; }
+        .pago-table td { border: 1pt solid #000; padding: 5px; font-size: 11px; }
+
+        .text-end { text-align: right; }
+        .text-center { text-align: center; }
+        .fw-bold { font-weight: bold; }
+        .spacer { height: 10px; }
+    </style>
+</head>
+<body>
+    <div style="width: 100%;">
+        <!-- CABECERA -->
+        <table>
+            <tr>
+                <td width="50%" style="padding-right: 10px;">
+                    <div class="brand-name">{{ d.nombre_comercial }}</div>
+                    <div class="box">
+                        <div class="razon-social">{{ d.razon_social }}</div>
+                        <span class="label">Dirección Matriz:</span> <span class="value">{{ d.dir_matriz }}</span><br>
+                        <span class="label">Dirección Sucursal:</span> <span class="value">{{ d.dir_matriz }}</span><br><br>
+                        <span class="label">Obligado a llevar contabilidad:</span> <span class="value">{{ empresa.obligado_contabilidad|upper }}</span>
+                    </div>
+                </td>
+                <td width="50%" style="padding-left: 10px;">
+                    <div class="box">
+                        <div class="ruc-text">R.U.C.: {{ d.ruc_emisor }}</div>
+                        <div class="factura-text">FACTURA</div>
+                        <div class="num-doc">No. {{ d.clave_acceso[24:27] }}-{{ d.clave_acceso[27:30] }}-{{ d.clave_acceso[30:39] }}</div>
+                        
+                        <div class="spacer"></div>
+                        <span class="label">NÚMERO DE AUTORIZACIÓN:</span><br>
+                        <span style="font-size: 11px; font-weight: bold;">{{ d.num_autorizacion }}</span><br>
+                        
+                        <div class="spacer"></div>
+                        <span class="label">FECHA Y HORA AUTORIZACIÓN:</span> <span class="value">{{ d.fecha_autorizacion }}</span><br>
+                        <span class="label">AMBIENTE:</span> <span class="value">{{ d.ambiente }}</span><br>
+                        <span class="label">EMISIÓN:</span> <span class="value">NORMAL</span><br>
+                        
+                        <div class="text-center" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                            <img src="data:image/png;base64,{{ d.barcode_64 }}" style="width: 250px; height: 60px;"><br>
+                            <span style="font-size: 11px; font-family: monospace; font-weight: bold;">{{ d.clave_acceso }}</span>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="spacer"></div>
+
+        <!-- CLIENTE -->
+        <div class="box">
+            <table width="100%">
+                <tr>
+                    <td width="70%"><span class="label">RAZÓN SOCIAL / NOMBRES Y APELLIDOS:</span> <span class="value">{{ d.cliente_nombre }}</span></td>
+                    <td width="30%"><span class="label">IDENTIFICACIÓN:</span> <span class="value">{{ d.cliente_id }}</span></td>
+                </tr>
+                <tr>
+                    <td><span class="label">FECHA EMISIÓN:</span> <span class="value">{{ d.fecha_emision }}</span></td>
+                    <td><span class="label">GUÍA DE REMISIÓN:</span> <span class="value">N/A</span></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- ITEMS -->
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th width="15%">Cod. Principal</th>
+                    <th width="10%">Cant.</th>
+                    <th width="45%">Descripción</th>
+                    <th width="15%">P. Unitario</th>
+                    <th width="15%">P. Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in d.detalles %}
+                <tr>
+                    <td class="text-center">{{ item.codigo }}</td>
+                    <td class="text-center">{{ "%.2f"|format(item.cantidad) }}</td>
+                    <td>{{ item.descripcion }}</td>
+                    <td class="text-end">{{ "%.2f"|format(item.precio_unitario) }}</td>
+                    <td class="text-end">{{ "%.2f"|format(item.total) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- PIE -->
+        <table width="100%">
+            <tr>
+                <td width="60%" style="padding-right: 20px;">
+                    <div class="info-adicional">
+                        <div class="label" style="border-bottom: 1px solid #000; margin-bottom: 8px;">INFORMACIÓN ADICIONAL</div>
+                        <span class="label">Email:</span> <span class="value">{{ d.email or 'N/A' }}</span><br>
+                        <span class="label">Vendedor:</span> <span class="value">SISTEMA REINA</span><br>
+                        <span class="label">Punto de Emisión:</span> <span class="value">{{ d.clave_acceso[27:30] }}</span>
+                    </div>
+
+                    <table class="pago-table">
+                        <thead><tr><th>FORMA DE PAGO</th><th width="100">VALOR</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td>OTROS CON UTILIZACION DEL SISTEMA FINANCIERO</td>
+                                <td class="text-end fw-bold">$ {{ "%.2f"|format(d.total) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </td>
+                <td width="40%">
+                    <table class="totales-table">
+                        <tr><td class="label">SUBTOTAL 15%</td><td class="text-end">{{ "%.2f"|format(d.subtotal_15) }}</td></tr>
+                        <tr><td class="label">SUBTOTAL 0%</td><td class="text-end">{{ "%.2f"|format(d.subtotal_0) }}</td></tr>
+                        <tr><td class="label">SUBTOTAL SIN IMPUESTOS</td><td class="text-end">{{ "%.2f"|format(d.subtotal_0 + d.subtotal_15) }}</td></tr>
+                        <tr><td class="label">IVA 15%</td><td class="text-end">{{ "%.2f"|format(d.iva_valor) }}</td></tr>
+                        <tr style="background-color: #f2f2f2;">
+                            <td class="fw-bold" style="font-size: 14px;">VALOR TOTAL</td>
+                            <td class="text-end fw-bold" style="font-size: 14px;">$ {{ "%.2f"|format(d.total) }}</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>

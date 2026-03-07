@@ -66,7 +66,7 @@
             </div>
 
             <!-- SECCIÓN 2: DATOS SRI Y FIRMA (EN LA MISMA ZONA) -->
-            <div>
+            <div class="mb-5">
                 <h5 class="fw-bold border-bottom pb-2 mb-4 text-dark"><i class="fas fa-file-invoice me-2 text-muted"></i>2. Parámetros Técnicos y SRI</h5>
                 
                 <div class="row g-3 mb-3">
@@ -113,6 +113,39 @@
                     <div class="col-md-2">
                         <label class="small fw-bold text-muted">Clave Firma</label>
                         <input type="password" name="firma_password" class="form-control bg-light border-0" value="{{ empresa.firma_password if empresa else '' }}" placeholder="Contraseña">
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN 3: CONFIGURACIÓN DE CORREO (NUEVA) -->
+            <div>
+                <h5 class="fw-bold border-bottom pb-2 mb-4 text-dark"><i class="fas fa-envelope me-2 text-muted"></i>3. Configuración de Envío de Facturas</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="small fw-bold text-muted">Servidor SMTP (Host)</label>
+                        <input type="text" name="email_host" class="form-control bg-light border-0" value="{{ empresa.email_host if empresa else '' }}" placeholder="smtp.gmail.com">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="small fw-bold text-muted">Puerto</label>
+                        <input type="number" name="email_port" class="form-control bg-light border-0" value="{{ empresa.email_port if empresa else 587 }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small fw-bold text-muted">Usuario/Email</label>
+                        <input type="email" name="email_user" class="form-control bg-light border-0" value="{{ empresa.email_user if empresa else '' }}" placeholder="facturas@tuempresa.com">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="small fw-bold text-muted">Contraseña</label>
+                        <input type="password" name="email_pass" class="form-control bg-light border-0" value="{{ empresa.email_pass if empresa else '' }}">
+                    </div>
+                </div>
+                <div class="d-flex gap-4 mt-3 p-3 bg-light rounded-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="email_use_tls" value="1" id="tlsCheck" {{ 'checked' if empresa and empresa.email_use_tls else '' }}>
+                        <label class="form-check-label small fw-bold text-muted" for="tlsCheck">Usar TLS (Seguridad)</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="email_envio_automatico" value="1" id="autoSendCheck" {{ 'checked' if empresa and empresa.email_envio_automatico else '' }}>
+                        <label class="form-check-label small fw-bold text-muted text-success" for="autoSendCheck">ACTIVAR ENVÍO AUTOMÁTICO AL AUTORIZAR</label>
                     </div>
                 </div>
             </div>

@@ -10,3 +10,5 @@ wheel
 endesive
 lxml
 six
+fpdf
+python-barcode

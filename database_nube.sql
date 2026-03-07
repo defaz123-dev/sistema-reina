@@ -37,6 +37,7 @@ CREATE TABLE sucursales (
     nombre VARCHAR(100) NOT NULL,
     establecimiento VARCHAR(3) DEFAULT '001',
     punto_emision VARCHAR(3) DEFAULT '001',
+    ultimo_secuencial INT DEFAULT 0,
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
@@ -288,6 +289,9 @@ INSERT INTO tipos_comprobantes (id, nombre) VALUES
 INSERT INTO roles (id, nombre) VALUES (1, 'ADMINISTRADOR'), (2, 'CAJERO');
 
 INSERT INTO plataformas (id, nombre) VALUES (1, 'LOCAL'), (2, 'PEDIDOS YA'), (3, 'UBER EATS');
+
+INSERT INTO clientes (id, cedula_ruc, tipo_identificacion_id, nombres, apellidos, direccion) VALUES 
+(1, '9999999999', 4, 'CONSUMIDOR', 'FINAL', 'S/N');
 
 INSERT INTO sucursales (id, nombre, establecimiento, punto_emision) VALUES 
 (1, 'REINA VICTORIA PRINCIPAL', '001', '001'), (2, 'GRANADOS NORTE', '002', '001');

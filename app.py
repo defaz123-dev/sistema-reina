@@ -312,7 +312,20 @@ def eliminar_insumo_receta(id, p_id):
     cur = mysql.connection.cursor(); cur.execute("DELETE FROM recetas WHERE id=%s", (id,)); mysql.connection.commit(); cur.close()
     return redirect(url_for('ver_receta', producto_id=p_id))
 
-# --- INVENTARIO ---
+@app.route('/inventario/crear_ajax', methods=['POST'])
+@login_required
+@admin_required
+def crear_insumo_ajax():
+    data = request.get_json(); cur = mysql.connection.cursor(); u_id = session['user_id']
+    try:
+        nom = data['nombre'].upper().strip()
+        um_id = data['unidad_medida_id']
+        s_id = session['sucursal_id']
+        cur.execute("INSERT INTO insumos (nombre, stock_actual, stock_minimo, unidad_medida_id, sucursal_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, 0, 0, %s, %s, %s, %s)", (nom, um_id, s_id, u_id, u_id))
+        mysql.connection.commit(); ins_id = cur.lastrowid; cur.close()
+        return jsonify({'success': True, 'id': ins_id, 'nombre': nom})
+    except Exception as e: return jsonify({'success': False, 'message': str(e)})
+
 @app.route('/inventario')
 @login_required
 @admin_required
@@ -382,6 +395,44 @@ def guardar_compra():
             cur.execute("UPDATE insumos SET stock_actual = stock_actual + %s WHERE id = %s", (i['cantidad'], i['insumo_id']))
         mysql.connection.commit(); cur.close(); return jsonify({'success': True})
     except Exception as e: mysql.connection.rollback(); cur.close(); return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/compras/editar/<int:id>')
+@login_required
+@admin_required
+def editar_compra(id):
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM compras WHERE id=%s", (id,)); v = cur.fetchone()
+    if not v: cur.close(); flash('Compra no encontrada', 'danger'); return redirect(url_for('compras'))
+    
+    cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1"); iva_p = cur.fetchone()['iva_porcentaje']
+    cur.execute("SELECT p.*, t.nombre as tipo_comprobante_nombre FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id"); provs = cur.fetchall()
+    cur.execute("SELECT * FROM sucursales"); sucs = cur.fetchall(); cur.execute("SELECT * FROM unidades_medida"); ums = cur.fetchall()
+    cur.execute("SELECT i.*, u.nombre as unidad_medida FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id"); ins = cur.fetchall()
+    cur.execute("SELECT * FROM detalles_compras WHERE compra_id=%s", (id,)); det = cur.fetchall(); cur.close()
+    
+    if v['fecha_caducidad']: v['fecha_caducidad_fmt'] = v['fecha_caducidad'].strftime('%Y-%m-%d')
+    else: v['fecha_caducidad_fmt'] = ''
+    
+    return render_template('nueva_compra.html', proveedores=provs, insumos=ins, sucursales=sucs, unidades=ums, compra=v, detalles=det, iva_porcentaje=iva_p)
+
+@app.route('/compras/verificar_clave/<string:clave>')
+@login_required
+def verificar_clave_acceso(clave):
+    exclude_id = request.args.get('exclude_id')
+    cur = mysql.connection.cursor()
+    if exclude_id: cur.execute("SELECT COUNT(*) as c FROM compras WHERE clave_acceso=%s AND id!=%s", (clave, exclude_id))
+    else: cur.execute("SELECT COUNT(*) as c FROM compras WHERE clave_acceso=%s", (clave,))
+    r = cur.fetchone(); cur.close(); return jsonify({'existe': r['c'] > 0})
+
+@app.route('/compras/consultar_sri/<string:clave>')
+@login_required
+def consultar_datos_sri(clave):
+    import facturacion_sri
+    try:
+        data = facturacion_sri.consultar_comprobante_sri(clave)
+        if data: return jsonify({'success': True, **data})
+        else: return jsonify({'success': False, 'message': 'No se pudo obtener datos del SRI. Verifique la clave.'})
+    except Exception as e: return jsonify({'success': False, 'message': str(e)})
 
 # --- PROVEEDORES ---
 @app.route('/proveedores')
@@ -462,9 +513,9 @@ def sucursales():
 @admin_required
 def guardar_sucursal():
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    nom, est, pto = d['nombre'].upper(), d['establecimiento'], d['punto_emision']
-    if d.get('id'): cur.execute("UPDATE sucursales SET nombre=%s, establecimiento=%s, punto_emision=%s, usuario_modificacion_id=%s WHERE id=%s", (nom, est, pto, u_id, d['id']))
-    else: cur.execute("INSERT INTO sucursales (nombre, establecimiento, punto_emision, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s)", (nom, est, pto, u_id, u_id))
+    nom, est, pto, u_sec = d['nombre'].upper(), d['establecimiento'], d['punto_emision'], d.get('ultimo_secuencial', 0)
+    if d.get('id'): cur.execute("UPDATE sucursales SET nombre=%s, establecimiento=%s, punto_emision=%s, ultimo_secuencial=%s, usuario_modificacion_id=%s WHERE id=%s", (nom, est, pto, u_sec, u_id, d['id']))
+    else: cur.execute("INSERT INTO sucursales (nombre, establecimiento, punto_emision, ultimo_secuencial, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s)", (nom, est, pto, u_sec, u_id, u_id))
     mysql.connection.commit(); cur.close(); return redirect(url_for('sucursales'))
 
 # --- CATEGORIAS ---
@@ -497,13 +548,120 @@ def guardar_empresa():
     from security_utils import cifrar_password
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
     ruc, razon, nom, dir, iva, color, f_pass, icono = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion_matriz'].upper(), d.get('iva_porcentaje', 15.00), d.get('color_tema', '#008938'), cifrar_password(d.get('firma_password', '')), d.get('icono_espera', 'fa-crown')
+    
+    # Parámetros de Correo
+    e_host, e_port, e_user, e_pass = d.get('email_host'), d.get('email_port'), d.get('email_user'), d.get('email_pass')
+    e_tls, e_auto = d.get('email_use_tls', 0), d.get('email_envio_automatico', 0)
+
     f_file = request.files.get('firma_file')
     if f_file and f_file.filename:
         if not os.path.exists('certs'): os.makedirs('certs')
         f_file.save(os.path.join('certs', 'firma.p12'))
-    if d.get('id'): cur.execute("UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, firma_password=%s, obligado_contabilidad=%s, icono_espera=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), icono, u_id, d['id']))
-    else: cur.execute("INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, firma_password, obligado_contabilidad, icono_espera, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), icono, u_id, u_id))
-    mysql.connection.commit(); cur.close(); flash('Empresa actualizada', 'success'); return redirect(url_for('configuracion_empresa'))
+    
+    if d.get('id'): 
+        cur.execute("""UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, firma_password=%s, obligado_contabilidad=%s, icono_espera=%s, 
+                       email_host=%s, email_port=%s, email_user=%s, email_pass=%s, email_use_tls=%s, email_envio_automatico=%s, usuario_modificacion_id=%s WHERE id=%s""", 
+                    (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, d['id']))
+    else: 
+        cur.execute("""INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, firma_password, obligado_contabilidad, icono_espera, email_host, email_port, email_user, email_pass, email_use_tls, email_envio_automatico, usuario_creacion_id, usuario_modificacion_id) 
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
+                    (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, u_id))
+    
+    mysql.connection.commit(); cur.close(); flash('Configuración actualizada correctamente', 'success'); return redirect(url_for('configuracion_empresa'))
+
+def enviar_comprobante_email(venta_id):
+    """
+    Genera PDF, adjunta XML y envía por correo al cliente de forma automática.
+    """
+    import smtplib, base64
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.base import MIMEBase
+    from email import encoders
+    from xhtml2pdf import pisa
+    
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT v.*, c.email as cliente_email, c.nombres, c.apellidos FROM ventas v JOIN clientes c ON v.cliente_id = c.id WHERE v.id = %s", (venta_id,))
+    v = cur.fetchone()
+    cur.execute("SELECT * FROM empresa LIMIT 1"); emp = cur.fetchone()
+    
+    # VERIFICACIÓN ESTRICTA: Si no hay email registrado o es inválido, no hace nada.
+    if not v or not v['cliente_email'] or str(v['cliente_email']).strip() == '' or '@' not in str(v['cliente_email']):
+        if cur: cur.close()
+        return False
+
+    if not emp or not emp['email_host'] or not emp['email_envio_automatico']:
+        if cur: cur.close()
+        return False
+
+    try:
+        # 1. Extraer datos del RIDE
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(v['xml_autorizado']); f_xml = root.find('.//factura') or root
+        it, inf = f_xml.find('infoTributaria'), f_xml.find('infoFactura')
+        datos = {
+            'ruc_emisor': it.find('ruc').text, 'razon_social': it.find('razonSocial').text, 'nombre_comercial': it.find('nombreComercial').text if it.find('nombreComercial') is not None else it.find('razonSocial').text,
+            'dir_matriz': it.find('dirMatriz').text, 'clave_acceso': it.find('claveAcceso').text, 'num_autorizacion': v['numero_autorizacion'], 'fecha_autorizacion': v['fecha'].strftime('%d/%m/%Y %H:%M'),
+            'ambiente': 'PRODUCCIÓN' if it.find('ambiente').text == '2' else 'PRUEBAS', 'obligado_contabilidad': inf.find('obligadoContabilidad').text if inf.find('obligadoContabilidad') is not None else 'NO',
+            'cliente_nombre': inf.find('razonSocialComprador').text, 'cliente_id': inf.find('identificacionComprador').text, 'fecha_emision': inf.find('fechaEmision').text, 'subtotal_0': 0.0, 'subtotal_15': 0.0, 'iva_valor': 0.0, 'total': float(inf.find('importeTotal').text), 'detalles': [],
+            'email': v['cliente_email'], 'forma_pago': v['forma_pago']
+        }
+        for ti in inf.find('totalConImpuestos').findall('totalImpuesto'):
+            if ti.find('codigoPorcentaje').text == '4': datos['subtotal_15'], datos['iva_valor'] = float(ti.find('baseImponible').text), float(ti.find('valor').text)
+            elif ti.find('codigoPorcentaje').text == '0': datos['subtotal_0'] = float(ti.find('baseImponible').text)
+        for det_xml in f_xml.find('detalles').findall('detalle'):
+            datos['detalles'].append({'codigo': det_xml.find('codigoPrincipal').text, 'descripcion': det_xml.find('descripcion').text, 'cantidad': float(det_xml.find('cantidad').text), 'precio_unitario': float(det_xml.find('precioUnitario').text), 'total': float(det_xml.find('precioTotalSinImpuesto').text)})
+        
+        # GENERAR CÓDIGO DE BARRAS EN BASE64 PARA PDF
+        import barcode
+        from barcode.writer import ImageWriter
+        code128 = barcode.get('code128', datos['clave_acceso'], writer=ImageWriter())
+        barcode_io = io.BytesIO()
+        code128.write(barcode_io, options={"write_text": False, "module_height": 10})
+        datos['barcode_64'] = base64.b64encode(barcode_io.getvalue()).decode('utf-8')
+
+        # 2. Generar PDF usando FPDF (Calco exacto del sistema)
+        import ride_fpdf
+        pdf_data = ride_fpdf.generar_pdf_fpdf(datos, emp)
+
+        # 3. Preparar Email
+        msg = MIMEMultipart()
+        msg['From'] = f"{emp['nombre_comercial']} <{emp['email_user']}>"
+        msg['To'] = v['cliente_email']
+        msg['Subject'] = f"Comprobante Electrónico - {datos['clave_acceso']}"
+        
+        body = f"Estimado(a) {v['nombres']} {v['apellidos']},\n\nAdjuntamos su comprobante electrónico autorizado por el SRI.\n\nGracias por su compra."
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Adjuntar PDF
+        part_pdf = MIMEBase('application', 'pdf')
+        part_pdf.set_payload(pdf_data)
+        encoders.encode_base64(part_pdf)
+        part_pdf.add_header('Content-Disposition', f"attachment; filename=RIDE_{v['secuencial']}.pdf")
+        msg.attach(part_pdf)
+
+        # Adjuntar XML
+        part_xml = MIMEBase('application', 'xml')
+        part_xml.set_payload(v['xml_autorizado'].encode('utf-8'))
+        encoders.encode_base64(part_xml)
+        part_xml.add_header('Content-Disposition', f"attachment; filename={v['clave_acceso_sri']}.xml")
+        msg.attach(part_xml)
+
+        # 4. Enviar vía SMTP
+        server = smtplib.SMTP(emp['email_host'], emp['email_port'])
+        if emp['email_use_tls']: server.starttls()
+        server.login(emp['email_user'], emp['email_pass'])
+        server.send_message(msg)
+        server.quit()
+        
+        # MARCAR COMO ENVIADO EN LA BASE DE DATOS
+        cur.execute("UPDATE ventas SET email_enviado = 1 WHERE id = %s", (venta_id,))
+        mysql.connection.commit()
+        
+        cur.close(); return True
+    except Exception as e:
+        print(f"Error enviando email: {str(e)}")
+        cur.close(); return False
 
 # --- POS ---
 @app.route('/pos')
@@ -522,9 +680,11 @@ def pos():
     for p in prods:
         cur.execute("SELECT plataforma_id, precio FROM producto_precios WHERE producto_id = %s", (p['id'],))
         precs = cur.fetchall(); p['precios_json'] = {item['plataforma_id']: float(item['precio']) for item in precs}
+        # CORRECCIÓN: Si stock_disponible es None, verificamos si es que no tiene receta
         if p['stock_disponible'] is None:
             cur.execute("SELECT COUNT(*) as c FROM recetas WHERE producto_id=%s", (p['id'],))
-            p['stock_disponible'] = 0 if cur.fetchone()['c'] > 0 else 999
+            # Si no tiene receta, asumimos stock infinito (999) para que se pueda vender
+            p['stock_disponible'] = 999 if cur.fetchone()['c'] == 0 else 0
     cur.close(); return render_template('pos.html', categorias=cats, productos=prods, tipos_id=t_id, iva_porcentaje=iva_p, plataformas=plats)
 
 @app.route('/pos/venta', methods=['POST'])
@@ -533,14 +693,26 @@ def procesar_venta_v2():
     data = request.get_json(); cur = mysql.connection.cursor(); u_id = session['user_id']
     try:
         c_id, fpago, s_id, plat_id = data.get('cliente_id'), data.get('forma_pago', 'EFECTIVO').upper(), session['sucursal_id'], data.get('plataforma_id')
+        
+        # VALIDACIÓN LEGAL SRI: Consumidor Final monto máximo $50.00
+        if str(c_id) == '1' and float(data['total']) > 50.00:
+            return jsonify({'success': False, 'message': 'Ventas superiores a $50.00 requieren identificación del cliente.'})
+
         est, pto = session.get('establecimiento', '001'), session.get('punto_emision', '001')
         cur.execute("SELECT ruc, ambiente, iva_porcentaje FROM empresa LIMIT 1"); emp = cur.fetchone()
         ruc, amb, iva_p = emp['ruc'], emp['ambiente'], float(emp['iva_porcentaje']); divisor = 1 + (iva_p / 100)
-        cur.execute("SELECT AUTO_INCREMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA=%s AND TABLE_NAME='ventas'", (app.config['MYSQL_DB'],))
-        sec = str(cur.fetchone()['AUTO_INCREMENT']).zfill(9); serie = f"{est}{pto}"; clave = generar_clave_acceso_sri(datetime.now(), ruc, amb, serie, sec)
+        
+        # OBTENER SIGUIENTE SECUENCIAL DE LA SUCURSAL
+        cur.execute("SELECT ultimo_secuencial FROM sucursales WHERE id=%s FOR UPDATE", (s_id,))
+        suc_data = cur.fetchone(); siguiente_sec = (suc_data['ultimo_secuencial'] or 0) + 1
+        sec_str = str(siguiente_sec).zfill(9); serie = f"{est}{pto}"; clave = generar_clave_acceso_sri(datetime.now(), ruc, amb, serie, sec_str)
+        
         cur.execute("""INSERT INTO ventas (usuario_id, sucursal_id, cliente_id, plataforma_id, subtotal_0, subtotal_15, iva_valor, total, forma_pago, clave_acceso_sri, estado_sri, establecimiento, punto_emision, secuencial, usuario_creacion_id, usuario_modificacion_id) 
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDIENTE',%s,%s,%s,%s,%s)""", (u_id, s_id, c_id, plat_id, data.get('subtotal_0', 0), data.get('subtotal_15', 0), data.get('iva_valor', 0), data['total'], fpago, clave, est, pto, sec, u_id, u_id))
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDIENTE',%s,%s,%s,%s,%s)""", (u_id, s_id, c_id, plat_id, data.get('subtotal_0', 0), data.get('subtotal_15', 0), data.get('iva_valor', 0), data['total'], fpago, clave, est, pto, sec_str, u_id, u_id))
         v_id = cur.lastrowid
+        
+        # ACTUALIZAR EL ÚLTIMO SECUENCIAL EN LA SUCURSAL
+        cur.execute("UPDATE sucursales SET ultimo_secuencial=%s WHERE id=%s", (siguiente_sec, s_id))
         for i in data['items']:
             i_tot = float(i['precio']) * int(i['cantidad']); i_iva = i_tot - (i_tot / divisor)
             cur.execute("INSERT INTO detalles_ventas (venta_id, producto_id, cantidad, precio_unitario, subtotal, iva_valor) VALUES (%s,%s,%s,%s,%s,%s)", (v_id, i['id'], i['cantidad'], i['precio'], i_tot, i_iva))
@@ -548,6 +720,13 @@ def procesar_venta_v2():
             for r in cur.fetchall(): cur.execute("UPDATE insumos SET stock_actual=stock_actual-%s WHERE id=%s AND sucursal_id=%s", (float(r['cantidad_requerida']) * int(i['cantidad']), r['insumo_id'], s_id))
         mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta ID: {v_id} registrada")
         import facturacion_sri; facturacion_sri.procesar_factura_electronica(v_id, mysql)
+        
+        # INTENTAR ENVÍO AUTOMÁTICO DE EMAIL SI FUE AUTORIZADA
+        if enviar_comprobante_email(v_id):
+            flash('Factura autorizada y enviada al cliente por correo', 'success')
+        else:
+            flash('Factura autorizada (el envío por correo falló o no está configurado)', 'info')
+        
         return jsonify({'success': True, 'venta_id': v_id})
     except Exception as e: mysql.connection.rollback(); return jsonify({'success': False, 'message': str(e)})
     finally: cur.close()
@@ -564,9 +743,23 @@ def historial_ventas():
 def reintentar_sri(id):
     import facturacion_sri
     try:
-        if facturacion_sri.procesar_factura_electronica(id, mysql): flash('Sincronización completada', 'success')
+        if facturacion_sri.procesar_factura_electronica(id, mysql): 
+            flash('Sincronización completada', 'success')
+            enviar_comprobante_email(id)
         else: flash('El SRI reportó novedades', 'warning')
     except Exception as e: flash(str(e), 'danger')
+    return redirect(url_for('historial_ventas'))
+
+@app.route('/ventas/reenviar_email/<int:id>')
+@login_required
+def reenviar_email_venta(id):
+    try:
+        if enviar_comprobante_email(id):
+            flash('Correo enviado correctamente al cliente', 'success')
+        else:
+            flash('No se pudo enviar el correo. Verifique que el cliente tenga email y la configuración sea correcta.', 'warning')
+    except Exception as e:
+        flash(f'Error técnico al enviar: {str(e)}', 'danger')
     return redirect(url_for('historial_ventas'))
 
 @app.route('/venta/ride/<int:id>')

@@ -298,6 +298,63 @@ def enviar_recepcion_sri(xml_firmado_str, ambiente):
         return 'DEVUELTA', " | ".join(msgs) if msgs else "Error Recepcion"
     except Exception as e: return 'ERROR', str(e)
 
+def consultar_comprobante_sri(clave):
+    """
+    Consulta una factura en el SRI por clave de acceso y extrae los datos para importación.
+    """
+    # Determinamos ambiente por la clave (dígito 24)
+    ambiente = int(clave[23])
+    estado, num_aut, xml_str, msj = solicitar_autorizacion_sri(clave, ambiente)
+    
+    if estado != 'AUTORIZADO':
+        return None
+
+    try:
+        root = etree.fromstring(xml_str.encode('utf-8'))
+        # El XML del SRI a veces viene con el comprobante dentro de un CDATA o como nodo hijo
+        factura_xml = root
+        if root.tag != 'factura':
+            fact_node = root.find('.//factura')
+            if fact_node is not None: factura_xml = fact_node
+            else:
+                # Intentar parsear el contenido de <comprobante>
+                comp_text = root.find('.//comprobante').text
+                factura_xml = etree.fromstring(comp_text.encode('utf-8'))
+
+        it = factura_xml.find('infoTributaria')
+        inf = factura_xml.find('infoFactura')
+        
+        datos = {
+            'razon_social': it.find('razonSocial').text,
+            'ruc_proveedor': it.find('ruc').text,
+            'establecimiento': it.find('estab').text,
+            'punto_emision': it.find('ptoEmi').text,
+            'secuencial': it.find('secuencial').text,
+            'fecha_emision': datetime.strptime(inf.find('fechaEmision').text, '%d/%m/%Y').strftime('%Y-%m-%d'),
+            'total': float(inf.find('importeTotal').text),
+            'razon_social_comprador': inf.find('razonSocialComprador').text,
+            'items': []
+        }
+
+        for d in factura_xml.find('detalles').findall('detalle'):
+            paga_iva = False
+            for imp in d.find('impuestos').findall('impuesto'):
+                if imp.find('codigo').text == '2' and imp.find('codigoPorcentaje').text in ['2', '3', '4', '10']:
+                    paga_iva = True
+            
+            datos['items'].append({
+                'nombre': d.find('descripcion').text,
+                'cantidad': float(d.find('cantidad').text),
+                'precio_unitario': float(d.find('precioUnitario').text),
+                'subtotal': float(d.find('precioTotalSinImpuesto').text),
+                'paga_iva': paga_iva
+            })
+        
+        return datos
+    except Exception as e:
+        log_sri(f"Error parseando XML importacion: {str(e)}")
+        return None
+
 def solicitar_autorizacion_sri(clave, ambiente):
     url = "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl" if ambiente == 1 else "https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl"
     soap = f"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ec="http://ec.gob.sri.ws.autorizacion"><soapenv:Header/><soapenv:Body><ec:autorizacionComprobante><claveAccesoComprobante>{clave}</claveAccesoComprobante></ec:autorizacionComprobante></soapenv:Body></soapenv:Envelope>"""

@@ -11,6 +11,14 @@
 {% endblock %}
 
 {% block content %}
+<style>
+    .container.py-4 { max-width: 100% !important; width: 100% !important; padding-left: 30px !important; padding-right: 30px !important; }
+    .table-responsive { overflow-x: auto; }
+    #tablaVentas th, #tablaVentas td { white-space: nowrap; }
+    .email-sent { color: #0d6efd; filter: drop-shadow(0 0 2px rgba(13,110,253,0.2)); }
+    .email-pending { color: #dee2e6; }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="brand-logo"><i class="fas fa-shopping-cart me-2"></i>Historial de Ventas</h2>
     <div class="d-flex gap-2">
@@ -32,6 +40,7 @@
                         <th>Forma Pago</th>
                         <th class="text-end">Total</th>
                         <th class="text-center">Estado SRI</th>
+                        <th class="text-center">Email</th>
                         <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -61,12 +70,28 @@
                             {% endif %}
                         </td>
                         <td class="text-center">
+                            {% if v.email_enviado %}
+                                <i class="fas fa-envelope email-sent" title="Enviado al cliente"></i>
+                            {% else %}
+                                <i class="fas fa-envelope email-pending" title="No enviado"></i>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
                             <a href="{{ url_for('ver_ticket', id=v.id) }}" target="_blank" class="btn btn-outline-secondary border-0" title="Imprimir Ticket">
                                 <i class="fas fa-print fa-lg action-icon"></i>
                             </a>
+
+                            {% if v.autorizado_sri %}
+                            <a href="{{ url_for('ver_ride', id=v.id) }}" target="_blank" class="btn btn-outline-danger border-0" title="Ver RIDE PDF">
+                                <i class="fas fa-file-pdf fa-lg action-icon"></i>
+                            </a>
+                            <a href="{{ url_for('reenviar_email_venta', id=v.id) }}" class="btn btn-outline-primary border-0" title="Enviar/Reenviar Email" onclick="showLoading()">
+                                <i class="fas fa-paper-plane fa-lg action-icon"></i>
+                            </a>
+                            {% endif %}
                             
                             {% if not v.autorizado_sri %}
-                            <a href="{{ url_for('reintentar_sri', id=v.id) }}" class="btn btn-outline-primary border-0" title="Reintentar envío al SRI">
+                            <a href="{{ url_for('reintentar_sri', id=v.id) }}" class="btn btn-outline-primary border-0" title="Reintentar envío al SRI" onclick="showLoading()">
                                 <i class="fas fa-cloud-upload-alt fa-lg action-icon"></i>
                             </a>
                             {% endif %}

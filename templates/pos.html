@@ -111,7 +111,7 @@
                                     <div class="stock-badge bg-secondary text-white" style="font-size: 0.55rem;">SIN RECETA</div>
                                 {% elif p.stock_disponible <= 0 %}
                                     <div class="stock-badge bg-danger text-white">AGOTADO</div>
-                                {% elif p.stock_disponible < 10 %}
+                                {% else %}
                                     <div class="stock-badge bg-warning text-dark">Quedan {{ p.stock_disponible|int }}</div>
                                 {% endif %}
                                 

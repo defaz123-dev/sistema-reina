@@ -36,6 +36,7 @@
                         <th>Nombre de Sucursal</th>
                         <th class="text-center">Estab.</th>
                         <th class="text-center">Pto. Emi.</th>
+                        <th class="text-center">Inicio Factura</th>
                         <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -46,6 +47,7 @@
                         <td class="fw-bold">{{ s.nombre }}</td>
                         <td class="text-center"><span class="badge bg-light text-dark border">{{ s.establecimiento }}</span></td>
                         <td class="text-center"><span class="badge bg-light text-dark border">{{ s.punto_emision }}</span></td>
+                        <td class="text-center fw-bold text-primary">{{ s.ultimo_secuencial|int + 1 }}</td>
                         <td class="text-center">
                             <button class="btn btn-outline-primary border-0" 
                                     data-bs-toggle="modal" 
@@ -54,6 +56,7 @@
                                     data-nombre="{{ s.nombre }}"
                                     data-estab="{{ s.establecimiento }}"
                                     data-pto="{{ s.punto_emision }}"
+                                    data-sec="{{ s.ultimo_secuencial }}"
                                     onclick="prepararEdicionSucursal(this)">
                                 <i class="fas fa-edit fa-lg action-icon"></i>
                             </button>
@@ -91,6 +94,11 @@
                             <input type="text" name="punto_emision" id="suc_pto" class="form-control bg-light border-0" maxlength="3" required placeholder="001">
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Secuencial de Inicio (Última factura emitida)</label>
+                        <input type="number" name="ultimo_secuencial" id="suc_sec" class="form-control bg-light border-0 fw-bold text-primary" value="0" required>
+                        <div class="extra-small text-muted mt-1">La próxima factura será este número + 1.</div>
+                    </div>
                 </div>
                 <div class="modal-footer border-0 p-4 pt-0">
                     <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
@@ -116,6 +124,7 @@
         document.getElementById('suc_nom').value = '';
         document.getElementById('suc_est').value = '001';
         document.getElementById('suc_pto').value = '001';
+        document.getElementById('suc_sec').value = '0';
         document.getElementById('modalSucursalTitle').innerText = 'Nueva Sucursal';
     }
     function prepararEdicionSucursal(btn) {
@@ -123,6 +132,7 @@
         document.getElementById('suc_nom').value = btn.getAttribute('data-nombre');
         document.getElementById('suc_est').value = btn.getAttribute('data-estab');
         document.getElementById('suc_pto').value = btn.getAttribute('data-pto');
+        document.getElementById('suc_sec').value = btn.getAttribute('data-sec');
         document.getElementById('modalSucursalTitle').innerText = 'Editar Sucursal';
     }
 </script>
