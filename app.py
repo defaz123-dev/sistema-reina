@@ -52,7 +52,8 @@ def generar_clave_acceso_sri(fecha, ruc, ambiente, serie='001001', secuencial='0
 def registrar_auditoria(accion, detalle):
     try:
         cur = mysql.connection.cursor()
-        ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0]
+        ip_str = request.headers.get('X-Forwarded-For', request.remote_addr)
+        ip = ip_str.split(',')[0] if ip_str else '0.0.0.0'
         cur.execute("INSERT INTO auditoria (usuario_id, accion, detalle, ip) VALUES (%s, %s, %s, %s)",
                     (session.get('user_id'), accion, f"[{session.get('sucursal_nombre','S/S')}] {detalle}", ip))
         mysql.connection.commit(); cur.close()
