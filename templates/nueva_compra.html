@@ -482,6 +482,9 @@ function confirmarImportacionSRI() {
 }
 
 async function finalizarCompra() {
+    const suc_id = document.getElementById('compraSucursal').value;
+    if(!suc_id) return reinaAlert('Faltan Datos', 'Debe seleccionar la sucursal de destino.', 'warning');
+
     const totalText = document.getElementById('labelTotalCompra').innerText.replace('$ ', '').trim();
     const totalMostrado = parseFloat(totalText);
     const provSelect = document.getElementById('compraProveedor'); 

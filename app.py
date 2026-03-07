@@ -379,7 +379,9 @@ def nueva_compra():
 def guardar_compra():
     data = request.get_json(); cur = mysql.connection.cursor()
     try:
-        id_c, f, s_id, u_id = data.get('compra_id'), data['fecha'], data.get('sucursal_id') or session['sucursal_id'], session['user_id']
+        id_c, f, s_id, u_id = data.get('compra_id'), data['fecha'], data.get('sucursal_id'), session['user_id']
+        if not s_id: return jsonify({'success': False, 'message': 'Debe seleccionar una sucursal de destino.'})
+        
         est, pto, sec, n_aut, f_cad = data.get('establecimiento','001'), data.get('punto_emision','001'), data.get('numero_comprobante','').upper(), data.get('numero_autorizacion'), data.get('fecha_caducidad')
         if not f_cad or str(f_cad).strip() == '': f_cad = None
         if id_c:

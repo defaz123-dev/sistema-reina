@@ -8,55 +8,55 @@
 ---
 
 ## 1. DESCRIPCIÓN DE LA SOLUCIÓN
-Propuesta integral para la implementación del **Sistema Reina (Versión Enterprise)**, un ecosistema diseñado para el control total de operaciones comerciales, gestión multisucursal y cumplimiento tributario automatizado.
+Propuesta integral para la implementación del **Sistema Reina (Versión Enterprise Pro)**, un ecosistema de grado empresarial diseñado para el control total, automatización legal y personalización de marca.
 
-### Pilares Tecnológicos:
-*   **Facturación Electrónica SRI (Full Pro):** Generación, firma digital XAdES-BES, envío automático y representación RIDE en formato A4 profesional.
-*   **Validación Inteligente de Datos:** Motor SRI incorporado para validar Cédulas y RUCs en tiempo real, previniendo errores de digitación y garantizando la validez legal de cada cliente y proveedor.
-*   **Arquitectura Multisucursal:** Control independiente de puntos de emisión y establecimientos. Cada local factura con su propio secuencial y serie legal.
-*   **Identidad Visual Whitelabel:** Personalización avanzada que permite cambiar colores del tema, nombre del sistema e incluso el icono de carga animado (20 opciones disponibles) para reflejar su marca.
-*   **Business Intelligence & Dashboard:** Analítica avanzada con 7 reportes de decisión (Rentabilidad Real, Ticket Promedio, Horas Pico, Insumos Críticos).
-*   **POS Multicanal Delivery:** Gestión de precios diferenciados por plataforma con cambio de tarifa en tiempo real.
+### Pilares Tecnológicos Premium:
+*   **Facturación Electrónica SRI (Motor Pro):** Generación y firma digital XAdES-BES. Incluye el nuevo motor de **Alta Fidelidad (FPDF)** para que las facturas enviadas por correo sean impecables.
+*   **Notificaciones Automáticas:** Sistema de envío automático de comprobantes (XML + RIDE PDF) al correo del cliente inmediatamente tras la autorización.
+*   **Validación Inteligente SRI:** Motor incorporado que valida RUC y Cédula en tiempo real, garantizando datos 100% verídicos y cumpliendo con la ley de facturación (Restricción de $50 para Consumidor Final).
+*   **Arquitectura Multisucursal:** Gestión independiente de puntos de emisión con **secuenciales personalizables** por cada local.
+*   **Whitelabel & Identidad:** Personalización total del sistema (Colores, Nombre e Iconografía de carga dinámicos).
+*   **POS con Stock Inteligente:** Visualización del inventario disponible en tiempo real basado en el costo de recetas.
 
 ---
 
 ## 2. INVERSIÓN (ACTUALIZADA)
 
-Dada la envergadura del motor de facturación, validaciones SRI y capacidades de personalización de marca, se presentan las siguientes opciones:
+Debido a la inclusión del motor de correo automático y el diseño de PDF de alta fidelidad, se presentan los siguientes valores:
 
 ### OPCIÓN A: PROPIEDAD TOTAL (LICENCIA PERPETUA)
 *Para empresas que desean el control total de sus datos y servidor.*
 
 | Concepto | Detalle | Total |
 | :--- | :--- | :---: |
-| **Licencia Perpetua** | Versión ENTERPRISE (SRI + Sucursales + Whitelabel) | $ 1,950.00 |
-| **Configuración SRI** | Parametrización de firma, ambientes y series | $ 300.00 |
+| **Licencia Perpetua** | Versión ENTERPRISE (SRI + Whitelabel + Email Pro) | $ 2,150.00 |
+| **Configuración SRI & Email** | Parametrización de firma y servidor SMTP | $ 350.00 |
 | **Capacitación Pro** | Formación en gestión de costos y auditoría | $ 200.00 |
-| **TOTAL INVERSIÓN INICIAL** | | **$ 2,450.00** |
-| *Soporte y SRI Update* | *Garantía de cumplimiento SRI y Soporte VIP* | *$ 400.00/año* |
+| **TOTAL INVERSIÓN INICIAL** | | **$ 2,700.00** |
+| *Soporte y SRI Update* | *Garantía de cumplimiento y Soporte VIP* | *$ 450.00/año* |
 
 ### OPCIÓN B: MODELO SAAS (MENSUALIDAD)
 *Ideal para un inicio rápido con soporte continuo incluido.*
 
 | Concepto | Detalle | Costo |
 | :--- | :--- | :---: |
-| **Suscripción Mensual** | Servidor Cloud + Mantenimiento + SRI Update | $ 135.00/mes |
-| **Activación Pro** | Configuración de entorno y carga de recetas | $ 250.00 |
-| **TOTAL INICIAL** | **Primer mes + Activación** | **$ 385.00** |
+| **Suscripción Mensual** | Servidor Cloud + SRI + Email Automatic | $ 155.00/mes |
+| **Activación Pro** | Configuración de entorno y carga de datos | $ 300.00 |
+| **TOTAL INICIAL** | **Primer mes + Activación** | **$ 455.00** |
 
 ---
 
 ## 3. VENTAJAS COMPETITIVAS
-1.  **Independencia Operativa:** Facture desde cualquier sucursal con datos reales y legales al instante.
-2.  **Validación de Datos SRI:** Evite errores legales con el motor de validación de identificaciones integrado.
-3.  **Control de Márgenes:** Sepa exactamente cuánto dinero gana por cada producto vendido tras descontar el costo de insumos.
-4.  **Marca Blanca Total:** El sistema se adapta visualmente a su negocio de forma profesional y moderna.
+1.  **Imagen Profesional:** Sus clientes reciben sus facturas al instante con un diseño elegante y corporativo.
+2.  **Seguridad Legal:** El sistema impide errores en facturación a consumidor final y valida identidades reales.
+3.  **Control Total:** Administre múltiples locales desde una sola plataforma con reportes de rentabilidad.
+4.  **Marca Propia:** El software proyecta la identidad de su negocio en cada interacción.
 
 ---
 
 ## 4. TÉRMINOS Y CONDICIONES
 *   **Tiempo de Implementación:** 7 a 10 días laborables.
-*   **Requerimientos:** Certificado de firma electrónica (.p12) y RUC activo.
+*   **Requerimientos:** Certificado de firma electrónica (.p12) y cuenta de correo activa.
 *   **Forma de Pago:** 50% al aceptar la propuesta y 50% tras la capacitación final.
 
 Atentamente,
