@@ -177,7 +177,7 @@
 <!-- Overlay de Carga Temático (CSS Puro para velocidad instantánea) -->
 <div id="reina-loader" class="d-none" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); backdrop-filter: blur(5px); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column;">
     <div class="crown-loader" style="font-size: 5rem; color: var(--reina-yellow); animation: crown-pulse 1.2s infinite ease-in-out;">
-        <i class="fas fa-crown"></i>
+        <i class="fas {{ config_empresa.icono_espera if config_empresa and config_empresa.icono_espera else 'fa-crown' }}"></i>
     </div>
     <div class="loading-text h4 mt-3" style="color: var(--reina-green); font-weight: 900; letter-spacing: 2px;">{{ config_empresa.nombre_comercial }}</div>
     <div class="text-muted fw-bold">PROCESANDO...</div>
@@ -260,6 +260,60 @@
         const table = document.getElementById(tableID);
         const wb = XLSX.utils.table_to_book(table, { sheet: "Hoja1" });
         XLSX.writeFile(wb, filename + ".xlsx");
+    }
+
+    // --- VALIDACIÓN SRI GLOBAL (JS) ---
+    function validarIdentificacionSRI(numero, tipo_id) {
+        numero = numero.trim();
+        if (tipo_id == "4") return numero === "9999999999"; // Consumidor Final
+        if (tipo_id == "3") return numero.length > 5; // Pasaporte (flexible)
+        if (!/^\d+$/.test(numero)) return false;
+
+        const l = numero.length;
+        if (tipo_id == "1" && l !== 10) return false;
+        if (tipo_id == "2" && l !== 13) return false;
+        if (l < 10) return false;
+
+        const prov = parseInt(numero.substring(0, 2));
+        if (!((prov >= 1 && prov <= 24) || prov == 30)) return false;
+
+        const tercer_digito = parseInt(numero.substring(2, 3));
+        if (tercer_digito < 6) {
+            // Persona Natural / Cédula (Módulo 10)
+            const coef = [2, 1, 2, 1, 2, 1, 2, 1, 2];
+            const verificador = parseInt(numero.substring(9, 10));
+            let suma = 0;
+            for (let i = 0; i < 9; i++) {
+                let v = parseInt(numero[i]) * coef[i];
+                suma += (v > 9) ? v - 9 : v;
+            }
+            let res = 10 - (suma % 10);
+            if (res === 10) res = 0;
+            if (res !== verificador) return false;
+        } else if (tercer_digito == 6) {
+            // Públicos (Módulo 11)
+            if (l !== 13) return false;
+            const coef = [3, 2, 7, 6, 5, 4, 3, 2];
+            const verificador = parseInt(numero.substring(8, 9));
+            let suma = 0;
+            for (let i = 0; i < 8; i++) suma += parseInt(numero[i]) * coef[i];
+            let res = 11 - (suma % 11);
+            if (res === 11) res = 0;
+            if (res !== verificador) return false;
+        } else if (tercer_digito == 9) {
+            // Sociedades (Módulo 11)
+            if (l !== 13) return false;
+            const coef = [4, 3, 2, 7, 6, 5, 4, 3, 2];
+            const verificador = parseInt(numero.substring(9, 10));
+            let suma = 0;
+            for (let i = 0; i < 9; i++) suma += parseInt(numero[i]) * coef[i];
+            let res = 11 - (suma % 11);
+            if (res === 11) res = 0;
+            if (res !== verificador) return false;
+        } else return false;
+
+        if (l === 13 && numero.substring(10, 13) !== "001") return false;
+        return true;
     }
 </script>
 

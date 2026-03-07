@@ -48,7 +48,7 @@
                         <td class="fw-bold text-dark">{{ u.cedula }}</td>
                         <td class="fw-bold"><i class="fas fa-user-circle me-2 text-primary"></i> {{ u.usuario }}</td>
                         <td><span class="badge bg-light text-dark border">{{ u.sucursal_nombre }}</span></td>
-                        <td><span class="badge {{ 'bg-success' if u.rol_nombre == 'ADMIN' else 'bg-secondary' }}">{{ u.rol_nombre }}</span></td>
+                        <td><span class="badge {{ 'bg-success' if u.rol_nombre == 'ADMINISTRADOR' else 'bg-secondary' }}">{{ u.rol_nombre }}</span></td>
                         <td>
                             {% if u.activo %}
                             <span class="badge bg-info text-dark rounded-pill">ACTIVO</span>
@@ -128,7 +128,7 @@
                             <select name="rol_id" id="edit_rol_id" class="form-select form-select-sm bg-light border-0" required>
                                 <option value="" disabled>-- ROL --</option>
                                 {% for r in roles %}
-                                <option value="{{ r.id }}">{{ r.descripcion }}</option>
+                                <option value="{{ r.id }}">{{ r.nombre }}</option>
                                 {% endfor %}
                             </select>
                         </div>

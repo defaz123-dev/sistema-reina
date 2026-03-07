@@ -66,7 +66,7 @@
         </a>
     </div>
 
-    {% if session['rol'] == 'ADMIN' %}
+    {% if session['rol'] == 'ADMINISTRADOR' %}
     <!-- --- SECCIÓN ABASTECIMIENTO --- -->
     <div class="col-6 col-md-3 col-lg-2">
         <a href="{{ url_for('compras') }}" class="text-decoration-none">
@@ -132,7 +132,7 @@
                     <div class="icon-box border-danger text-danger mb-3">
                         <i class="fas fa-hamburger"></i>
                     </div>
-                    <h6 class="fw-bold text-dark mb-1">Menú</h6>
+                    <h6 class="fw-bold text-dark mb-1">Producto</h6>
                     <p class="text-muted extra-small mb-0">Recetas</p>
                 </div>
             </div>

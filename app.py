@@ -71,6 +71,74 @@ def identificar_tipo_doc(doc):
     if doc == "9999999999": return 4
     return 2 if len(doc) == 13 else 1
 
+def validar_ruc_sri(identificacion, tipo_id=None):
+    """
+    Valida RUC o Cédula de Ecuador con algoritmos del SRI (Módulo 10 y 11)
+    Si se provee tipo_id: 1=Cedula, 2=RUC
+    """
+    identificacion = str(identificacion).strip()
+    if not identificacion.isdigit(): return False
+    
+    l = len(identificacion)
+    
+    # Validar longitud según tipo_id si se proporciona
+    if tipo_id:
+        tipo_id = int(tipo_id)
+        if tipo_id == 1 and l != 10: return False # Cédula debe ser 10
+        if tipo_id == 2 and l != 13: return False # RUC debe ser 13
+        if tipo_id == 4: return identificacion == "9999999999" # Consumidor Final
+        if tipo_id == 3: return True # Pasaporte no tiene regla fija numérica estricta aquí
+    
+    if l not in [10, 13]: return False
+
+    # Los dos primeros dígitos corresponden a la provincia (01 a 24) o 30
+    prov = int(identificacion[0:2])
+    if not (1 <= prov <= 24 or prov == 30): return False
+
+    # El tercer dígito indica el tipo de ruc
+    tercer_digito = int(identificacion[2])
+    
+    if tercer_digito < 6:
+        # Persona Natural o Cédula (Módulo 10)
+        coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2]
+        verificador = int(identificacion[9])
+        suma = 0
+        for i in range(9):
+            valor = int(identificacion[i]) * coeficientes[i]
+            suma += valor if valor < 10 else valor - 9
+        resultado = 10 - (suma % 10)
+        if resultado == 10: resultado = 0
+        if resultado != verificador: return False
+    elif tercer_digito == 6:
+        # Entidades Públicas (Módulo 11)
+        if l == 10: return False # RUC público siempre es 13
+        coeficientes = [3, 2, 7, 6, 5, 4, 3, 2]
+        verificador = int(identificacion[8])
+        suma = 0
+        for i in range(8):
+            suma += int(identificacion[i]) * coeficientes[i]
+        resultado = 11 - (suma % 11)
+        if resultado == 11: resultado = 0
+        if resultado != verificador: return False
+    elif tercer_digito == 9:
+        # Sociedades Privadas / Extranjeros (Módulo 11)
+        coeficientes = [4, 3, 2, 7, 6, 5, 4, 3, 2]
+        verificador = int(identificacion[9])
+        suma = 0
+        for i in range(9):
+            suma += int(identificacion[i]) * coeficientes[i]
+        resultado = 11 - (suma % 11)
+        if resultado == 11: resultado = 0
+        if resultado != verificador: return False
+    else:
+        return False
+
+    # Si es RUC (13 dígitos), los últimos 3 deben ser 001
+    if l == 13 and identificacion[10:13] != "001":
+        return False
+
+    return True
+
 # --- DECORADORES ---
 def login_required(f):
     @wraps(f)
@@ -82,7 +150,7 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def dec(*args, **kwargs):
-        if session.get('rol') != 'ADMIN':
+        if session.get('rol') != 'ADMINISTRADOR':
             flash('Acceso denegado', 'danger'); return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return dec
@@ -91,10 +159,10 @@ def admin_required(f):
 def inject_empresa():
     try:
         cur = mysql.connection.cursor()
-        cur.execute("SELECT nombre_comercial, color_tema FROM empresa LIMIT 1")
+        cur.execute("SELECT nombre_comercial, color_tema, icono_espera FROM empresa LIMIT 1")
         e = cur.fetchone(); cur.close()
-        return dict(config_empresa=e) if e else dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938'})
-    except: return dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938'})
+        return dict(config_empresa=e) if e else dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938', 'icono_espera': 'fa-crown'})
+    except: return dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938', 'icono_espera': 'fa-crown'})
 
 # --- RUTAS BASE ---
 @app.route('/')
@@ -148,24 +216,42 @@ def buscar_cliente(cedula):
 @login_required
 def guardar_cliente():
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    t_id = d.get('tipo_identificacion_id') or identificar_tipo_doc(d['cedula_ruc'])
+    ruc_ced = d['cedula_ruc'].strip()
+
+    # VALIDACIÓN SRI (Excepto Consumidor Final)
+    if ruc_ced != "9999999999" and not validar_ruc_sri(ruc_ced):
+        flash('La identificación ingresada no es válida según el algoritmo del SRI', 'danger')
+        return redirect(url_for('clientes'))
+
+    t_id = d.get('tipo_identificacion_id') or identificar_tipo_doc(ruc_ced)
     nom, ape, dir = d['nombres'].upper(), d['apellidos'].upper(), d['direccion'].upper()
-    if d.get('id'): cur.execute("UPDATE clientes SET cedula_ruc=%s, tipo_identificacion_id=%s, nombres=%s, apellidos=%s, direccion=%s, telefono=%s, email=%s, usuario_modificacion_id=%s WHERE id=%s", (d['cedula_ruc'], t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, d['id']))
-    else: cur.execute("INSERT INTO clientes (cedula_ruc, tipo_identificacion_id, nombres, apellidos, direccion, telefono, email, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (d['cedula_ruc'], t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, u_id))
-    mysql.connection.commit(); cur.close(); flash('Cliente guardado', 'success'); return redirect(url_for('clientes'))
+    try:
+        if d.get('id'): cur.execute("UPDATE clientes SET cedula_ruc=%s, tipo_identificacion_id=%s, nombres=%s, apellidos=%s, direccion=%s, telefono=%s, email=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc_ced, t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, d['id']))
+        else: cur.execute("INSERT INTO clientes (cedula_ruc, tipo_identificacion_id, nombres, apellidos, direccion, telefono, email, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (ruc_ced, t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, u_id))
+        mysql.connection.commit(); cur.close(); flash('Cliente guardado', 'success')
+    except Exception as e:
+        if "1062" in str(e): flash('Error: Ya existe un cliente con esa identificación', 'danger')
+        else: flash(f'Error al guardar: {str(e)}', 'danger')
+        cur.close()
+    return redirect(url_for('clientes'))
 
 @app.route('/clientes/guardar_json', methods=['POST'])
 @login_required
 def guardar_cliente_json():
     data = request.get_json(); cur = mysql.connection.cursor(); u_id = session['user_id']
     try:
+        ruc_ced = data['cedula_ruc'].strip()
+        # VALIDACIÓN SRI (Excepto Consumidor Final)
+        if ruc_ced != "9999999999" and not validar_ruc_sri(ruc_ced):
+            return jsonify({'success': False, 'message': 'La identificación no es válida (Algoritmo SRI)'})
+
         nom, ape, dir = data['nombres'].upper(), data['apellidos'].upper(), data.get('direccion','').upper()
         tel, eml = data.get('telefono','').upper(), data.get('email','').upper()
-        t_id = data.get('tipo_identificacion_id') or identificar_tipo_doc(data['cedula_ruc'])
+        t_id = data.get('tipo_identificacion_id') or identificar_tipo_doc(ruc_ced)
         cur.execute("""INSERT INTO clientes (cedula_ruc, tipo_identificacion_id, nombres, apellidos, direccion, telefono, email, usuario_creacion_id, usuario_modificacion_id) 
                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE nombres=%s, apellidos=%s, direccion=%s, email=%s""", 
-                    (data['cedula_ruc'], t_id, nom, ape, dir, tel, eml, u_id, u_id, nom, ape, dir, eml))
-        mysql.connection.commit(); cur.execute("SELECT id FROM clientes WHERE cedula_ruc=%s", (data['cedula_ruc'],)); c_id = cur.fetchone()['id']; cur.close()
+                    (ruc_ced, t_id, nom, ape, dir, tel, eml, u_id, u_id, nom, ape, dir, eml))
+        mysql.connection.commit(); cur.execute("SELECT id FROM clientes WHERE cedula_ruc=%s", (ruc_ced,)); c_id = cur.fetchone()['id']; cur.close()
         return jsonify({'success': True, 'id': c_id})
     except Exception as e: return jsonify({'success': False, 'message': str(e)})
 
@@ -311,10 +397,16 @@ def proveedores():
 @admin_required
 def guardar_proveedor():
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    ruc, razon, nom, dir, tel, eml, t_comp = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion'].upper(), d['telefono'], d['email'].upper(), d['tipo_comprobante_id']
+    ruc, razon, nom, dir, tel, eml, t_comp = d['ruc'].strip(), d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion'].upper(), d['telefono'], d['email'].upper(), d['tipo_comprobante_id']
+    
+    # VALIDACIÓN DE RUC (Debe tener 13 dígitos y ser numérico)
+    if len(ruc) != 13 or not ruc.isdigit():
+        flash('El RUC del proveedor debe tener exactamente 13 dígitos numéricos', 'danger')
+        return redirect(url_for('proveedores'))
+
     if d.get('id'): cur.execute("UPDATE proveedores SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion=%s, telefono=%s, email=%s, tipo_comprobante_id=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, tel, eml, t_comp, u_id, d['id']))
     else: cur.execute("INSERT INTO proveedores (ruc, razon_social, nombre_comercial, direccion, telefono, email, tipo_comprobante_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)", (ruc, razon, nom, dir, tel, eml, t_comp, u_id, u_id))
-    mysql.connection.commit(); cur.close(); flash('Guardado', 'success'); return redirect(url_for('proveedores'))
+    mysql.connection.commit(); cur.close(); flash('Proveedor guardado correctamente', 'success'); return redirect(url_for('proveedores'))
 
 # --- USUARIOS ---
 @app.route('/usuarios')
@@ -331,8 +423,12 @@ def usuarios():
 def crear_usuario():
     c, u, p, s, rid, tid = request.form['cedula'].strip(), request.form['usuario'].upper().strip(), request.form['password'], request.form['sucursal_id'], request.form['rol_id'], request.form['tipo_identificacion_id']
     hp = generate_password_hash(p); cur = mysql.connection.cursor()
-    try: cur.execute("INSERT INTO usuarios (cedula, usuario, password, sucursal_id, rol_id, activo, tipo_identificacion_id) VALUES (%s, %s, %s, %s, %s, 1, %s)", (c, u, hp, s, rid, tid)); mysql.connection.commit()
-    except Exception as e: flash(str(e), 'danger')
+    try: 
+        cur.execute("INSERT INTO usuarios (cedula, usuario, password, sucursal_id, rol_id, activo, tipo_identificacion_id) VALUES (%s, %s, %s, %s, %s, 1, %s)", (c, u, hp, s, rid, tid))
+        mysql.connection.commit(); flash('Usuario creado correctamente', 'success')
+    except Exception as e: 
+        if "1062" in str(e): flash('Error: Esa identificación ya está registrada en otro usuario', 'danger')
+        else: flash(str(e), 'danger')
     cur.close(); return redirect(url_for('usuarios'))
 
 @app.route('/usuarios/editar', methods=['POST'])
@@ -342,10 +438,15 @@ def editar_usuario():
     id_u, c, u, p, s, rid, a, tid = request.form['id'], request.form['cedula'].strip(), request.form['usuario'].upper().strip(), request.form['password'], request.form['sucursal_id'], request.form['rol_id'], request.form['activo'], request.form['tipo_identificacion_id']
     cur = mysql.connection.cursor()
     try:
-        if p: hp = generate_password_hash(p); cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, password=%s, sucursal_id=%s, rol_id=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, hp, s, rid, a, tid, id_u))
-        else: cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, sucursal_id=%s, rol_id=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, s, rid, a, tid, id_u))
-        mysql.connection.commit()
-    except Exception as e: flash(str(e), 'danger')
+        if p: 
+            hp = generate_password_hash(p)
+            cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, password=%s, sucursal_id=%s, rol_id=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, hp, s, rid, a, tid, id_u))
+        else: 
+            cur.execute("UPDATE usuarios SET cedula=%s, usuario=%s, sucursal_id=%s, rol_id=%s, activo=%s, tipo_identificacion_id=%s WHERE id=%s", (c, u, s, rid, a, tid, id_u))
+        mysql.connection.commit(); flash('Usuario actualizado', 'success')
+    except Exception as e: 
+        if "1062" in str(e): flash('Error: Esa identificación ya está siendo usada por otro usuario', 'danger')
+        else: flash(str(e), 'danger')
     cur.close(); return redirect(url_for('usuarios'))
 
 # --- SUCURSALES ---
@@ -395,13 +496,13 @@ def configuracion_empresa():
 def guardar_empresa():
     from security_utils import cifrar_password
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    ruc, razon, nom, dir, iva, color, f_pass = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion_matriz'].upper(), d.get('iva_porcentaje', 15.00), d.get('color_tema', '#008938'), cifrar_password(d.get('firma_password', ''))
+    ruc, razon, nom, dir, iva, color, f_pass, icono = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion_matriz'].upper(), d.get('iva_porcentaje', 15.00), d.get('color_tema', '#008938'), cifrar_password(d.get('firma_password', '')), d.get('icono_espera', 'fa-crown')
     f_file = request.files.get('firma_file')
     if f_file and f_file.filename:
         if not os.path.exists('certs'): os.makedirs('certs')
         f_file.save(os.path.join('certs', 'firma.p12'))
-    if d.get('id'): cur.execute("UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, firma_password=%s, obligado_contabilidad=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), u_id, d['id']))
-    else: cur.execute("INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, firma_password, obligado_contabilidad, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), u_id, u_id))
+    if d.get('id'): cur.execute("UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, firma_password=%s, obligado_contabilidad=%s, icono_espera=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), icono, u_id, d['id']))
+    else: cur.execute("INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, firma_password, obligado_contabilidad, icono_espera, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), icono, u_id, u_id))
     mysql.connection.commit(); cur.close(); flash('Empresa actualizada', 'success'); return redirect(url_for('configuracion_empresa'))
 
 # --- POS ---

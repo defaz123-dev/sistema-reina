@@ -71,7 +71,7 @@
 <div class="modal fade" id="modalProv" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 rounded-4 shadow-lg">
-            <form action="{{ url_for('guardar_proveedor') }}" method="POST">
+            <form action="{{ url_for('guardar_proveedor') }}" method="POST" onsubmit="return validarAntesDeEnviarProv()">
                 <input type="hidden" name="id" id="provId">
                 <div class="modal-header border-0 pb-3 bg-success text-white rounded-top-4">
                     <h5 class="modal-title fw-bold"><i class="fas fa-truck me-2"></i> Datos del Proveedor</h5>
@@ -81,7 +81,8 @@
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label class="form-label small fw-bold">RUC</label>
-                            <input type="text" name="ruc" id="inputRuc" class="form-control" maxlength="13" required>
+                            <input type="text" name="ruc" id="inputRuc" class="form-control" maxlength="13" required oninput="validarRucProveedor()">
+                            <div id="ruc_error" class="text-danger extra-small mt-1 d-none">RUC no válido (SRI Ecuador).</div>
                         </div>
                         <div class="col-md-8">
                             <label class="form-label small fw-bold">Razón Social</label>
@@ -153,6 +154,9 @@ $('#tablaProveedores tbody').on('click', '.btn-edit', function() {
     document.getElementById('inputEml').value = d.eml;
     document.getElementById('inputTipo').value = d.tipo;
     document.querySelector('.modal-title').innerHTML = '<i class="fas fa-edit me-2"></i> Editar Proveedor';
+    
+    // Validar inmediatamente al cargar datos para mostrar estado correcto
+    validarRucProveedor();
 });
 
 const modalProv = document.getElementById('modalProv');
@@ -162,6 +166,12 @@ if(modalProv) {
         const f = modalProv.querySelector('form');
         if(f) f.reset();
         document.querySelector('.modal-title').innerHTML = '<i class="fas fa-truck me-2"></i> Datos del Proveedor';
+        
+        // LIMPIAR ESTADOS DE VALIDACIÓN AL CERRAR
+        const rucInput = document.getElementById('inputRuc');
+        const errorDiv = document.getElementById('ruc_error');
+        rucInput.classList.remove('border-danger', 'border-success');
+        errorDiv.classList.add('d-none');
     });
 }
 
@@ -172,5 +182,36 @@ function confirmarBajaProveedor(id, nombre) {
         }
     });
 }
+
+function validarRucProveedor() {
+    const ruc = document.getElementById('inputRuc').value.trim();
+    const errorDiv = document.getElementById('ruc_error');
+    const rucInput = document.getElementById('inputRuc');
+
+    if (ruc.length >= 10) {
+        if (!validarIdentificacionSRI(ruc, "2")) { // "2" es RUC
+            errorDiv.classList.remove('d-none');
+            rucInput.classList.add('border-danger');
+            rucInput.classList.remove('border-success');
+        } else {
+            errorDiv.classList.add('d-none');
+            rucInput.classList.remove('border-danger');
+            rucInput.classList.add('border-success');
+        }
+    } else {
+        errorDiv.classList.add('d-none');
+        rucInput.classList.remove('border-danger', 'border-success');
+    }
+}
+
+function validarAntesDeEnviarProv() {
+    const ruc = document.getElementById('inputRuc').value.trim();
+    if (!validarIdentificacionSRI(ruc, "2")) {
+        reinaAlert('Error', 'El RUC ingresado no es válido.', 'danger');
+        return false;
+    }
+    return true;
+}
 </script>
+
 {% endblock %}

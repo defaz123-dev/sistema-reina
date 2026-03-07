@@ -55,6 +55,7 @@ CREATE TABLE empresa (
     contribuyente_especial VARCHAR(50),
     ambiente INT DEFAULT 1, -- 1: Pruebas, 2: Produccion
     color_tema VARCHAR(7) DEFAULT '#008938',
+    icono_espera VARCHAR(50) DEFAULT 'fa-crown',
     firma_password VARCHAR(255),
     usuario_creacion_id INT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -284,7 +285,7 @@ INSERT INTO tipos_identificacion (id, nombre, codigo_sri) VALUES
 INSERT INTO tipos_comprobantes (id, nombre) VALUES 
 (1, 'FACTURA'), (2, 'NOTA DE VENTA');
 
-INSERT INTO roles (id, nombre) VALUES (1, 'ADMIN'), (2, 'USER');
+INSERT INTO roles (id, nombre) VALUES (1, 'ADMINISTRADOR'), (2, 'CAJERO');
 
 INSERT INTO plataformas (id, nombre) VALUES (1, 'LOCAL'), (2, 'PEDIDOS YA'), (3, 'UBER EATS');
 

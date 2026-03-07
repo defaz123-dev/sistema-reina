@@ -100,7 +100,8 @@
 
                     <div class="mb-3">
                         <label class="extra-small fw-bold text-muted text-uppercase">Número de Identificación</label>
-                        <input type="text" name="cedula_ruc" id="cliente_doc" class="form-control form-control-sm bg-light border-0" required>
+                        <input type="text" name="cedula_ruc" id="cliente_doc" class="form-control form-control-sm bg-light border-0" required oninput="validarDocTiempoReal()">
+                        <div id="doc_error" class="text-danger extra-small mt-1 d-none">Identificación no válida para el tipo seleccionado.</div>
                     </div>
 
                     <div class="row g-2">
@@ -169,10 +170,32 @@
         return digito_validador === parseInt(cedula[9]);
     }
 
+    function validarDocTiempoReal() {
+        const tipo = document.getElementById('cliente_tipo_id').value;
+        const doc = document.getElementById('cliente_doc').value.trim();
+        const errorDiv = document.getElementById('doc_error');
+        const docInput = document.getElementById('cliente_doc');
+
+        if (doc.length >= 10) {
+            if (!validarIdentificacionSRI(doc, tipo)) {
+                errorDiv.classList.remove('d-none');
+                docInput.classList.add('border-danger');
+                docInput.classList.remove('border-success');
+            } else {
+                errorDiv.classList.add('d-none');
+                docInput.classList.remove('border-danger');
+                docInput.classList.add('border-success');
+            }
+        } else {
+            errorDiv.classList.add('d-none');
+            docInput.classList.remove('border-danger', 'border-success');
+        }
+    }
+
     function validarAntesDeEnviar() {
         const tipo = document.getElementById('cliente_tipo_id').value;
         const doc = document.getElementById('cliente_doc').value.trim();
-        if (!validarIdEcuador(doc, tipo)) {
+        if (!validarIdentificacionSRI(doc, tipo)) {
             reinaAlert('Error', 'La identificación no es válida para el tipo seleccionado.', 'danger');
             return false;
         }
@@ -199,6 +222,12 @@
         document.getElementById('cliente_eml').value = '';
         document.getElementById('cliente_tipo_id').value = ''; // Resetear selector
         document.getElementById('modalClienteTitle').innerText = 'Nuevo Cliente';
+
+        // Limpiar estilos de error
+        const docInput = document.getElementById('cliente_doc');
+        const errorDiv = document.getElementById('doc_error');
+        docInput.classList.remove('border-danger', 'border-success');
+        errorDiv.classList.add('d-none');
     }
 
     function prepararEdicionCliente(btn) {
@@ -211,6 +240,9 @@
         document.getElementById('cliente_tel').value = btn.getAttribute('data-tel');
         document.getElementById('cliente_eml').value = btn.getAttribute('data-eml');
         document.getElementById('modalClienteTitle').innerText = 'Editar Cliente';
+
+        // Validar inmediatamente al cargar datos para mostrar estado correcto
+        validarDocTiempoReal();
     }
 </script>
 {% endblock %}
