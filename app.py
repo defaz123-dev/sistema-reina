@@ -684,11 +684,11 @@ def enviar_comprobante_email(venta_id):
                 print(f"DEBUG: No se pudo resolver {raw_host}, usando original.")
 
             if port == 465:
-                print("DEBUG: Usando SMTP_SSL (Puerto 465)...")
-                server = smtplib.SMTP_SSL(host, port, timeout=15)
+                print(f"DEBUG: Usando SMTP_SSL en {host}:{port} (Timeout 60s)...")
+                server = smtplib.SMTP_SSL(host, port, timeout=60)
             else:
-                print(f"DEBUG: Usando SMTP estándar (Puerto {port})...")
-                server = smtplib.SMTP(host, port, timeout=15)
+                print(f"DEBUG: Usando SMTP estándar en {host}:{port} (Timeout 60s)...")
+                server = smtplib.SMTP(host, port, timeout=60)
                 if emp['email_use_tls']:
                     print("DEBUG: Iniciando STARTTLS...")
                     server.starttls()
