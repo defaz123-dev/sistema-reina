@@ -75,7 +75,7 @@ CREATE TABLE empresa (
     ambiente INT DEFAULT 1,
     color_tema VARCHAR(7) DEFAULT '#008938',
     icono_espera VARCHAR(50) DEFAULT 'fa-crown',
-    firma_password VARCHAR(255),
+    firma_password TEXT,
     email_host VARCHAR(100),
     email_port INT,
     email_user VARCHAR(100),
