@@ -668,37 +668,28 @@ def enviar_comprobante_email(venta_id):
         # 4. Enviar vía SMTP con manejo especial para la nube (Render/Heroku)
         import socket
         try:
-            raw_host = str(emp['email_host']).strip()
+            host = str(emp['email_host']).strip()
             port = int(emp['email_port'])
             user = str(emp['email_user']).strip()
             password = str(emp['email_pass']).strip()
 
-            print(f"DEBUG: Iniciando conexión a {raw_host}:{port}...")
+            print(f"DEBUG: Intentando conexión a {host}:{port}...")
             
-            # INTENTO DE RESOLUCIÓN IPV4 (Para evitar 'Network is unreachable')
-            try:
-                host = socket.gethostbyname(raw_host)
-                print(f"DEBUG: Host {raw_host} resuelto a IPv4: {host}")
-            except:
-                host = raw_host
-                print(f"DEBUG: No se pudo resolver {raw_host}, usando original.")
-
             if port == 465:
-                print(f"DEBUG: Usando SMTP_SSL en {host}:{port} (Timeout 60s)...")
-                server = smtplib.SMTP_SSL(host, port, timeout=60)
+                # Conexión SSL Directa
+                server = smtplib.SMTP_SSL(host, port, timeout=20)
             else:
-                print(f"DEBUG: Usando SMTP estándar en {host}:{port} (Timeout 60s)...")
-                server = smtplib.SMTP(host, port, timeout=60)
+                # Conexión estándar 587 (Recomendada para Render)
+                server = smtplib.SMTP(host, port, timeout=20)
                 if emp['email_use_tls']:
-                    print("DEBUG: Iniciando STARTTLS...")
+                    server.ehlo()
                     server.starttls()
+                    server.ehlo()
             
-            print("DEBUG: Intentando Login...")
             server.login(user, password)
-            print("DEBUG: Login Exitoso. Enviando Mensaje...")
             server.send_message(msg)
             server.quit()
-            print("DEBUG: Proceso de envío completado.")
+            print("DEBUG: Email enviado exitosamente.")
             
             # MARCAR COMO ENVIADO EN LA BASE DE DATOS
             cur.execute("UPDATE ventas SET email_enviado = 1 WHERE id = %s", (venta_id,))
@@ -706,7 +697,7 @@ def enviar_comprobante_email(venta_id):
             cur.close(); return True
 
         except Exception as e:
-            print(f"DETALLE ERROR SMTP ({raw_host}:{port}): {str(e)}")
+            print(f"DETALLE ERROR SMTP ({host}:{port}): {str(e)}")
             if cur: 
                 try: cur.close()
                 except: pass
