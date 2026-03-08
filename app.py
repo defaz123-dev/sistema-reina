@@ -549,25 +549,34 @@ def configuracion_empresa():
 def guardar_empresa():
     from security_utils import cifrar_password
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    ruc, razon, nom, dir, iva, color, f_pass, icono = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion_matriz'].upper(), d.get('iva_porcentaje', 15.00), d.get('color_tema', '#008938'), cifrar_password(d.get('firma_password', '')), d.get('icono_espera', 'fa-crown')
+    ruc, razon, nom, dir, iva, color, icono = d['ruc'], d['razon_social'].upper(), d['nombre_comercial'].upper(), d['direccion_matriz'].upper(), d.get('iva_porcentaje', 15.00), d.get('color_tema', '#008938'), d.get('icono_espera', 'fa-crown')
     
-    # Parámetros de Correo
-    e_host, e_port, e_user, e_pass = d.get('email_host'), d.get('email_port'), d.get('email_user'), d.get('email_pass')
-    e_tls, e_auto = d.get('email_use_tls', 0), d.get('email_envio_automatico', 0)
-
+    # Manejo de Firma Electrónica (Archivo)
     f_file = request.files.get('firma_file')
     if f_file and f_file.filename:
         if not os.path.exists('certs'): os.makedirs('certs')
         f_file.save(os.path.join('certs', 'firma.p12'))
     
+    # Manejo de Contraseña de Firma (Opcional)
+    f_pass = d.get('firma_password', '')
+    
+    # Parámetros de Correo
+    e_host, e_port, e_user, e_pass = d.get('email_host'), d.get('email_port'), d.get('email_user'), d.get('email_pass')
+    e_tls, e_auto = d.get('email_use_tls', 0), d.get('email_envio_automatico', 0)
+
     if d.get('id'): 
-        cur.execute("""UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, firma_password=%s, obligado_contabilidad=%s, icono_espera=%s, 
-                       email_host=%s, email_port=%s, email_user=%s, email_pass=%s, email_use_tls=%s, email_envio_automatico=%s, usuario_modificacion_id=%s WHERE id=%s""", 
-                    (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, d['id']))
+        if f_pass: # Si envió nueva clave, la actualizamos
+            cur.execute("""UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, firma_password=%s, obligado_contabilidad=%s, icono_espera=%s, 
+                           email_host=%s, email_port=%s, email_user=%s, email_pass=%s, email_use_tls=%s, email_envio_automatico=%s, usuario_modificacion_id=%s WHERE id=%s""", 
+                        (ruc, razon, nom, dir, iva, d['ambiente'], color, cifrar_password(f_pass), d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, d['id']))
+        else: # Si no envió clave, mantenemos la anterior
+            cur.execute("""UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, obligado_contabilidad=%s, icono_espera=%s, 
+                           email_host=%s, email_port=%s, email_user=%s, email_pass=%s, email_use_tls=%s, email_envio_automatico=%s, usuario_modificacion_id=%s WHERE id=%s""", 
+                        (ruc, razon, nom, dir, iva, d['ambiente'], color, d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, d['id']))
     else: 
         cur.execute("""INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, firma_password, obligado_contabilidad, icono_espera, email_host, email_port, email_user, email_pass, email_use_tls, email_envio_automatico, usuario_creacion_id, usuario_modificacion_id) 
                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
-                    (ruc, razon, nom, dir, iva, d['ambiente'], color, f_pass, d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, u_id))
+                    (ruc, razon, nom, dir, iva, d['ambiente'], color, cifrar_password(f_pass), d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, u_id))
     
     mysql.connection.commit(); cur.close(); flash('Configuración actualizada correctamente', 'success'); return redirect(url_for('configuracion_empresa'))
 
