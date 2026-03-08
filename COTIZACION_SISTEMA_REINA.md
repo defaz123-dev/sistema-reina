@@ -8,49 +8,41 @@
 ---
 
 ## 1. DESCRIPCIÓN DE LA SOLUCIÓN
-Propuesta integral para la implementación del **Sistema Reina (Versión Enterprise Pro)**, un ecosistema de grado empresarial diseñado para el control total, automatización legal y personalización de marca.
+Propuesta integral para la implementación del **Sistema Reina (Versión Enterprise Pro)**, un ecosistema diseñado bajo arquitectura distribuida de clase mundial para garantizar 0% bloqueos y 100% disponibilidad.
 
-### Pilares Tecnológicos Premium:
-*   **Facturación Electrónica SRI (Motor Pro):** Generación y firma digital XAdES-BES. Incluye el nuevo motor de **Alta Fidelidad (FPDF)** para que las facturas enviadas por correo sean impecables.
-*   **Notificaciones Automáticas:** Sistema de envío automático de comprobantes (XML + RIDE PDF) al correo del cliente inmediatamente tras la autorización.
-*   **Validación Inteligente SRI:** Motor incorporado que valida RUC y Cédula en tiempo real, garantizando datos 100% verídicos y cumpliendo con la ley de facturación (Restricción de $50 para Consumidor Final).
-*   **Arquitectura Multisucursal:** Gestión independiente de puntos de emisión con **secuenciales personalizables** por cada local.
-*   **Whitelabel & Identidad:** Personalización total del sistema (Colores, Nombre e Iconografía de carga dinámicos).
-*   **POS con Stock Inteligente:** Visualización del inventario disponible en tiempo real basado en el costo de recetas.
+### Infraestructura Multi-Cloud Incluida:
+*   **Application Server (Render):** Procesamiento de alto rendimiento para el motor Flask.
+*   **Managed Database (Aiven):** Almacenamiento seguro en clúster de base de datos MySQL.
+*   **Delivery API (Resend):** Garantía de entrega de facturas al 100% mediante API HTTPS, eliminando fallos por bloqueos de red tradicionales.
+
+### Pilares Tecnológicos:
+*   **Facturación SRI Motor Pro:** Firma digital XAdES-BES y generación de RIDE en **Alta Fidelidad (FPDF)**.
+*   **Notificaciones Inteligentes:** Envío automático de XML y PDF profesional al correo del cliente.
+*   **Seguridad y Validación:** Motor SRI para validación de identidades en tiempo real y cumplimiento legal de montos máximos.
+*   **Gestión Multisucursal:** Control de inventarios, recetas y secuenciales de facturación por cada punto de venta.
 
 ---
 
 ## 2. INVERSIÓN (ACTUALIZADA)
-
-Debido a la inclusión del motor de correo automático y el diseño de PDF de alta fidelidad, se presentan los siguientes valores:
 
 ### OPCIÓN A: PROPIEDAD TOTAL (LICENCIA PERPETUA)
 *Para empresas que desean el control total de sus datos y servidor.*
 
 | Concepto | Detalle | Total |
 | :--- | :--- | :---: |
-| **Licencia Perpetua** | Versión ENTERPRISE (SRI + Whitelabel + Email Pro) | $ 2,150.00 |
-| **Configuración SRI & Email** | Parametrización de firma y servidor SMTP | $ 350.00 |
+| **Licencia Perpetua** | Versión ENTERPRISE (SRI + Multi-Cloud + Whitelabel) | $ 2,300.00 |
+| **Configuración Cloud** | Setup de Render, Aiven y Resend API | $ 400.00 |
 | **Capacitación Pro** | Formación en gestión de costos y auditoría | $ 200.00 |
-| **TOTAL INVERSIÓN INICIAL** | | **$ 2,700.00** |
-| *Soporte y SRI Update* | *Garantía de cumplimiento y Soporte VIP* | *$ 450.00/año* |
-
-### OPCIÓN B: MODELO SAAS (MENSUALIDAD)
-*Ideal para un inicio rápido con soporte continuo incluido.*
-
-| Concepto | Detalle | Costo |
-| :--- | :--- | :---: |
-| **Suscripción Mensual** | Servidor Cloud + SRI + Email Automatic | $ 155.00/mes |
-| **Activación Pro** | Configuración de entorno y carga de datos | $ 300.00 |
-| **TOTAL INICIAL** | **Primer mes + Activación** | **$ 455.00** |
+| **TOTAL INVERSIÓN INICIAL** | | **$ 2,900.00** |
+| *Soporte y Cloud Update* | *Garantía de cumplimiento y Soporte VIP* | *$ 500.00/año* |
 
 ---
 
 ## 3. VENTAJAS COMPETITIVAS
-1.  **Imagen Profesional:** Sus clientes reciben sus facturas al instante con un diseño elegante y corporativo.
-2.  **Seguridad Legal:** El sistema impide errores en facturación a consumidor final y valida identidades reales.
-3.  **Control Total:** Administre múltiples locales desde una sola plataforma con reportes de rentabilidad.
-4.  **Marca Propia:** El software proyecta la identidad de su negocio en cada interacción.
+1.  **Fiabilidad Total:** Gracias al uso de Resend API, sus facturas nunca serán bloqueadas por los servidores de correo.
+2.  **Escalabilidad:** Infraestructura preparada para crecer con su negocio de forma transparente.
+3.  **Imagen de Marca:** Documentos PDF adjuntos con diseño corporativo impecable.
+4.  **Cumplimiento Legal:** Automatización total de las reglas vigentes del SRI.
 
 ---
 
