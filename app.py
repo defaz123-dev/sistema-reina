@@ -631,28 +631,32 @@ def enviar_comprobante_email(venta_id):
         import ride_fpdf
         pdf_data = ride_fpdf.generar_pdf_fpdf(datos, emp)
 
-        # 3. Enviar vía API de RESEND
-        resend_api_key = "re_5fREbmr6_37rnUZxF3MXJRKXEqdab3iLk"
+        # 3. Enviar vía API de BREVO
+        brevo_api_key = os.environ.get('BREVO_API_KEY')
+        if not brevo_api_key:
+            print("ERROR: BREVO_API_KEY no configurada.")
+            cur.close(); return False
         
-        url = "https://api.resend.com/emails"
+        url = "https://api.brevo.com/v3/smtp/email"
         headers = {
-            "Authorization": f"Bearer {resend_api_key}",
-            "Content-Type": "application/json"
+            "api-key": brevo_api_key,
+            "content-type": "application/json",
+            "accept": "application/json"
         }
         
         payload = {
-            "from": f"{emp['nombre_comercial']} <onboarding@resend.dev>",
-            "to": [v['cliente_email']],
+            "sender": {"name": emp['nombre_comercial'], "email": emp['email_user']},
+            "to": [{"email": v['cliente_email'], "name": f"{v['nombres']} {v['apellidos']}"}],
             "subject": f"Comprobante Electronico - {datos['clave_acceso']}",
-            "html": f"<p>Estimado(a) <b>{v['nombres']} {v['apellidos']}</b>,</p><p>Adjuntamos su comprobante electrónico autorizado por el SRI.</p><p>Gracias por su compra.</p>",
-            "attachments": [
+            "htmlContent": f"<p>Estimado(a) <b>{v['nombres']} {v['apellidos']}</b>,</p><p>Adjuntamos su comprobante electrónico autorizado por el SRI.</p><p>Gracias por su compra.</p>",
+            "attachment": [
                 {
                     "content": base64.b64encode(pdf_data).decode('utf-8'),
-                    "filename": f"RIDE_{v['secuencial']}.pdf"
+                    "name": f"RIDE_{v['secuencial']}.pdf"
                 },
                 {
                     "content": base64.b64encode(v['xml_autorizado'].encode('utf-8')).decode('utf-8'),
-                    "filename": f"{v['clave_acceso_sri']}.xml"
+                    "name": f"{v['clave_acceso_sri']}.xml"
                 }
             ]
         }
@@ -660,12 +664,12 @@ def enviar_comprobante_email(venta_id):
         response = requests.post(url, headers=headers, json=payload)
         
         if response.status_code in [200, 201]:
-            print("DEBUG: Email enviado exitosamente vía RESEND API.")
+            print("DEBUG: Email enviado exitosamente vía BREVO API.")
             cur.execute("UPDATE ventas SET email_enviado = 1 WHERE id = %s", (venta_id,))
             mysql.connection.commit()
             cur.close(); return True
         else:
-            print(f"ERROR RESEND API ({response.status_code}): {response.text}")
+            print(f"ERROR BREVO API ({response.status_code}): {response.text}")
             cur.close(); return False
 
     except Exception as e:
