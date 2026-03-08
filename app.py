@@ -583,22 +583,10 @@ def guardar_empresa():
 
 def enviar_comprobante_email(venta_id):
     """
-    Genera PDF, adjunta XML y envía por correo al cliente de forma automática.
+    Genera PDF, adjunta XML y envía por correo al cliente usando la API de RESEND (para saltar bloqueos de Render).
     """
-    import smtplib, base64, socket
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from email.mime.base import MIMEBase
-    from email import encoders
+    import base64, requests
     
-    # --- PARCHE PARA NUBE (RENDER): FORZAR IPV4 ---
-    orig_getaddrinfo = socket.getaddrinfo
-    def patched_getaddrinfo(*args, **kwargs):
-        responses = orig_getaddrinfo(*args, **kwargs)
-        return [res for res in responses if res[0] == socket.AF_INET]
-    socket.getaddrinfo = patched_getaddrinfo
-    # ----------------------------------------------
-
     cur = mysql.connection.cursor()
     cur.execute("SELECT v.*, c.email as cliente_email, c.nombres, c.apellidos FROM ventas v JOIN clientes c ON v.cliente_id = c.id WHERE v.id = %s", (venta_id,))
     v = cur.fetchone()
@@ -609,7 +597,7 @@ def enviar_comprobante_email(venta_id):
         if cur: cur.close()
         return False
 
-    if not emp or not emp['email_host'] or not emp['email_envio_automatico']:
+    if not emp or not emp['email_envio_automatico']:
         if cur: cur.close()
         return False
 
@@ -639,73 +627,50 @@ def enviar_comprobante_email(venta_id):
         code128.write(barcode_io, options={"write_text": False, "module_height": 10})
         datos['barcode_64'] = base64.b64encode(barcode_io.getvalue()).decode('utf-8')
 
-        # 2. Generar PDF usando FPDF (Calco exacto del sistema)
+        # 2. Generar PDF usando FPDF
         import ride_fpdf
         pdf_data = ride_fpdf.generar_pdf_fpdf(datos, emp)
 
-        # 3. Preparar Email
-        msg = MIMEMultipart()
-        msg['From'] = f"{emp['nombre_comercial']} <{emp['email_user']}>"
-        msg['To'] = v['cliente_email']
-        msg['Subject'] = f"Comprobante Electrónico - {datos['clave_acceso']}"
+        # 3. Enviar vía API de RESEND
+        resend_api_key = "re_5fREbmr6_37rnUZxF3MXJRKXEqdab3iLk"
         
-        body = f"Estimado(a) {v['nombres']} {v['apellidos']},\n\nAdjuntamos su comprobante electrónico autorizado por el SRI.\n\nGracias por su compra."
-        msg.attach(MIMEText(body, 'plain'))
-
-        # Adjuntar PDF
-        part_pdf = MIMEBase('application', 'pdf')
-        part_pdf.set_payload(pdf_data)
-        encoders.encode_base64(part_pdf)
-        part_pdf.add_header('Content-Disposition', f"attachment; filename=RIDE_{v['secuencial']}.pdf")
-        msg.attach(part_pdf)
-
-        # Adjuntar XML
-        part_xml = MIMEBase('application', 'xml')
-        part_xml.set_payload(v['xml_autorizado'].encode('utf-8'))
-        encoders.encode_base64(part_xml)
-        part_xml.add_header('Content-Disposition', f"attachment; filename={v['clave_acceso_sri']}.xml")
-        msg.attach(part_xml)
-
-        # 4. Enviar vía SMTP con manejo especial para la nube (Render/Heroku)
-        import socket
-        try:
-            host = str(emp['email_host']).strip()
-            port = int(emp['email_port'])
-            user = str(emp['email_user']).strip()
-            password = str(emp['email_pass']).strip()
-
-            print(f"DEBUG: Intentando conexión a {host}:{port}...")
-            
-            if port == 465:
-                # Conexión SSL Directa
-                server = smtplib.SMTP_SSL(host, port, timeout=20)
-            else:
-                # Conexión estándar 587 (Recomendada para Render)
-                server = smtplib.SMTP(host, port, timeout=20)
-                if emp['email_use_tls']:
-                    server.ehlo()
-                    server.starttls()
-                    server.ehlo()
-            
-            server.login(user, password)
-            server.send_message(msg)
-            server.quit()
-            print("DEBUG: Email enviado exitosamente.")
-            
-            # MARCAR COMO ENVIADO EN LA BASE DE DATOS
+        url = "https://api.resend.com/emails"
+        headers = {
+            "Authorization": f"Bearer {resend_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "from": f"{emp['nombre_comercial']} <onboarding@resend.dev>",
+            "to": [v['cliente_email']],
+            "subject": f"Comprobante Electronico - {datos['clave_acceso']}",
+            "html": f"<p>Estimado(a) <b>{v['nombres']} {v['apellidos']}</b>,</p><p>Adjuntamos su comprobante electrónico autorizado por el SRI.</p><p>Gracias por su compra.</p>",
+            "attachments": [
+                {
+                    "content": base64.b64encode(pdf_data).decode('utf-8'),
+                    "filename": f"RIDE_{v['secuencial']}.pdf"
+                },
+                {
+                    "content": base64.b64encode(v['xml_autorizado'].encode('utf-8')).decode('utf-8'),
+                    "filename": f"{v['clave_acceso_sri']}.xml"
+                }
+            ]
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code in [200, 201]:
+            print("DEBUG: Email enviado exitosamente vía RESEND API.")
             cur.execute("UPDATE ventas SET email_enviado = 1 WHERE id = %s", (venta_id,))
             mysql.connection.commit()
             cur.close(); return True
+        else:
+            print(f"ERROR RESEND API ({response.status_code}): {response.text}")
+            cur.close(); return False
 
-        except Exception as e:
-            print(f"DETALLE ERROR SMTP ({host}:{port}): {str(e)}")
-            if cur: 
-                try: cur.close()
-                except: pass
-            return False
     except Exception as e:
         import traceback
-        print(f"ERROR CRÍTICO ENVIANDO EMAIL: {str(e)}")
+        print(f"ERROR CRÍTICO ENVIANDO EMAIL VIA RESEND: {str(e)}")
         print(traceback.format_exc())
         if cur: cur.close()
         return False
