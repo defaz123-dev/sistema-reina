@@ -658,16 +658,19 @@ def enviar_comprobante_email(venta_id):
         msg.attach(part_xml)
 
         # 4. Enviar vía SMTP con manejo especial para la nube (Render/Heroku)
-        import socket
         try:
-            # Forzamos a que use IPv4 si está disponible (evita 'Network is unreachable')
-            if int(emp['email_port']) == 465:
-                server = smtplib.SMTP_SSL(emp['email_host'], int(emp['email_port']), timeout=20)
+            host = str(emp['email_host']).strip()
+            port = int(emp['email_port'])
+            user = str(emp['email_user']).strip()
+            password = str(emp['email_pass']).strip()
+
+            if port == 465:
+                server = smtplib.SMTP_SSL(host, port, timeout=30)
             else:
-                server = smtplib.SMTP(emp['email_host'], int(emp['email_port']), timeout=20)
+                server = smtplib.SMTP(host, port, timeout=30)
                 if emp['email_use_tls']: server.starttls()
             
-            server.login(emp['email_user'], emp['email_pass'])
+            server.login(user, password)
             server.send_message(msg)
             server.quit()
             
@@ -676,9 +679,11 @@ def enviar_comprobante_email(venta_id):
             mysql.connection.commit()
             cur.close(); return True
 
-        except (socket.gaierror, socket.error) as e:
-            print(f"ERROR DE RED SMTP: {str(e)}")
-            if cur: cur.close()
+        except Exception as e:
+            print(f"DETALLE ERROR SMTP ({host}:{port}): {str(e)}")
+            if cur: 
+                try: cur.close()
+                except: pass
             return False
     except Exception as e:
         import traceback
