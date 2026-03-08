@@ -584,12 +584,20 @@ def enviar_comprobante_email(venta_id):
     """
     Genera PDF, adjunta XML y envía por correo al cliente de forma automática.
     """
-    import smtplib, base64
+    import smtplib, base64, socket
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
     from email.mime.base import MIMEBase
     from email import encoders
     
+    # --- PARCHE PARA NUBE (RENDER): FORZAR IPV4 ---
+    orig_getaddrinfo = socket.getaddrinfo
+    def patched_getaddrinfo(*args, **kwargs):
+        responses = orig_getaddrinfo(*args, **kwargs)
+        return [res for res in responses if res[0] == socket.AF_INET]
+    socket.getaddrinfo = patched_getaddrinfo
+    # ----------------------------------------------
+
     cur = mysql.connection.cursor()
     cur.execute("SELECT v.*, c.email as cliente_email, c.nombres, c.apellidos FROM ventas v JOIN clientes c ON v.cliente_id = c.id WHERE v.id = %s", (venta_id,))
     v = cur.fetchone()
