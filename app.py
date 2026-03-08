@@ -562,14 +562,15 @@ def guardar_empresa():
     
     # Parámetros de Correo
     e_host, e_port, e_user, e_pass = d.get('email_host'), d.get('email_port'), d.get('email_user'), d.get('email_pass')
-    e_tls, e_auto = d.get('email_use_tls', 0), d.get('email_envio_automatico', 0)
+    e_tls = 1 if 'email_use_tls' in d else 0
+    e_auto = 1 if 'email_envio_automatico' in d else 0
 
     if d.get('id'): 
         if f_pass: # Si envió nueva clave, la actualizamos
             cur.execute("""UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, firma_password=%s, obligado_contabilidad=%s, icono_espera=%s, 
                            email_host=%s, email_port=%s, email_user=%s, email_pass=%s, email_use_tls=%s, email_envio_automatico=%s, usuario_modificacion_id=%s WHERE id=%s""", 
                         (ruc, razon, nom, dir, iva, d['ambiente'], color, cifrar_password(f_pass), d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, d['id']))
-        else: # Si no envió clave, mantenemos la anterior
+        else: # Si no envió clave, mantenemos la anterior (CORREGIDO: Coincidencia de columnas y valores)
             cur.execute("""UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, obligado_contabilidad=%s, icono_espera=%s, 
                            email_host=%s, email_port=%s, email_user=%s, email_pass=%s, email_use_tls=%s, email_envio_automatico=%s, usuario_modificacion_id=%s WHERE id=%s""", 
                         (ruc, razon, nom, dir, iva, d['ambiente'], color, d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, d['id']))
@@ -584,12 +585,20 @@ def enviar_comprobante_email(venta_id):
     """
     Genera PDF, adjunta XML y envía por correo al cliente de forma automática.
     """
-    import smtplib, base64
+    import smtplib, base64, socket
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
     from email.mime.base import MIMEBase
     from email import encoders
     
+    # --- PARCHE PARA NUBE (RENDER): FORZAR IPV4 ---
+    orig_getaddrinfo = socket.getaddrinfo
+    def patched_getaddrinfo(*args, **kwargs):
+        responses = orig_getaddrinfo(*args, **kwargs)
+        return [res for res in responses if res[0] == socket.AF_INET]
+    socket.getaddrinfo = patched_getaddrinfo
+    # ----------------------------------------------
+
     cur = mysql.connection.cursor()
     cur.execute("SELECT v.*, c.email as cliente_email, c.nombres, c.apellidos FROM ventas v JOIN clientes c ON v.cliente_id = c.id WHERE v.id = %s", (venta_id,))
     v = cur.fetchone()
