@@ -199,23 +199,46 @@
                             <div class="card-body p-4">
                                 <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-user-tag me-2 text-success"></i> DATOS DEL CLIENTE</h6>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <label class="small fw-bold text-muted">Cédula / RUC</label>
+                                    <label class="small fw-bold text-muted">Cliente (Cédula o Nombre)</label>
                                     <button class="btn btn-link btn-sm text-success p-0 text-decoration-none fw-bold" onclick="setConsumidorFinal()">Consumidor Final</button>
                                 </div>
-                                <div class="input-group mb-3">
-                                    <input type="text" id="clienteCedula" class="form-control border-0 bg-light" placeholder="Escriba identificación..." autofocus>
-                                    <button class="btn btn-dark px-3" onclick="buscarCliente()"><i class="fas fa-search"></i></button>
+                                <div class="position-relative mb-3">
+                                    <div class="input-group">
+                                        <input type="text" id="clienteCedula" class="form-control border-0 bg-light" placeholder="Identificación o nombre..." autofocus 
+                                               onkeydown="if(event.key === 'Enter') { 
+                                                   event.preventDefault(); 
+                                                   const lista = document.getElementById('listaResultadosClientes');
+                                                   if(lista.style.display === 'block') {
+                                                       const first = lista.querySelector('.list-group-item');
+                                                       if(first) first.click();
+                                                   } else {
+                                                       buscarCliente(); 
+                                                   }
+                                               }" autocomplete="off">
+                                        <button class="btn btn-dark px-3" onclick="buscarCliente()"><i class="fas fa-search"></i></button>
+                                    </div>
+                                    <div id="listaResultadosClientes" class="list-group position-absolute w-100 shadow-lg mt-1" style="display:none; z-index: 1050; max-height: 200px; overflow-y: auto;">
+                                    </div>
                                 </div>
                                 <div id="clienteInfo" class="p-3 bg-white rounded-3 border-start border-4 border-success shadow-sm mb-4">
-                                    <div class="small text-muted mb-1">Nombre Seleccionado:</div>
+                                    <div class="small text-muted mb-1">Cliente Seleccionado:</div>
                                     <div id="clienteNombre" class="fw-bold text-dark h5 mb-0">CONSUMIDOR FINAL</div>
                                     <input type="hidden" id="clienteId" value="1">
                                 </div>
                                 <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-wallet me-2 text-success"></i> MÉTODO DE PAGO</h6>
-                                <div class="row g-2">
-                                    <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoEfectivo" value="EFECTIVO" checked><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoEfectivo"><i class="fas fa-money-bill-wave d-block mb-1"></i> EFECTIVO</label></div>
-                                    <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoTrans" value="TRANSFERENCIA"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoTrans"><i class="fas fa-university d-block mb-1"></i> TRANSF.</label></div>
-                                    <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoTarjeta" value="TARJETA"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoTarjeta"><i class="fas fa-credit-card d-block mb-1"></i> TARJETA</label></div>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoEfectivo" value="EFECTIVO" checked onclick="toggleTarjetaSelector()"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoEfectivo"><i class="fas fa-money-bill-wave d-block mb-1"></i> EFECTIVO</label></div>
+                                    <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoTrans" value="TRANSFERENCIA" onclick="toggleTarjetaSelector()"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoTrans"><i class="fas fa-university d-block mb-1"></i> TRANSF.</label></div>
+                                    <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoTarjeta" value="TARJETA" onclick="toggleTarjetaSelector()"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoTarjeta"><i class="fas fa-credit-card d-block mb-1"></i> TARJETA</label></div>
+                                </div>
+                                <div id="tarjetaSelector" class="mb-4" style="display: none;">
+                                    <label class="extra-small fw-bold text-muted text-uppercase d-block mb-2">Seleccione Tipo de Tarjeta</label>
+                                    <select id="id_tarjeta" class="form-select bg-light border-0 fw-bold">
+                                        <option value="" selected disabled>-- SELECCIONE TARJETA --</option>
+                                        {% for t in cat_tarjetas %}
+                                        <option value="{{ t.id }}">{{ t.nombre }}</option>
+                                        {% endfor %}
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -366,18 +389,66 @@ function buscarPorCodigo(codigo) {
 }
 
 function buscarCliente() {
-    const doc = document.getElementById('clienteCedula').value.trim();
-    if (!doc) return;
-    fetch(`/clientes/buscar/${doc}`).then(res => res.json()).then(data => {
-        if (data.success) {
-            document.getElementById('clienteNombre').textContent = `${data.cliente.nombres} ${data.cliente.apellidos}`;
-            document.getElementById('clienteId').value = data.cliente.id;
-        } else {
-            document.getElementById('new_cedula').value = doc;
-            document.getElementById('new_tipo_id').value = (doc.length === 13) ? "2" : "1";
-            modalClienteInstance.show();
-        }
+    const term = document.getElementById('clienteCedula').value.trim();
+    if (!term) return;
+    
+    // Si es numérico y tiene 10 o 13 dígitos, buscamos por cédula directamente primero
+    if (/^\d+$/.test(term) && (term.length === 10 || term.length === 13)) {
+        fetch(`/clientes/buscar/${encodeURIComponent(term)}`).then(res => res.json()).then(data => {
+            if (data.success) {
+                seleccionarCliente(data.cliente);
+            } else {
+                document.getElementById('new_cedula').value = term;
+                document.getElementById('new_tipo_id').value = (term.length === 13) ? "2" : "1";
+                modalClienteInstance.show();
+            }
+        });
+    } else {
+        // De lo contrario, buscamos por nombre o coincidencia parcial
+        fetch(`/clientes/buscar_nombre/${encodeURIComponent(term)}`).then(res => res.json()).then(data => {
+            if (data.success && data.clientes.length > 0) {
+                if (data.clientes.length === 1) {
+                    seleccionarCliente(data.clientes[0]);
+                } else {
+                    mostrarListaClientes(data.clientes);
+                }
+            } else {
+                reinaAlert('No encontrado', 'No se encontraron clientes con ese nombre o identificación.', 'warning');
+            }
+        });
+    }
+}
+
+function seleccionarCliente(c) {
+    document.getElementById('clienteNombre').textContent = `${c.nombres} ${c.apellidos}`;
+    document.getElementById('clienteId').value = c.id;
+    document.getElementById('clienteCedula').value = c.cedula_ruc;
+    document.getElementById('listaResultadosClientes').style.display = 'none';
+}
+
+function mostrarListaClientes(clientes) {
+    const lista = document.getElementById('listaResultadosClientes');
+    lista.innerHTML = '';
+    clientes.forEach(c => {
+        const item = document.createElement('button');
+        item.className = 'list-group-item list-group-item-action small py-2 d-flex justify-content-between align-items-center';
+        item.innerHTML = `<div><span class="fw-bold">${c.cedula_ruc}</span> - ${c.nombres} ${c.apellidos}</div><i class="fas fa-chevron-right text-muted extra-small"></i>`;
+        item.onclick = (e) => {
+            e.preventDefault();
+            seleccionarCliente(c);
+        };
+        lista.appendChild(item);
     });
+    lista.style.display = 'block';
+
+    // Cerrar lista al hacer click fuera
+    const closeList = (e) => {
+        if (!lista.contains(e.target) && e.target.id !== 'clienteCedula') {
+            lista.style.display = 'none';
+            document.removeEventListener('click', closeList);
+        }
+    };
+    document.addEventListener('click', closeList);
 }
 
 async function guardarClienteRapido() {
@@ -508,15 +579,29 @@ function abrirModalFinalizar() {
     modalFinalizarInstance.show();
 }
 
+function toggleTarjetaSelector() {
+    const selector = document.getElementById('tarjetaSelector');
+    const isTarjeta = document.getElementById('pagoTarjeta').checked;
+    selector.style.display = isTarjeta ? 'block' : 'none';
+    if (!isTarjeta) document.getElementById('id_tarjeta').value = '';
+}
+
 async function confirmarOrden() {
     const c_id = document.getElementById('clienteId').value;
     const f_pago = document.querySelector('input[name="formaPago"]:checked').value;
+    const id_tarjeta = document.getElementById('id_tarjeta').value;
     const plat_id = document.getElementById('ventaPlataforma').value;
     const total = carrito.reduce((s, i) => s + (i.precio * i.cantidad), 0);
     const base15 = total / 1.15;
     const ivaVal = total - base15;
 
     if (!c_id) return reinaAlert('Aviso', 'Seleccione un cliente', 'warning');
+    
+    // Validación de tarjeta si corresponde
+    if (f_pago === 'TARJETA' && !id_tarjeta) {
+        return reinaAlert('Faltan Datos', 'Debe seleccionar el tipo de tarjeta para este pago.', 'warning');
+    }
+
     if (c_id == '1' && total > 50) return reinaAlert('Límite Excedido', 'Ventas superiores a $50.00 requieren datos del cliente.', 'warning');
     
     if (c_id == '1') {
@@ -529,7 +614,8 @@ async function confirmarOrden() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            items: carrito, subtotal_0: 0, subtotal_15: base15, iva_valor: ivaVal, total: total, cliente_id: c_id, forma_pago: f_pago, plataforma_id: plat_id
+            items: carrito, subtotal_0: 0, subtotal_15: base15, iva_valor: ivaVal, total: total, 
+            cliente_id: c_id, forma_pago: f_pago, id_tarjeta: id_tarjeta, plataforma_id: plat_id
         })
     });
     const data = await res.json();

@@ -205,11 +205,13 @@ def procesar_factura_electronica(venta_id, mysql):
                     return True
                 time.sleep(3)
             cur.execute("UPDATE ventas SET estado_sri = 'PENDIENTE DE AUTORIZACION' WHERE id = %s", (venta_id,))
+            mysql.connection.commit()
+            return False # Retornamos False porque no se autorizó en este ciclo
         else:
             cur.execute("UPDATE ventas SET estado_sri = %s WHERE id = %s", (f"DEVUELTA: {mensaje_recepcion}"[:500], venta_id))
+            mysql.connection.commit()
+            return False # Retornamos False porque fue devuelta
         
-        mysql.connection.commit()
-        return True
     except Exception as e:
         error_msg = str(e)
         log_sri(f"ERROR: {error_msg}")

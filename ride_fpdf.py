@@ -219,7 +219,16 @@ def generar_pdf_fpdf(d, empresa):
     pdf.cell(30, 6, "VALOR", 1, 1, 'C', 1)
     pdf.set_font('Arial', '', 8)
     pdf.set_x(10)
-    pdf.cell(80, 6, "OTROS CON UTILIZACION DEL SISTEMA FINANCIERO", 1, 0, 'L')
+    
+    fp_text = "OTROS CON UTILIZACION DEL SISTEMA FINANCIERO"
+    if d.get('forma_pago') == 'EFECTIVO':
+        fp_text = "SIN UTILIZACION DEL SISTEMA FINANCIERO"
+    elif d.get('forma_pago') == 'TARJETA':
+        fp_text = "TARJETA DE CREDITO / DEBITO"
+    elif d.get('forma_pago') == 'TRANSFERENCIA':
+        fp_text = "OTROS CON UTILIZACION DEL SISTEMA FINANCIERO"
+        
+    pdf.cell(80, 6, fp_text, 1, 0, 'L')
     pdf.set_font('Arial', '', 9)
     pdf.cell(30, 6, "$ %.2f" % d['total'], 1, 1, 'R')
     

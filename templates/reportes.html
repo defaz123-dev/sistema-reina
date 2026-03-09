@@ -1,17 +1,18 @@
 {% extends "layout.html" %}
 {% block title %}Reportes Estratégicos - {{ config_empresa.nombre_comercial }}{% endblock %}
 
+{% block container_class %}container-fluid px-4{% endblock %}
+
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-    <div class="container">
+    <div class="container-fluid px-4">
         <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">{{ config_empresa.nombre_comercial|upper }}</a>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3">Inicio</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3"><i class="fas fa-home me-1"></i> Inicio</a>
     </div>
 </nav>
 {% endblock %}
 
 {% block content %}
-
 <div class="row mb-4">
     <div class="col-12 d-flex justify-content-between align-items-center">
         <div>
@@ -44,6 +45,9 @@
             <button class="nav-link rounded-pill fw-bold" id="pills-rentabilidad-tab" data-bs-toggle="pill" data-bs-target="#pills-rentabilidad" type="button" role="tab"><i class="fas fa-hand-holding-usd me-2"></i>Rentabilidad</button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-utilidad-tab" data-bs-toggle="pill" data-bs-target="#pills-utilidad" type="button" role="tab"><i class="fas fa-chart-line me-2"></i>Utilidad Real</button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link rounded-pill fw-bold" id="pills-horarios-tab" data-bs-toggle="pill" data-bs-target="#pills-horarios" type="button" role="tab"><i class="fas fa-clock me-2"></i>Horarios</button>
         </li>
         <li class="nav-item" role="presentation">
@@ -51,6 +55,9 @@
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link rounded-pill fw-bold" id="pills-pagos-tab" data-bs-toggle="pill" data-bs-target="#pills-pagos" type="button" role="tab"><i class="fas fa-credit-card me-2"></i>Formas de Pago</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-cierres-tab" data-bs-toggle="pill" data-bs-target="#pills-cierres" type="button" role="tab"><i class="fas fa-lock me-2"></i>Cierres de Caja</button>
         </li>
     </ul>
 </div>
@@ -81,7 +88,7 @@
                 <h5 class="fw-bold mb-0">Listado de Ventas</h5>
                 <button class="btn btn-sm btn-reina px-3 rounded-pill" onclick="exportTableToExcel('tableVentas', 'Ventas_Reina')"><i class="fas fa-file-excel me-1"></i> Excel</button>
             </div>
-            <div class="table-responsive" style="max-height: 500px;">
+            <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0" id="tableVentas">
                     <thead class="table-light text-uppercase small text-muted">
                         <tr><th>ID</th><th>Fecha</th><th>Cliente</th><th>Cajero</th><th class="text-end pe-4">Total</th></tr>
@@ -137,6 +144,62 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA: UTILIDAD REAL -->
+    <div class="tab-pane fade" id="pills-utilidad" role="tabpanel">
+        <div class="row g-4 mb-4">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm rounded-4 p-4 text-center">
+                    <div class="extra-small fw-bold text-muted text-uppercase mb-1">Ventas Totales</div>
+                    <div class="h3 fw-bold text-success mb-0" id="util_ventas">$ 0.00</div>
+                    <small class="text-muted">Ingresos brutos registrados</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm rounded-4 p-4 text-center">
+                    <div class="extra-small fw-bold text-muted text-uppercase mb-1">Gastos (Compras + Egresos)</div>
+                    <div class="h3 fw-bold text-danger mb-0" id="util_gastos">$ 0.00</div>
+                    <small class="text-muted">Insumos y gastos operativos</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm rounded-4 p-4 text-center bg-dark text-white">
+                    <div class="extra-small fw-bold text-success text-uppercase mb-1">Utilidad Neta Actual</div>
+                    <div class="h3 fw-bold text-white mb-0" id="util_neta">$ 0.00</div>
+                    <small class="text-white-50">Balance real de operación</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h6 class="fw-bold mb-3">Desglose de Operación</h6>
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <canvas id="chartUtilidad" height="300"></canvas>
+                </div>
+                <div class="col-md-6">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span><i class="fas fa-cash-register text-success me-2"></i> Ventas Totales</span>
+                            <span class="fw-bold" id="list_ventas">$ 0.00</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span><i class="fas fa-shopping-cart text-primary me-2"></i> Compras de Insumos</span>
+                            <span class="fw-bold text-danger" id="list_compras">$ 0.00</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span><i class="fas fa-hand-holding-usd text-danger me-2"></i> Egresos Varios</span>
+                            <span class="fw-bold text-danger" id="list_egresos">$ 0.00</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-light rounded-3 mt-2 p-3">
+                            <span class="fw-bold">UTILIDAD NETA</span>
+                            <span class="h5 fw-bold mb-0 text-success" id="list_neta">$ 0.00</span>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -241,6 +304,87 @@
             </div>
         </div>
     </div>
+
+    <!-- PESTAÑA: CIERRES DE CAJA -->
+    <div class="tab-pane fade" id="pills-cierres" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">Historial Detallado de Cierres</h5>
+                <button class="btn btn-sm btn-reina px-3 rounded-pill" onclick="exportTableToExcel('tableCierres', 'Auditoria_Cajas_Reina')"><i class="fas fa-file-excel me-1"></i> Excel</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 w-100" id="tableCierres">
+                    <thead class="table-dark text-uppercase small">
+                        <tr>
+                            <th class="ps-3" rowspan="2">Fecha / Cajero</th>
+                            <th class="text-center border-start border-secondary" colspan="3">Efectivo (Físico)</th>
+                            <th class="text-center border-start border-secondary" colspan="3">Tarjetas (Vouchers)</th>
+                            <th class="text-center border-start border-secondary" colspan="3">Transferencias</th>
+                            <th class="text-center border-start border-secondary bg-success" colspan="3">Balance Total</th>
+                        </tr>
+                        <tr class="bg-dark">
+                            <th class="text-center border-start border-secondary">Sist.</th><th class="text-center">Real</th><th class="text-center">Dif.</th>
+                            <th class="text-center border-start border-secondary">Sist.</th><th class="text-center">Real</th><th class="text-center">Dif.</th>
+                            <th class="text-center border-start border-secondary">Sist.</th><th class="text-center">Real</th><th class="text-center">Dif.</th>
+                            <th class="text-center border-start border-secondary">Sist.</th><th class="text-center">Real</th><th class="text-center">Dif.</th>
+                        </tr>
+                    </thead>
+                    <tbody style="font-size: 0.95rem;">
+                        {% for c in cierres_caja %}
+                        {% set sist_efe = (c.monto_inicial + c.monto_ventas_efectivo - c.monto_egresos) %}
+                        {% set dif_efe = c.real_efectivo - sist_efe %}
+                        {% set dif_tar = c.real_tarjeta - c.monto_ventas_tarjeta %}
+                        {% set dif_tra = c.real_transferencia - c.monto_ventas_transferencia %}
+                        <tr>
+                            <td class="ps-3 py-3">
+                                <div class="fw-bold">{{ c.fecha_cierre.strftime('%d/%m/%Y %H:%M') }}</div>
+                                <div class="small text-muted text-uppercase fw-bold">{{ c.usuario }}</div>
+                            </td>
+                            <!-- EFECTIVO -->
+                            <td class="text-center border-start">$ {{ "%.2f"|format(sist_efe) }}</td>
+                            <td class="text-center fw-bold">$ {{ "%.2f"|format(c.real_efectivo) }}</td>
+                            <td class="text-center">
+                                <div class="fw-bold {{ 'text-success' if dif_efe == 0 else 'text-danger' if dif_efe < 0 else 'text-warning' }}">
+                                    {{ "+" if dif_efe > 0 }}{{ "%.2f"|format(dif_efe) }}
+                                </div>
+                                {% if c.obs_efectivo %}<div class="extra-small text-muted italic" style="font-size: 0.75rem; line-height: 1.1;">{{ c.obs_efectivo }}</div>{% endif %}
+                            </td>
+                            <!-- TARJETAS -->
+                            <td class="text-center border-start">$ {{ "%.2f"|format(c.monto_ventas_tarjeta) }}</td>
+                            <td class="text-center fw-bold">$ {{ "%.2f"|format(c.real_tarjeta) }}</td>
+                            <td class="text-center">
+                                <div class="fw-bold {{ 'text-success' if dif_tar == 0 else 'text-danger' if dif_tar < 0 else 'text-warning' }}">
+                                    {{ "+" if dif_tar > 0 }}{{ "%.2f"|format(dif_tar) }}
+                                </div>
+                                {% if c.obs_tarjeta %}<div class="extra-small text-muted italic" style="font-size: 0.75rem; line-height: 1.1;">{{ c.obs_tarjeta }}</div>{% endif %}
+                            </td>
+                            <!-- TRANSFERENCIAS -->
+                            <td class="text-center border-start">$ {{ "%.2f"|format(c.monto_ventas_transferencia) }}</td>
+                            <td class="text-center fw-bold">$ {{ "%.2f"|format(c.real_transferencia) }}</td>
+                            <td class="text-center">
+                                <div class="fw-bold {{ 'text-success' if dif_tra == 0 else 'text-danger' if dif_tra < 0 else 'text-warning' }}">
+                                    {{ "+" if dif_tra > 0 }}{{ "%.2f"|format(dif_tra) }}
+                                </div>
+                                {% if c.obs_transferencia %}<div class="extra-small text-muted italic" style="font-size: 0.75rem; line-height: 1.1;">{{ c.obs_transferencia }}</div>{% endif %}
+                            </td>
+                            <!-- BALANCE TOTAL -->
+                            <td class="text-center border-start bg-light">$ {{ "%.2f"|format(c.monto_final_esperado) }}</td>
+                            <td class="text-center bg-light fw-bold">$ {{ "%.2f"|format(c.monto_final_real) }}</td>
+                            <td class="text-center bg-light fw-bold">
+                                <span class="badge rounded-pill px-3 {{ 'bg-success' if c.diferencia == 0 else 'bg-danger' if c.diferencia < 0 else 'bg-warning text-dark' }}" style="font-size: 0.9rem;">
+                                    $ {{ "%.2f"|format(c.diferencia) }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not cierres_caja %}
+                        <tr><td colspan="13" class="text-center py-5 text-muted">No hay cierres registrados.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -255,7 +399,7 @@ document.addEventListener('DOMContentLoaded', function() {
             datasets: [{
                 label: 'Unidades',
                 data: [{% for p in top_productos %}{{ p.total_vendido }},{% endfor %}],
-                backgroundColor: '#008938',
+                backgroundColor: '{{ config_empresa.color_tema }}',
                 borderRadius: 8
             }]
         },
@@ -286,7 +430,7 @@ document.addEventListener('DOMContentLoaded', function() {
             datasets: [{
                 label: 'Monto $',
                 data: [{% for h in franja_horaria %}{{ h.total }},{% endfor %}],
-                backgroundColor: '#008938'
+                backgroundColor: '{{ config_empresa.color_tema }}'
             }]
         }
     });
@@ -298,10 +442,37 @@ document.addEventListener('DOMContentLoaded', function() {
             labels: [{% for f in formas_pago %}"{{ f.forma_pago }}",{% endfor %}],
             datasets: [{
                 data: [{% for f in formas_pago %}{{ f.total }},{% endfor %}],
-                backgroundColor: ['#008938', '#ffc20e', '#0d6efd', '#6c757d']
+                backgroundColor: ['{{ config_empresa.color_tema }}', '#ffc20e', '#0d6efd', '#6c757d']
             }]
         }
     });
+    // 5. Cargar Utilidad Real
+    const utilTab = document.getElementById('pills-utilidad-tab');
+    utilTab.addEventListener('shown.bs.tab', function () {
+        fetch('{{ url_for("utilidad_real") }}')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('util_ventas').innerText = `$ ${data.total_ventas.toFixed(2)}`;
+            document.getElementById('util_gastos').innerText = `$ ${(data.total_compras + data.total_egresos_varios).toFixed(2)}`;
+            document.getElementById('util_neta').innerText = `$ ${data.utilidad_neta.toFixed(2)}`;
+            
+            document.getElementById('list_ventas').innerText = `$ ${data.total_ventas.toFixed(2)}`;
+            document.getElementById('list_compras').innerText = `$ ${data.total_compras.toFixed(2)}`;
+            document.getElementById('list_egresos').innerText = `$ ${data.total_egresos_varios.toFixed(2)}`;
+            document.getElementById('list_neta').innerText = `$ ${data.utilidad_neta.toFixed(2)}`;
+
+            new Chart(document.getElementById('chartUtilidad'), {
+                type: 'pie',
+                data: {
+                    labels: ['Ventas', 'Compras', 'Egresos'],
+                    datasets: [{
+                        data: [data.total_ventas, data.total_compras, data.total_egresos_varios],
+                        backgroundColor: ['#2ecc71', '#3498db', '#e74c3c']
+                    }]
+                }
+            });
+        });
+    }, { once: true });
 });
 </script>
 {% endblock %}

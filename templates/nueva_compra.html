@@ -250,21 +250,40 @@ document.addEventListener('DOMContentLoaded', () => {
 function toggleClaveAcceso() {
     const sel = document.getElementById('compraProveedor'); if(!sel.value) return;
     const opt = sel.options[sel.selectedIndex];
-    const divElec = document.getElementById('divFacturaElec'); const divAuto = document.getElementById('divAutorizacion');
+    const ruc = opt.dataset.ruc;
+    const divElec = document.getElementById('divFacturaElec'); 
+    const divAuto = document.getElementById('divAutorizacion');
     const divCad = document.getElementById('divCaducidad');
     const manualPanel = document.getElementById('manualEntryPanel');
+    const compGroup = document.querySelector('.input-comprobante-group');
 
-    if (opt && opt.dataset.tipo === 'FACTURA') { 
+    // CASO 1: FACTURA ELECTRÓNICA
+    if (opt && opt.dataset.tipo === 'FACTURA' && ruc !== '9999999999999') { 
         divElec.style.display = 'block'; 
         divAuto.style.display = 'none';
         divCad.style.display = 'none';
         manualPanel.style.display = 'none'; 
+        compGroup.style.display = 'block';
     }
+    // CASO 2: GASTOS VARIOS (Informal)
+    else if (ruc === '9999999999999') {
+        divElec.style.display = 'none'; 
+        divAuto.style.display = 'none';
+        divCad.style.display = 'none';
+        manualPanel.style.display = 'block';
+        compGroup.style.display = 'none'; // Ocultar Est-Pto-Sec
+        // Auto-llenar con ceros para la DB
+        document.getElementById('compraEst').value = '000';
+        document.getElementById('compraPto').value = '000';
+        document.getElementById('compraSec').value = '000';
+    }
+    // CASO 3: NOTA DE VENTA O DOCUMENTOS FÍSICOS
     else { 
         divElec.style.display = 'none'; 
         divAuto.style.display = 'block';
-        divCad.style.display = 'block'; // MOSTRAR CADUCIDAD
+        divCad.style.display = 'block';
         manualPanel.style.display = 'block'; 
+        compGroup.style.display = 'block';
     }
 }
 
@@ -497,24 +516,30 @@ async function finalizarCompra() {
     const est = document.getElementById('compraEst').value.trim();
     const pto = document.getElementById('compraPto').value.trim();
     const sec = document.getElementById('compraSec').value.trim();
-    if(!est || !pto || !sec) return reinaAlert('Faltan Datos', 'El número de comprobante (Est-Pto-Sec) es obligatorio.', 'warning');
+    const ruc = optProv.dataset.ruc;
+
+    if (ruc !== '9999999999999') {
+        if(!est || !pto || !sec) return reinaAlert('Faltan Datos', 'El número de comprobante (Est-Pto-Sec) es obligatorio.', 'warning');
+    }
 
     const auto = document.getElementById('compraAuto').value.trim();
     const clave = document.getElementById('compraClave').value.trim();
     const f_cad = document.getElementById('compraFechaCaducidad').value;
 
-    if (optProv.dataset.tipo === 'FACTURA' && !clave) {
-        return reinaAlert('Faltan Datos', 'Las facturas electrónicas requieren la Clave de Acceso.', 'warning');
-    }
-    if (optProv.dataset.tipo !== 'FACTURA') {
-        if (!auto) return reinaAlert('Faltan Datos', 'Ingrese el Número de Autorización del SRI para este documento físico.', 'warning');
-        if (!f_cad) return reinaAlert('Faltan Datos', 'La fecha de caducidad es obligatoria para Notas de Venta.', 'warning');
-        
-        // Validación de Vigencia en JS
-        const hoy = new Date(); hoy.setHours(0,0,0,0);
-        const cad = new Date(f_cad + 'T00:00:00');
-        if (cad < hoy) {
-            return reinaAlert('Documento Caducado', 'LA NOTA DE VENTA ESTÁ CADUCADA. NO SE PUEDE INGRESAR.', 'danger');
+    if (ruc !== '9999999999999') {
+        if (optProv.dataset.tipo === 'FACTURA' && !clave) {
+            return reinaAlert('Faltan Datos', 'Las facturas electrónicas requieren la Clave de Acceso.', 'warning');
+        }
+        if (optProv.dataset.tipo !== 'FACTURA') {
+            if (!auto) return reinaAlert('Faltan Datos', 'Ingrese el Número de Autorización del SRI para este documento físico.', 'warning');
+            if (!f_cad) return reinaAlert('Faltan Datos', 'La fecha de caducidad es obligatoria para Notas de Venta.', 'warning');
+            
+            // Validación de Vigencia en JS
+            const hoy = new Date(); hoy.setHours(0,0,0,0);
+            const cad = new Date(f_cad + 'T00:00:00');
+            if (cad < hoy) {
+                return reinaAlert('Documento Caducado', 'LA NOTA DE VENTA ESTÁ CADUCADA. NO SE PUEDE INGRESAR.', 'danger');
+            }
         }
     }
 

@@ -1,0 +1,250 @@
+{% extends "layout.html" %}
+{% block title %}Cierre de Turno - {{ config_empresa.nombre_comercial }}{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">{{ config_empresa.nombre_comercial|upper }}</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3"><i class="fas fa-home me-1"></i> Inicio</a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4 mt-2">
+    <div class="col-12 text-center">
+        <h2 class="brand-logo"><i class="fas fa-lock me-2"></i>Cierre de Turno</h2>
+        <p class="text-muted small">Resumen consolidado y cuadre de valores físicos.</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- COLUMNA IZQUIERDA: FORMULARIO DE CUADRE (col-md-8) -->
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+            <div class="card-header bg-success text-white border-0 py-3">
+                <h5 class="fw-bold mb-0">Cuadre Detallado de Turno</h5>
+            </div>
+            <div class="card-body p-4">
+                <form id="formCierre" action="{{ url_for('cerrar_caja') }}" method="POST">
+                    <!-- Inputs ocultos para observaciones específicas -->
+                    <input type="hidden" name="obs_efectivo" id="hidden_obs_efe">
+                    <input type="hidden" name="obs_tarjeta" id="hidden_obs_tar">
+                    <input type="hidden" name="obs_transferencia" id="hidden_obs_tra">
+
+                    <!-- SECCIÓN: EFECTIVO -->
+                    <div class="row align-items-center mb-4 bg-light p-3 rounded-4">
+                        <div class="col-md-6">
+                            <div class="small fw-bold text-muted text-uppercase mb-1">Efectivo en Caja (Sistema)</div>
+                            <div class="h5 fw-bold text-dark mb-1">$ {{ "%.2f"|format(esperado) }}</div>
+                            <div class="extra-small text-muted">
+                                Ventas: ${{ "%.2f"|format(v_efectivo) }} <br>
+                                <span class="text-danger">(-) Egresos: ${{ "%.2f"|format(salidas) }}</span>
+                            </div>
+                            {% if detalles_egresos %}
+                            <div class="mt-2 border-top pt-2">
+                                <div class="extra-small fw-bold text-uppercase text-muted mb-1">Detalle de Gastos:</div>
+                                {% for eg in detalles_egresos %}
+                                <div class="d-flex justify-content-between extra-small text-muted italic">
+                                    <span class="text-truncate" style="max-width: 150px;">• {{ eg.descripcion }}</span>
+                                    <span class="fw-bold">-$ {{ "%.2f"|format(eg.monto) }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="extra-small fw-bold text-success text-uppercase">Ingresar Monto Físico ($)</label>
+                            <input type="number" id="input_real_efe" step="0.01" name="real_efectivo" class="form-control form-control-lg border-success fw-bold text-success" value="{{ "%.2f"|format(esperado) }}" oninput="actualizarTotalReal()" required>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN: TARJETAS -->
+                    <div class="row align-items-center mb-4 bg-light p-3 rounded-4">
+                        <div class="col-md-6">
+                            <div class="small fw-bold text-muted text-uppercase mb-1">Ventas Tarjeta</div>
+                            <div class="h5 fw-bold text-dark mb-0">$ {{ "%.2f"|format(v_tarjeta) }} <small class="text-muted fw-normal">(Sistema)</small></div>
+                            {% if desglose_tarjetas %}
+                            <div class="mt-2 border-top pt-1">
+                                {% for t in desglose_tarjetas %}
+                                <div class="d-flex justify-content-between extra-small text-muted">
+                                    <span>{{ t.tarjeta }}:</span>
+                                    <span>$ {{ "%.2f"|format(t.total) }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="extra-small fw-bold text-primary text-uppercase">Ingresar Valor Vouchers ($)</label>
+                            <input type="number" id="input_real_tar" step="0.01" name="real_tarjeta" class="form-control form-control-lg border-primary fw-bold text-primary" value="{{ "%.2f"|format(v_tarjeta) }}" oninput="actualizarTotalReal()" required>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN: TRANSFERENCIAS -->
+                    <div class="row align-items-center mb-4 bg-light p-3 rounded-4">
+                        <div class="col-md-6">
+                            <div class="small fw-bold text-muted text-uppercase mb-1">Transferencias</div>
+                            <div class="h5 fw-bold text-dark mb-0">$ {{ "%.2f"|format(v_trans) }} <small class="text-muted fw-normal">(Sistema)</small></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="extra-small fw-bold text-info text-uppercase">Ingresar Valor Confirmado ($)</label>
+                            <input type="number" id="input_real_tra" step="0.01" name="real_transferencia" class="form-control form-control-lg border-info fw-bold text-info" value="{{ "%.2f"|format(v_trans) }}" oninput="actualizarTotalReal()" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 p-3 rounded-4 border text-center bg-white shadow-sm">
+                        <div class="row">
+                            <div class="col-6 border-end">
+                                <small class="extra-small fw-bold text-muted text-uppercase">Total Sistema</small>
+                                <div class="h4 fw-bold text-dark mb-0">$ {{ "%.2f"|format(esperado + v_tarjeta + v_trans) }}</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="extra-small fw-bold text-muted text-uppercase">Total Real Ingresado</small>
+                                <div class="h4 fw-bold text-primary mb-0" id="labelTotalReal">$ 0.00</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-reina w-100 rounded-pill py-3 fw-bold shadow-lg mt-2" onclick="confirmarCierreDetallado()">
+                        <i class="fas fa-lock me-2"></i> CONFIRMAR Y CERRAR TURNO
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- COLUMNA DERECHA: INFORMACIÓN -->
+    <div class="col-md-4">
+        <!-- BLOQUE DE PRODUCCIÓN TOTAL -->
+        <div class="card border-0 shadow-sm rounded-4 bg-dark text-white p-4 text-center mb-4">
+            <small class="extra-small fw-bold text-uppercase text-success opacity-75">Producción Total del Turno</small>
+            <div class="h1 fw-bold mb-0 text-white">$ {{ "%.2f"|format(total_jornada) }}</div>
+            <p class="extra-small mb-0 opacity-50">(Suma de Efectivo + Tarjetas + Transferencias)</p>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+            <h6 class="fw-bold mb-3 text-uppercase small text-muted">Información del Turno</h6>
+            <div class="mb-2 d-flex justify-content-between">
+                <small class="text-muted">Cajero:</small>
+                <small class="fw-bold">{{ session['usuario'] }}</small>
+            </div>
+            <div class="mb-2 d-flex justify-content-between">
+                <small class="text-muted">Base Apertura:</small>
+                <small class="fw-bold text-success">$ {{ "%.2f"|format(sesion.monto_inicial) }}</small>
+            </div>
+            <div class="mb-2 d-flex justify-content-between">
+                <small class="text-muted">Hora Apertura:</small>
+                <small class="fw-bold">{{ sesion.fecha_apertura.strftime('%H:%M') }}</small>
+            </div>
+            <div class="mb-0 d-flex justify-content-between">
+                <small class="text-muted">Sucursal:</small>
+                <small class="fw-bold">{{ session['sucursal_nombre'] }}</small>
+            </div>
+        </div>
+
+        <div class="alert border-0 rounded-4 small p-3 bg-light text-muted">
+            <i class="fas fa-info-circle me-2"></i> Al confirmar el cierre, no podrá modificar las transacciones de esta sesión.
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE JUSTIFICACIÓN DE DESCUADRE -->
+<div class="modal fade" id="modalJustificacion" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="fw-bold mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Justificación de Diferencias</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="small text-muted mb-4">Se han detectado diferencias. Explique el motivo por cada método afectado:</p>
+                <div id="div_obs_efe" style="display:none;" class="mb-3">
+                    <label class="extra-small fw-bold text-danger text-uppercase">Diferencia en Efectivo</label>
+                    <textarea id="modal_obs_efe" class="form-control bg-light border-0 small" rows="2"></textarea>
+                </div>
+                <div id="div_obs_tar" style="display:none;" class="mb-3">
+                    <label class="extra-small fw-bold text-primary text-uppercase">Diferencia en Tarjetas</label>
+                    <textarea id="modal_obs_tar" class="form-control bg-light border-0 small" rows="2"></textarea>
+                </div>
+                <div id="div_obs_tra" style="display:none;" class="mb-3">
+                    <label class="extra-small fw-bold text-info text-uppercase">Diferencia en Transferencias</label>
+                    <textarea id="modal_obs_tra" class="form-control bg-light border-0 small" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button type="button" class="btn btn-reina w-100 rounded-pill py-3 fw-bold shadow" onclick="finalizarConJustificacion()">GUARDAR Y CERRAR</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+// FUNCIÓN DE SUMA GLOBAL
+function actualizarTotalReal() {
+    const efe = document.getElementById('input_real_efe');
+    const tar = document.getElementById('input_real_tar');
+    const tra = document.getElementById('input_real_tra');
+    const lbl = document.getElementById('labelTotalReal');
+
+    if (!efe || !tar || !tra || !lbl) return;
+
+    const v1 = parseFloat(efe.value) || 0;
+    const v2 = parseFloat(tar.value) || 0;
+    const v3 = parseFloat(tra.value) || 0;
+    
+    lbl.innerText = `$ ${(v1 + v2 + v3).toFixed(2)}`;
+}
+
+// DELEGACIÓN DE EVENTOS (Infalible)
+document.addEventListener('input', function(e) {
+    if (['input_real_efe', 'input_real_tar', 'input_real_tra'].includes(e.target.id)) {
+        actualizarTotalReal();
+    }
+});
+
+// Ejecutar al inicio
+document.addEventListener('DOMContentLoaded', actualizarTotalReal);
+
+async function confirmarCierreDetallado() {
+    const rEfe = parseFloat(document.getElementById('input_real_efe').value) || 0;
+    const rTar = parseFloat(document.getElementById('input_real_tar').value) || 0;
+    const rTra = parseFloat(document.getElementById('input_real_tra').value) || 0;
+    const eEfe = parseFloat("{{ esperado }}");
+    const eTar = parseFloat("{{ v_tarjeta }}");
+    const eTra = parseFloat("{{ v_trans }}");
+
+    const hasDifEfe = Math.abs(rEfe - eEfe) > 0.01;
+    const hasDifTar = Math.abs(rTar - eTar) > 0.01;
+    const hasDifTra = Math.abs(rTra - eTra) > 0.01;
+
+    if (hasDifEfe || hasDifTar || hasDifTra) {
+        document.getElementById('div_obs_efe').style.display = hasDifEfe ? 'block' : 'none';
+        document.getElementById('div_obs_tar').style.display = hasDifTar ? 'block' : 'none';
+        document.getElementById('div_obs_tra').style.display = hasDifTra ? 'block' : 'none';
+        const modal = new bootstrap.Modal(document.getElementById('modalJustificacion'));
+        modal.show();
+    } else {
+        const ok = await reinaConfirm("Cuadre Perfecto", "¿Confirmar cierre de turno?");
+        if (ok) document.getElementById('formCierre').submit();
+    }
+}
+
+function finalizarConJustificacion() {
+    const oEfe = document.getElementById('modal_obs_efe').value.trim();
+    const oTar = document.getElementById('modal_obs_tar').value.trim();
+    const oTra = document.getElementById('modal_obs_tra').value.trim();
+    
+    if (document.getElementById('div_obs_efe').style.display === 'block' && !oEfe) return reinaAlert('Aviso', 'Justifique el efectivo', 'warning');
+    if (document.getElementById('div_obs_tar').style.display === 'block' && !oTar) return reinaAlert('Aviso', 'Justifique las tarjetas', 'warning');
+    if (document.getElementById('div_obs_tra').style.display === 'block' && !oTra) return reinaAlert('Aviso', 'Justifique las transferencias', 'warning');
+    
+    document.getElementById('hidden_obs_efe').value = oEfe;
+    document.getElementById('hidden_obs_tar').value = oTar;
+    document.getElementById('hidden_obs_tra').value = oTra;
+    document.getElementById('formCierre').submit();
+}
+</script>
+{% endblock %}
+{% endblock %}

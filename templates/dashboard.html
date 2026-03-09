@@ -39,6 +39,50 @@
     </div>
 
     <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('listar_egresos') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-danger text-danger mb-3">
+                        <i class="fas fa-hand-holding-usd"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Egresos</h6>
+                    <p class="text-muted extra-small mb-0">Gastos Varios</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('sesion_caja') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-warning text-warning mb-3">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Turno Caja</h6>
+                    <p class="text-muted extra-small mb-0">Abrir/Cerrar Turno</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    {% if session.rol == 'ADMINISTRADOR' %}
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('cierre_diario') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-dark text-dark mb-3">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Cierre Día</h6>
+                    <p class="text-muted extra-small mb-0">Consolidado Admin</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endif %}
+
+    <div class="col-6 col-md-3 col-lg-2">
         <a href="{{ url_for('historial_ventas') }}" class="text-decoration-none">
             <div class="card h-100 border-0 shadow main-card">
                 <div class="card-body p-3 text-center">

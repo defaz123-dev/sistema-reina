@@ -150,7 +150,7 @@
     {% endwith %}
 </div>
 
-<div class="container py-4">
+<div class="{% block container_class %}container{% endblock %} py-4">
     {% block content %}{% endblock %}
 </div>
 

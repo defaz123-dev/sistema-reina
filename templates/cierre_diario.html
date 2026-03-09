@@ -1,0 +1,119 @@
+{% extends "layout.html" %}
+{% block title %}Cierre Final Diario - {{ config_empresa.nombre_comercial }}{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">{{ config_empresa.nombre_comercial|upper }}</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3"><i class="fas fa-home me-1"></i> Inicio</a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4 mt-2 align-items-center">
+    <div class="col-md-8">
+        <h2 class="brand-logo"><i class="fas fa-calendar-check me-2"></i>Cierre Final Diario</h2>
+        <p class="text-muted small">Consolidación de todos los turnos del día {{ hoy }}</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- COLUMNA IZQUIERDA: RESUMEN Y ACCIÓN -->
+    <div class="col-md-7 mb-4">
+        {% if abiertas %}
+        <div class="alert alert-danger border-0 shadow-sm rounded-4 mb-4">
+            <h5 class="fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>¡Atención! Hay turnos abiertos</h5>
+            <p class="small mb-2">No puedes realizar el cierre diario hasta que los siguientes usuarios cierren su turno de caja:</p>
+            <ul class="mb-0 fw-bold">
+                {% for a in abiertas %}
+                <li>{{ a.usuario }} (Desde: {{ a.fecha_apertura.strftime('%H:%M') }})</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+            <div class="card-header bg-dark text-white border-0 py-3">
+                <h5 class="fw-bold mb-0">Resumen Consolidado de Hoy</h5>
+            </div>
+            <div class="card-body p-4">
+                {% if resumen and resumen.turnos %}
+                <div class="row text-center mb-4">
+                    <div class="col-4 border-end">
+                        <div class="small text-muted text-uppercase fw-bold">Turnos</div>
+                        <div class="h3 fw-bold text-dark">{{ resumen.turnos }}</div>
+                    </div>
+                    <div class="col-4 border-end">
+                        <div class="small text-muted text-uppercase fw-bold">Egresos Totales</div>
+                        <div class="h3 fw-bold text-danger">$ {{ "%.2f"|format(resumen.t_egresos) }}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted text-uppercase fw-bold">Saldo Entregado</div>
+                        <div class="h3 fw-bold text-success">$ {{ "%.2f"|format(resumen.saldo_real_entregado) }}</div>
+                    </div>
+                </div>
+                
+                <h6 class="fw-bold border-bottom pb-2 mb-3">Desglose de Ingresos</h6>
+                <div class="row mb-2">
+                    <div class="col-6 text-muted">Ventas Efectivo:</div>
+                    <div class="col-6 text-end fw-bold">$ {{ "%.2f"|format(resumen.t_efectivo) }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-6 text-muted">Ventas Tarjeta:</div>
+                    <div class="col-6 text-end fw-bold">$ {{ "%.2f"|format(resumen.t_tarjeta) }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-6 text-muted">Ventas Transferencia:</div>
+                    <div class="col-6 text-end fw-bold">$ {{ "%.2f"|format(resumen.t_trans) }}</div>
+                </div>
+                
+                {% if not abiertas %}
+                <form action="{{ url_for('ejecutar_cierre_diario') }}" method="POST" class="mt-4">
+                    <textarea name="observaciones" class="form-control bg-light border-0 mb-3" rows="2" placeholder="Observaciones del cierre diario (opcional)..."></textarea>
+                    <button type="submit" class="btn btn-reina w-100 rounded-pill py-3 fw-bold shadow-sm" onclick="return confirm('¿Seguro que deseas consolidar el cierre de hoy?')">
+                        <i class="fas fa-check-double me-2"></i> EJECUTAR CIERRE DIARIO
+                    </button>
+                </form>
+                {% endif %}
+                
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-folder-open fa-3x mb-3 opacity-25"></i>
+                    <p>No hay turnos cerrados en el día de hoy para consolidar.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- COLUMNA DERECHA: HISTORIAL -->
+    <div class="col-md-5 mb-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="fw-bold mb-0">Historial de Cierres Diarios</h6>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for h in historial %}
+                <div class="list-group-item p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <strong class="text-dark"><i class="fas fa-calendar-day text-success me-2"></i>{{ h.fecha_dia.strftime('%d/%m/%Y') }}</strong>
+                        <span class="badge bg-light text-dark border">{{ h.fecha_cierre.strftime('%H:%M') }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted">
+                        <span>Total Ventas:</span>
+                        <span class="fw-bold text-dark">$ {{ "%.2f"|format(h.total_ventas) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted">
+                        <span>Caja Entregada:</span>
+                        <span class="fw-bold text-success">$ {{ "%.2f"|format(h.saldo_final_caja) }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center p-4 text-muted small">No hay historial de cierres.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

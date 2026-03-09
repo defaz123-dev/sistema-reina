@@ -18,8 +18,10 @@ Propuesta integral para la implementación del **Sistema Reina (Versión Enterpr
 ### Pilares Tecnológicos:
 *   **Facturación SRI Motor Pro:** Firma digital XAdES-BES y generación de RIDE en **Alta Fidelidad (FPDF)**.
 *   **Notificaciones Inteligentes:** Envío automático de XML y PDF profesional al correo del cliente.
-*   **Seguridad y Validación:** Motor SRI para validación de identidades en tiempo real y cumplimiento legal de montos máximos.
-*   **Gestión Multisucursal:** Control de inventarios, recetas y secuenciales de facturación por cada punto de venta.
+*   **Cierre de Caja Multiturno:** Gestión de turnos individuales con cuadre detallado (Efectivo, Tarjetas, Transferencias) y justificación de descuadres.
+*   **Módulo de Egresos:** Control de gastos operativos y compras menores que afectan el flujo de caja sin alterar el inventario.
+*   **Reportes Estratégicos:** Panel de control con historial de cierres, rentabilidad por producto y utilidad neta real.
+*   **Gestión Multisucursal:** Control de inventarios, recetas y secuenciales de facturación por cada local.
 
 ---
 
