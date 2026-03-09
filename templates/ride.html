@@ -92,7 +92,7 @@
     </style>
 </head>
 <body>
-    <button class="btn-print" onclick="window.print()">🖨️ IMPRIMIR FACTURA</button>
+    <button class="btn-print" onclick="window.print()">🖨️ IMPRIMIR {% if d.es_nota_credito %}NOTA DE CRÉDITO{% else %}FACTURA{% endif %}</button>
 
     <div class="paper">
         <table class="header-table">
@@ -113,7 +113,7 @@
                 <td style="width: 50%;">
                     <div class="box">
                         <div class="ruc-text">R.U.C.: {{ d.ruc_emisor }}</div>
-                        <div class="factura-text">FACTURA</div>
+                        <div class="factura-text">{% if d.es_nota_credito %}NOTA DE CRÉDITO{% else %}FACTURA{% endif %}</div>
                         <div class="num-doc">No. {{ d.clave_acceso[24:27] }}-{{ d.clave_acceso[27:30] }}-{{ d.clave_acceso[30:39] }}</div>
                         
                         <div style="margin-top: 10px;"><span class="label">NÚMERO DE AUTORIZACIÓN:</span></div>
@@ -142,9 +142,13 @@
                     <td><span class="label">FECHA EMISIÓN:</span> <span class="value">{{ d.fecha_emision }}</span></td>
                     <td><span class="label">GUÍA DE REMISIÓN:</span> <span class="value">N/A</span></td>
                 </tr>
-                {% if d.direccion %}
-                <tr>
-                    <td colspan="2"><span class="label">DIRECCIÓN:</span> <span class="value">{{ d.direccion }}</span></td>
+                {% if d.es_nota_credito %}
+                <tr style="border-top: 1px solid #000;">
+                    <td colspan="2" style="padding-top: 8px;">
+                        <div><span class="label">COMPROBANTE QUE SE MODIFICA:</span> <span class="value">FACTURA {{ d.doc_modificado }}</span></div>
+                        <div><span class="label">FECHA DE EMISIÓN (COMPROBANTE A MODIFICAR):</span> <span class="value">{{ d.fecha_emision }}</span></div>
+                        <div><span class="label">RAZÓN DE MODIFICACIÓN:</span> <span class="value">{{ d.motivo_anulacion }}</span></div>
+                    </td>
                 </tr>
                 {% endif %}
             </table>

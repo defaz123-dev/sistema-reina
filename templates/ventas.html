@@ -65,8 +65,12 @@
                         <td><span class="badge bg-info text-dark">{{ v.forma_pago }}</span></td>
                         <td class="text-end fw-bold text-success">${{ "%.2f"|format(v.total) }}</td>
                         <td class="text-center">
-                            {% if v.autorizado_sri %}
-                                <span class="badge bg-success rounded-pill px-3" title="Autorización: {{ v.numero_autorizacion }}">
+                            {% if v.estado_sri == 'ANULACIÓN EN PROCESO' %}
+                                <span class="badge bg-warning text-dark rounded-pill px-3">
+                                    <i class="fas fa-spinner fa-spin me-1"></i> CLAVE EN PROCESO (ANULACIÓN)
+                                </span>
+                            {% elif v.autorizado_sri %}
+                                <span class="badge bg-success rounded-pill px-3">
                                     <i class="fas fa-check-circle me-1"></i> AUTORIZADO
                                 </span>
                             {% else %}
@@ -75,6 +79,7 @@
                                 </span>
                             {% endif %}
                         </td>
+
                         <td class="text-center">
                             {% if v.email_enviado %}
                                 <i class="fas fa-envelope email-sent" title="Enviado al cliente"></i>
@@ -87,7 +92,7 @@
                                 <i class="fas fa-print fa-lg action-icon"></i>
                             </a>
 
-                            {% if v.autorizado_sri %}
+                            {% if v.autorizado_sri or v.anulada %}
                             <a href="{{ url_for('ver_ride', id=v.id) }}" target="_blank" class="btn btn-outline-danger border-0" title="Ver RIDE PDF">
                                 <i class="fas fa-file-pdf fa-lg action-icon"></i>
                             </a>
@@ -96,10 +101,20 @@
                             </a>
                             {% endif %}
                             
-                            {% if not v.autorizado_sri %}
+                            {% if not v.autorizado_sri and v.estado_sri != 'ANULACIÓN EN PROCESO' %}
                             <a href="{{ url_for('reintentar_sri', id=v.id) }}" class="btn btn-outline-primary border-0" title="Reintentar envío al SRI" onclick="showLoading()">
                                 <i class="fas fa-cloud-upload-alt fa-lg action-icon"></i>
                             </a>
+                            {% endif %}
+
+                            {% if v.autorizado_sri and not v.anulada %}
+                            <button class="btn btn-outline-danger btn-sm rounded-pill px-3 ms-1" onclick="prepararAnulacion({{ v.id }}, '{{ v.establecimiento }}-{{ v.punto_emision }}-{{ v.secuencial }}')" title="Anular Factura">
+                                <i class="fas fa-times me-1"></i> ANULAR
+                            </button>
+                            {% endif %}
+                            
+                            {% if v.anulada %}
+                            <span class="badge bg-danger rounded-pill px-3 ms-1">ANULADA</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -110,8 +125,39 @@
     </div>
 </div>
 
+<!-- Modal de Anulación -->
+<div class="modal fade" id="modalAnulacion" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-danger text-white border-0 py-3">
+                <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i> Anular Factura</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formAnulacion" method="POST">
+                <div class="modal-body p-4">
+                    <p class="mb-3">¿Está seguro de anular la factura <b id="nroFacturaAnular"></b>? Esta acción es irreversible ante el SRI.</p>
+                    <div class="mb-0">
+                        <label class="form-label fw-bold">Motivo de Anulación</label>
+                        <textarea name="motivo" class="form-control rounded-3" rows="3" placeholder="Ej: Error en datos del cliente, devolución, etc." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-3 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">CANCELAR</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">CONFIRMAR ANULACIÓN</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% block scripts %}
 <script>
+    function prepararAnulacion(id, nro) {
+        document.getElementById('nroFacturaAnular').innerText = nro;
+        document.getElementById('formAnulacion').action = `/ventas/anular/${id}`;
+        new bootstrap.Modal(document.getElementById('modalAnulacion')).show();
+    }
+
     $(document).ready(function() {
         if (!$.fn.DataTable.isDataTable('#tablaVentas')) {
             $('#tablaVentas').DataTable({

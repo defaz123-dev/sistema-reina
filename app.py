@@ -419,7 +419,7 @@ def guardar_producto():
             registrar_auditoria('PRODUCTO', f"Actualizó producto: {nom} ({cod})")
             p_id = d['id']
         else: 
-            cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s)", (cod, nom, p_base, d['categoria_id'], u_id, u_id))
+            cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (cod, nom, p_base, d['categoria_id'], u_id, u_id))
             p_id = cur.lastrowid
             registrar_auditoria('PRODUCTO', f"Creó producto: {nom} ({cod})")
     
@@ -601,7 +601,7 @@ def consultar_datos_sri(clave):
 @admin_required
 def proveedores():
     cur = mysql.connection.cursor(); cur.execute("SELECT p.*, t.nombre as tipo_comprobante_nombre FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id")
-    p = cur.fetchall(); cur.execute("SELECT * FROM tipos_comprobantes"); t = cur.fetchall(); cur.close()
+    p = cur.fetchall(); cur.execute("SELECT * FROM tipos_identificacion"); t = cur.fetchall(); cur.close()
     return render_template('proveedores.html', proveedores=p, tipos=t)
 
 @app.route('/proveedores/guardar', methods=['POST'])
@@ -758,112 +758,173 @@ def guardar_empresa():
 
 def enviar_comprobante_email(venta_id, forzar=False):
     """
-    Genera PDF, adjunta XML y envía por correo al cliente usando la API de BREVO.
-    Incluye validación para evitar envíos duplicados a menos que se fuerce.
+    Genera PDF y XML basándose ÚNICAMENTE en el XML autorizado del SRI.
+    Extrae datos de forma RESILIENTE para evitar errores de NoneType.
     """
     import base64, requests
     
+    def log_mail(msg):
+        print(f"DEBUG MAIL: {msg}")
+        with open("email_error.log", "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now()}: {msg}\n")
+
     cur = mysql.connection.cursor()
-    cur.execute("SELECT v.*, c.email as cliente_email, c.nombres, c.apellidos FROM ventas v JOIN clientes c ON v.cliente_id = c.id WHERE v.id = %s", (venta_id,))
+    cur.execute("""
+        SELECT v.anulada, v.xml_autorizado, v.numero_autorizacion, v.clave_acceso_sri, v.fecha, v.forma_pago,
+               c.email as cliente_email, c.nombres, c.apellidos,
+               a.nc_xml_autorizado, a.nc_clave_acceso, a.nc_numero_autorizacion
+        FROM ventas v 
+        JOIN clientes c ON v.cliente_id = c.id 
+        LEFT JOIN anulaciones_factura a ON v.id = a.venta_id
+        WHERE v.id = %s
+    """, (venta_id,))
     v = cur.fetchone()
     
-    # VALIDACIÓN: Evitar envíos duplicados (si no se fuerza el envío manual)
-    if not v or (v.get('email_enviado') and not forzar):
-        if cur: cur.close()
-        return True # Ya fue enviado o no existe, no procesamos de nuevo automáticamete
-
-    # VALIDACIÓN: Verificar si tiene XML autorizado
-    if not v.get('xml_autorizado'):
-        if cur: cur.close()
-        return False # No se puede enviar si no está autorizada
-
-    cur.execute("SELECT * FROM empresa LIMIT 1"); emp = cur.fetchone()
-    
-    # VERIFICACIÓN ESTRICTA: Si no hay email registrado o es inválido, no hace nada.
-    if not v['cliente_email'] or str(v['cliente_email']).strip() == '' or '@' not in str(v['cliente_email']):
+    if not v:
+        log_mail(f"Venta ID {venta_id} no encontrada.")
         if cur: cur.close()
         return False
 
-    if not emp or not emp['email_envio_automatico']:
+    # PRIORIDAD NC
+    es_nc = True if (v['anulada'] and v['nc_xml_autorizado']) else False
+    xml_str = v['nc_xml_autorizado'] if es_nc else v['xml_autorizado']
+    clave_acc = v['nc_clave_acceso'] if es_nc else v['clave_acceso_sri']
+    num_aut = v['nc_numero_autorizacion'] if es_nc else v['numero_autorizacion']
+    tipo_doc_nombre = "Nota de Credito" if es_nc else "Factura"
+
+    if not xml_str:
+        log_mail(f"XML no disponible para Venta {venta_id}")
         if cur: cur.close()
         return False
+
+    cur.execute("SELECT * FROM empresa LIMIT 1"); emp = cur.fetchone(); cur.close()
 
     try:
-        # 1. Extraer datos del RIDE
         import xml.etree.ElementTree as ET
-        root = ET.fromstring(v['xml_autorizado']); f_xml = root.find('.//factura') or root
-        it, inf = f_xml.find('infoTributaria'), f_xml.find('infoFactura')
-        datos = {
-            'ruc_emisor': it.find('ruc').text, 'razon_social': it.find('razonSocial').text, 'nombre_comercial': it.find('nombreComercial').text if it.find('nombreComercial') is not None else it.find('razonSocial').text,
-            'dir_matriz': it.find('dirMatriz').text, 'clave_acceso': it.find('claveAcceso').text, 'num_autorizacion': v['numero_autorizacion'], 'fecha_autorizacion': v['fecha'].strftime('%d/%m/%Y %H:%M'),
-            'ambiente': 'PRODUCCIÓN' if it.find('ambiente').text == '2' else 'PRUEBAS', 'obligado_contabilidad': inf.find('obligadoContabilidad').text if inf.find('obligadoContabilidad') is not None else 'NO',
-            'cliente_nombre': inf.find('razonSocialComprador').text, 'cliente_id': inf.find('identificacionComprador').text, 'fecha_emision': inf.find('fechaEmision').text, 'subtotal_0': 0.0, 'subtotal_15': 0.0, 'iva_valor': 0.0, 'total': float(inf.find('importeTotal').text), 'detalles': [],
-            'email': v['cliente_email'], 'forma_pago': v['forma_pago']
-        }
-        for ti in inf.find('totalConImpuestos').findall('totalImpuesto'):
-            if ti.find('codigoPorcentaje').text == '4': datos['subtotal_15'], datos['iva_valor'] = float(ti.find('baseImponible').text), float(ti.find('valor').text)
-            elif ti.find('codigoPorcentaje').text == '0': datos['subtotal_0'] = float(ti.find('baseImponible').text)
-        for det_xml in f_xml.find('detalles').findall('detalle'):
-            datos['detalles'].append({'codigo': det_xml.find('codigoPrincipal').text, 'descripcion': det_xml.find('descripcion').text, 'cantidad': float(det_xml.find('cantidad').text), 'precio_unitario': float(det_xml.find('precioUnitario').text), 'total': float(det_xml.find('precioTotalSinImpuesto').text)})
+        # Limpiar posibles envoltorios del SRI (CDATA o autorizacion)
+        if '<comprobante>' in xml_str and '</comprobante>' in xml_str:
+            import html
+            xml_str = html.unescape(xml_str.split('<comprobante>')[1].split('</comprobante>')[0])
         
-        # GENERAR CÓDIGO DE BARRAS EN BASE64 PARA PDF
+        root = ET.fromstring(xml_str.strip())
+        
+        # Ayudante para buscar nodos ignorando namespaces
+        def find_node(parent, tag_name):
+            if parent is None: return None
+            # Primero intentamos búsqueda directa
+            res = parent.find(tag_name)
+            if res is not None: return res
+            # Si no, recorremos todos los nodos buscando el tag local
+            for node in parent.iter():
+                if tag_name in node.tag: return node
+            return None
+
+        def g_txt(parent, tag_name, default=''):
+            node = find_node(parent, tag_name)
+            return node.text.strip() if node is not None and node.text else default
+
+        it = find_node(root, 'infoTributaria')
+        if it is None: it = root if 'infoTributaria' in root.tag else None
+        if it is None: raise Exception("infoTributaria no hallada en el XML")
+
+        datos = {
+            'ruc_emisor': g_txt(it, 'ruc'),
+            'razon_social': g_txt(it, 'razonSocial'),
+            'nombre_comercial': g_txt(it, 'nombreComercial', g_txt(it, 'razonSocial')),
+            'dir_matriz': g_txt(it, 'dirMatriz'),
+            'clave_acceso': clave_acc,
+            'num_autorizacion': num_aut,
+            'fecha_autorizacion': v['fecha'].strftime('%d/%m/%Y %H:%M'),
+            'ambiente': 'PRODUCCIÓN' if g_txt(it, 'ambiente') == '2' else 'PRUEBAS',
+            'detalles': [],
+            'email': v['cliente_email'],
+            'es_nota_credito': es_nc
+        }
+
+        if es_nc:
+            inf = find_node(root, 'infoNotaCredito')
+            datos.update({
+                'cliente_nombre': g_txt(inf, 'razonSocialComprador'),
+                'cliente_id': g_txt(inf, 'identificacionComprador'),
+                'fecha_emision': g_txt(inf, 'fechaEmision'),
+                'total': float(g_txt(inf, 'valorModificacion', '0')),
+                'doc_modificado': g_txt(inf, 'numDocModificado'),
+                'motivo_anulacion': g_txt(inf, 'motivo'),
+                'subtotal_0': 0.0, 'subtotal_15': 0.0, 'iva_valor': 0.0
+            })
+        else:
+            inf = find_node(root, 'infoFactura')
+            datos.update({
+                'cliente_nombre': g_txt(inf, 'razonSocialComprador'),
+                'cliente_id': g_txt(inf, 'identificacionComprador'),
+                'fecha_emision': g_txt(inf, 'fechaEmision'),
+                'total': float(g_txt(inf, 'importeTotal', '0')),
+                'obligado_contabilidad': g_txt(inf, 'obligadoContabilidad', 'NO'),
+                'subtotal_0': 0.0, 'subtotal_15': 0.0, 'iva_valor': 0.0,
+                'forma_pago': v['forma_pago']
+            })
+
+        # Totales
+        if inf is not None:
+            # Buscamos todos los totalImpuesto en cualquier nivel bajo info
+            for ti in inf.iter():
+                if 'totalImpuesto' in ti.tag:
+                    cp = g_txt(ti, 'codigoPorcentaje')
+                    base = float(g_txt(ti, 'baseImponible', '0'))
+                    val = float(g_txt(ti, 'valor', '0'))
+                    if cp == '4': datos['subtotal_15'], datos['iva_valor'] = base, val
+                    elif cp == '0': datos['subtotal_0'] = base
+
+        # Detalles
+        det_node = find_node(root, 'detalles')
+        if det_node is not None:
+            for d in det_node.findall('*'):
+                datos['detalles'].append({
+                    'codigo': g_txt(d, 'codigoPrincipal', g_txt(d, 'codigoInterno')),
+                    'descripcion': g_txt(d, 'descripcion'),
+                    'cantidad': float(g_txt(d, 'cantidad', '0')),
+                    'precio_unitario': float(g_txt(d, 'precioUnitario', '0')),
+                    'total': float(g_txt(d, 'precioTotalSinImpuesto', '0'))
+                })
+
+        # CÓDIGO DE BARRAS
         import barcode
         from barcode.writer import ImageWriter
-        code128 = barcode.get('code128', datos['clave_acceso'], writer=ImageWriter())
+        code128 = barcode.get('code128', clave_acc, writer=ImageWriter())
         barcode_io = io.BytesIO()
         code128.write(barcode_io, options={"write_text": False, "module_height": 10})
         datos['barcode_64'] = base64.b64encode(barcode_io.getvalue()).decode('utf-8')
 
-        # 2. Generar PDF usando FPDF
+        # Generar PDF
         import ride_fpdf
         pdf_data = ride_fpdf.generar_pdf_fpdf(datos, emp)
 
-        # 3. Enviar vía API de BREVO
-        # Usamos fragmentación para evitar bloqueos de seguridad de GitHub pero mantener funcionalidad local
+        # Enviar vía Brevo
         kb_p1 = "xkeysib-47e7120cc4313c218521b79c83b2e9ca2182ea600bcd08792733d2b556ebaa82"
         kb_p2 = "-hH7UpUUP2wA4dlSM"
         brevo_api_key = os.environ.get('BREVO_API_KEY', kb_p1 + kb_p2)
         
-        url = "https://api.brevo.com/v3/smtp/email"
-        headers = {
-            "api-key": brevo_api_key,
-            "content-type": "application/json",
-            "accept": "application/json"
-        }
-        
         payload = {
             "sender": {"name": emp['nombre_comercial'], "email": emp['email_user']},
             "to": [{"email": v['cliente_email'], "name": f"{v['nombres']} {v['apellidos']}"}],
-            "subject": f"Comprobante Electronico - {datos['clave_acceso']}",
-            "htmlContent": f"<p>Estimado(a) <b>{v['nombres']} {v['apellidos']}</b>,</p><p>Adjuntamos su comprobante electrónico autorizado por el SRI.</p><p>Gracias por su compra.</p>",
+            "subject": f"{tipo_doc_nombre} Electronica - {clave_acc}",
+            "htmlContent": f"<p>Estimado(a) <b>{v['nombres']} {v['apellidos']}</b>,</p><p>Adjuntamos su <b>{tipo_doc_nombre}</b> autorizada por el SRI.</p><p>Gracias por su atención.</p>",
             "attachment": [
-                {
-                    "content": base64.b64encode(pdf_data).decode('utf-8'),
-                    "name": f"RIDE_{v['secuencial']}.pdf"
-                },
-                {
-                    "content": base64.b64encode(v['xml_autorizado'].encode('utf-8')).decode('utf-8'),
-                    "name": f"{v['clave_acceso_sri']}.xml"
-                }
+                {"content": base64.b64encode(pdf_data).decode('utf-8'), "name": f"{tipo_doc_nombre.replace(' ','_')}_{clave_acc[-9:]}.pdf"},
+                {"content": base64.b64encode(xml_str.encode('utf-8')).decode('utf-8'), "name": f"{clave_acc}.xml"}
             ]
         }
+        res = requests.post("https://api.brevo.com/v3/smtp/email", headers={"api-key": brevo_api_key, "content-type": "application/json"}, json=payload)
         
-        response = requests.post(url, headers=headers, json=payload)
-        
-        if response.status_code in [200, 201]:
-            print("DEBUG: Email enviado exitosamente vía BREVO API.")
-            cur.execute("UPDATE ventas SET email_enviado = 1 WHERE id = %s", (venta_id,))
-            mysql.connection.commit()
-            cur.close(); return True
+        if res.status_code in [200, 201]:
+            log_mail(f"EXITO: {tipo_doc_nombre} enviada a {v['cliente_email']}")
+            return True
         else:
-            print(f"ERROR BREVO API ({response.status_code}): {response.text}")
-            cur.close(); return False
-
+            log_mail(f"Error Brevo ({res.status_code}): {res.text}")
+            return False
     except Exception as e:
-        import traceback
-        print(f"ERROR CRÍTICO ENVIANDO EMAIL VIA RESEND: {str(e)}")
-        print(traceback.format_exc())
-        if cur: cur.close()
+        log_mail(f"Fallo critico: {str(e)}")
+        log_mail(traceback.format_exc())
         return False
 
 # --- CAJA Y TURNOS ---
@@ -1035,17 +1096,52 @@ def cierre_diario():
             SUM(monto_ventas_transferencia) as t_trans,
             SUM(monto_egresos) as t_egresos,
             SUM(monto_final_real) as saldo_real_entregado
-        FROM sesiones_caja 
+        FROM sesiones_caja
         WHERE sucursal_id = %s AND estado = 'CERRADA' AND DATE(fecha_cierre) = %s
     """, (s_id, hoy))
     resumen = cur.fetchone()
-    
+
+    # Detalle por cajero (sesiones cerradas hoy)
+    cur.execute("""
+        SELECT 
+            s.id,
+            u.usuario,
+            s.fecha_apertura,
+            s.fecha_cierre,
+            s.monto_inicial,
+            s.monto_ventas_efectivo,
+            s.monto_ventas_tarjeta,
+            s.monto_ventas_transferencia,
+            s.monto_egresos,
+            s.monto_final_real
+        FROM sesiones_caja s
+        JOIN usuarios u ON s.usuario_id = u.id
+        WHERE s.sucursal_id = %s AND s.estado = 'CERRADA' AND DATE(s.fecha_cierre) = %s
+        ORDER BY s.fecha_cierre DESC
+    """, (s_id, hoy))
+    detalle_cajeros = cur.fetchall()
+
+    # Por cada sesión, traer su desglose de tarjetas y lista de egresos
+    for ses in detalle_cajeros:
+        # Desglose tarjetas
+        cur.execute("""
+            SELECT ct.nombre as tarjeta, SUM(v.total) as total 
+            FROM ventas v 
+            JOIN cat_tarjetas ct ON v.id_tarjeta = ct.id 
+            WHERE v.sesion_caja_id = %s AND v.forma_pago = 'TARJETA'
+            GROUP BY ct.id
+        """, (ses['id'],))
+        ses['desglose_tarjetas'] = cur.fetchall()
+
+        # Lista egresos
+        cur.execute("SELECT descripcion, monto FROM egresos WHERE sesion_caja_id = %s", (ses['id'],))
+        ses['lista_egresos'] = cur.fetchall()
+
     cur.execute("SELECT * FROM cierres_diarios WHERE sucursal_id = %s ORDER BY fecha_cierre DESC LIMIT 5", (s_id,))
     historial = cur.fetchall()
-    
-    cur.close()
-    return render_template('cierre_diario.html', abiertas=abiertas, resumen=resumen, historial=historial, hoy=hoy)
 
+    cur.close()
+    return render_template('cierre_diario.html', abiertas=abiertas, resumen=resumen, historial=historial, hoy=hoy, detalle_cajeros=detalle_cajeros)
 @app.route('/caja/ejecutar_cierre_diario', methods=['POST'])
 @login_required
 @admin_required
@@ -1056,6 +1152,13 @@ def ejecutar_cierre_diario():
     obs = request.form.get('observaciones', '')
     hoy = datetime.now().strftime('%Y-%m-%d')
     
+    # 1. VALIDACIÓN CRÍTICA: ¿Ya se hizo el cierre hoy?
+    cur.execute("SELECT id FROM cierres_diarios WHERE sucursal_id = %s AND fecha_dia = %s", (s_id, hoy))
+    if cur.fetchone():
+        cur.close()
+        flash('El Cierre Diario para hoy ya fue realizado previamente.', 'warning')
+        return redirect(url_for('cierre_diario'))
+    
     # Verificar sesiones abiertas
     cur.execute("SELECT id FROM sesiones_caja WHERE sucursal_id = %s AND estado = 'ABIERTA'", (s_id,))
     if cur.fetchone():
@@ -1064,6 +1167,7 @@ def ejecutar_cierre_diario():
         
     cur.execute("""
         SELECT 
+            COUNT(id) as turnos_conteo,
             SUM(monto_ventas_efectivo + monto_ventas_tarjeta + monto_ventas_transferencia) as total_v,
             SUM(monto_ventas_efectivo) as t_efectivo,
             SUM(monto_ventas_tarjeta) as t_tarjeta,
@@ -1080,9 +1184,9 @@ def ejecutar_cierre_diario():
         return redirect(url_for('cierre_diario'))
         
     cur.execute("""
-        INSERT INTO cierres_diarios (sucursal_id, usuario_id, fecha_dia, total_ventas, total_efectivo, total_tarjetas, total_transferencias, total_egresos, saldo_final_caja, observaciones)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """, (s_id, u_id, hoy, res['total_v'], res['t_efectivo'], res['t_tarjeta'], res['t_trans'], res['t_egresos'], res['saldo_real'], obs))
+        INSERT INTO cierres_diarios (sucursal_id, usuario_id, cantidad_turnos, fecha_dia, total_ventas, total_efectivo, total_tarjetas, total_transferencias, total_egresos, saldo_final_caja, observaciones)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (s_id, u_id, res['turnos_conteo'], hoy, res['total_v'], res['t_efectivo'], res['t_tarjeta'], res['t_trans'], res['t_egresos'], res['saldo_real'], obs))
     
     mysql.connection.commit()
     registrar_auditoria('CAJA_ADMIN', f"Ejecutó Cierre Diario. Saldo Consolidado: ${res['saldo_real']:.2f}")
@@ -1210,6 +1314,44 @@ def reintentar_sri(id):
     except Exception as e: flash(str(e), 'danger')
     return redirect(url_for('historial_ventas'))
 
+@app.route('/ventas/anulaciones')
+@login_required
+@admin_required
+def listar_anulaciones():
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        SELECT a.*, v.secuencial, v.establecimiento, v.punto_emision, v.fecha as fecha_venta, 
+               c.nombres, c.apellidos, u.usuario as cajero
+        FROM anulaciones_factura a
+        JOIN ventas v ON a.venta_id = v.id
+        JOIN clientes c ON v.cliente_id = c.id
+        JOIN usuarios u ON v.usuario_id = u.id
+        ORDER BY a.fecha_solicitud DESC
+    """)
+    anulaciones = cur.fetchall()
+    cur.close()
+    return render_template('anulaciones.html', anulaciones=anulaciones)
+
+@app.route('/ventas/anular/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def anular_venta(id):
+    import facturacion_sri
+    motivo = request.form.get('motivo', 'ANULACIÓN SOLICITADA POR EL USUARIO')
+    try:
+        success, message = facturacion_sri.anular_factura_sri(id, motivo, mysql, session.get('user_id'))
+        if success:
+            # DISPARAR ENVÍO DE EMAIL DE LA NOTA DE CRÉDITO
+            enviar_comprobante_email(id, forzar=True)
+            flash(message + " Se ha enviado la Nota de Crédito al cliente.", 'success')
+            registrar_auditoria('ANULACION', f"Factura ID {id} anulada con NC exitosamente.")
+        else:
+            flash(f"No se pudo anular: {message}", 'danger')
+    except Exception as e:
+        flash(f"Error inesperado: {str(e)}", 'danger')
+    
+    return redirect(url_for('historial_ventas'))
+
 @app.route('/ventas/reenviar_email/<int:id>')
 @login_required
 def reenviar_email_venta(id):
@@ -1225,27 +1367,84 @@ def reenviar_email_venta(id):
 @app.route('/venta/ride/<int:id>')
 @login_required
 def ver_ride(id):
-    cur = mysql.connection.cursor(); cur.execute("SELECT xml_autorizado, numero_autorizacion, clave_acceso_sri, fecha, forma_pago FROM ventas WHERE id=%s", (id,)); v = cur.fetchone()
-    if not v or not v['xml_autorizado']: cur.close(); return "RIDE no disponible", 404
+    cur = mysql.connection.cursor()
+    # Verificar si está anulada para traer datos de la Nota de Crédito
+    cur.execute("SELECT v.*, a.nc_xml_autorizado, a.nc_numero_autorizacion, a.nc_clave_acceso FROM ventas v LEFT JOIN anulaciones_factura a ON v.id = a.venta_id WHERE v.id=%s", (id,))
+    v = cur.fetchone()
+    
+    # Decidimos qué XML usar
+    xml_data = v['nc_xml_autorizado'] if (v['anulada'] and v['nc_xml_autorizado']) else v['xml_autorizado']
+    num_aut = v['nc_numero_autorizacion'] if (v['anulada'] and v['nc_xml_autorizado']) else v['numero_autorizacion']
+    clave = v['nc_clave_acceso'] if (v['anulada'] and v['nc_xml_autorizado']) else v['clave_acceso_sri']
+    es_nc = True if (v['anulada'] and v['nc_xml_autorizado']) else False
+
+    if not v or not xml_data: cur.close(); return "RIDE no disponible", 404
+    
     import xml.etree.ElementTree as ET
     try:
-        root = ET.fromstring(v['xml_autorizado']); f_xml = root.find('.//factura') or root
-        it, inf = f_xml.find('infoTributaria'), f_xml.find('infoFactura')
+        root = ET.fromstring(xml_data); 
+        f_xml = root.find('.//factura') or root.find('.//notaCredito') or root
+        it = f_xml.find('infoTributaria')
+        
         datos = {
-            'ruc_emisor': it.find('ruc').text, 'razon_social': it.find('razonSocial').text, 'nombre_comercial': it.find('nombreComercial').text if it.find('nombreComercial') is not None else it.find('razonSocial').text,
-            'dir_matriz': it.find('dirMatriz').text, 'clave_acceso': it.find('claveAcceso').text, 'num_autorizacion': v['numero_autorizacion'], 'fecha_autorizacion': v['fecha'].strftime('%d/%m/%Y %H:%M'),
-            'ambiente': 'PRODUCCIÓN' if it.find('ambiente').text == '2' else 'PRUEBAS', 'obligado_contabilidad': inf.find('obligadoContabilidad').text if inf.find('obligadoContabilidad') is not None else 'NO',
-            'cliente_nombre': inf.find('razonSocialComprador').text, 'cliente_id': inf.find('identificacionComprador').text, 'fecha_emision': inf.find('fechaEmision').text, 'subtotal_0': 0.0, 'subtotal_15': 0.0, 'iva_valor': 0.0, 'total': float(inf.find('importeTotal').text), 'detalles': [],
-            'forma_pago': v['forma_pago']
+            'ruc_emisor': it.find('ruc').text, 
+            'razon_social': it.find('razonSocial').text, 
+            'nombre_comercial': it.find('nombreComercial').text if it.find('nombreComercial') is not None else it.find('razonSocial').text,
+            'dir_matriz': it.find('dirMatriz').text, 
+            'clave_acceso': clave, 
+            'num_autorizacion': num_aut, 
+            'fecha_autorizacion': v['fecha'].strftime('%d/%m/%Y %H:%M'),
+            'ambiente': 'PRODUCCIÓN' if it.find('ambiente').text == '2' else 'PRUEBAS',
+            'detalles': [],
+            'es_nota_credito': es_nc
         }
+
+        if es_nc:
+            inf = f_xml.find('infoNotaCredito')
+            datos.update({
+                'cliente_nombre': inf.find('razonSocialComprador').text,
+                'cliente_id': inf.find('identificacionComprador').text,
+                'fecha_emision': inf.find('fechaEmision').text,
+                'total': float(inf.find('valorModificacion').text),
+                'doc_modificado': inf.find('numDocModificado').text,
+                'motivo_anulacion': inf.find('motivo').text,
+                'subtotal_0': 0.0, 'subtotal_15': 0.0, 'iva_valor': 0.0
+            })
+        else:
+            inf = f_xml.find('infoFactura')
+            datos.update({
+                'cliente_nombre': inf.find('razonSocialComprador').text,
+                'cliente_id': inf.find('identificacionComprador').text,
+                'fecha_emision': inf.find('fechaEmision').text,
+                'total': float(inf.find('importeTotal').text),
+                'obligado_contabilidad': inf.find('obligadoContabilidad').text if inf.find('obligadoContabilidad') is not None else 'NO',
+                'subtotal_0': 0.0, 'subtotal_15': 0.0, 'iva_valor': 0.0,
+                'forma_pago': v['forma_pago']
+            })
+
+        # Totales e Impuestos (Lógica similar para ambos)
         for ti in inf.find('totalConImpuestos').findall('totalImpuesto'):
-            if ti.find('codigoPorcentaje').text == '4': datos['subtotal_15'], datos['iva_valor'] = float(ti.find('baseImponible').text), float(ti.find('valor').text)
-            elif ti.find('codigoPorcentaje').text == '0': datos['subtotal_0'] = float(ti.find('baseImponible').text)
-        for d in f_xml.find('detalles').findall('detalle'):
-            datos['detalles'].append({'codigo': d.find('codigoPrincipal').text, 'descripcion': d.find('descripcion').text, 'cantidad': float(d.find('cantidad').text), 'precio_unitario': float(d.find('precioUnitario').text), 'total': float(d.find('precioTotalSinImpuesto').text)})
+            if ti.find('codigoPorcentaje').text == '4': 
+                datos['subtotal_15'], datos['iva_valor'] = float(ti.find('baseImponible').text), float(ti.find('valor').text)
+            elif ti.find('codigoPorcentaje').text == '0': 
+                datos['subtotal_0'] = float(ti.find('baseImponible').text)
+
+        # Detalles
+        for d_node in f_xml.find('detalles').findall('detalle'):
+            datos['detalles'].append({
+                'codigo': (d_node.find('codigoPrincipal') or d_node.find('codigoInterno')).text, 
+                'descripcion': d_node.find('descripcion').text, 
+                'cantidad': float(d_node.find('cantidad').text), 
+                'precio_unitario': float(d_node.find('precioUnitario').text), 
+                'total': float(d_node.find('precioTotalSinImpuesto').text)
+            })
+
         cur.execute("SELECT * FROM empresa LIMIT 1"); emp = cur.fetchone(); cur.close()
         return render_template('ride.html', d=datos, empresa=emp)
-    except Exception as e: cur.close(); return str(e), 500
+    except Exception as e: 
+        import traceback
+        print(traceback.format_exc())
+        cur.close(); return str(e), 500
 
 @app.route('/venta/ticket/<int:id>')
 @login_required
@@ -1387,7 +1586,7 @@ def reportes():
     cur.execute("SELECT i.nombre, i.stock_actual, i.stock_minimo, u.nombre as unidad_medida, s.nombre as sucursal FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id JOIN sucursales s ON i.sucursal_id = s.id WHERE i.stock_actual <= i.stock_minimo"); crit = cur.fetchall()
     cur.execute("SELECT COUNT(*) as total_ventas, SUM(total) as monto_total, AVG(total) as ticket_promedio FROM ventas"); st = cur.fetchone()
     
-    # HISTORIAL DE CIERRES DE CAJA
+    # HISTORIAL DE CIERRES DE CAJA (SESIONES)
     cur.execute("""
         SELECT s.*, u.usuario, suc.nombre as sucursal_nombre 
         FROM sesiones_caja s 
@@ -1398,9 +1597,49 @@ def reportes():
         LIMIT 100
     """)
     cierres = cur.fetchall()
+
+    # HISTORIAL DE CIERRES DIARIOS CONSOLIDADOS
+    cur.execute("""
+        SELECT cd.*, u.usuario, suc.nombre as sucursal_nombre 
+        FROM cierres_diarios cd
+        JOIN usuarios u ON cd.usuario_id = u.id
+        JOIN sucursales suc ON cd.sucursal_id = suc.id
+        ORDER BY cd.fecha_dia DESC
+        LIMIT 100
+    """)
+    cierres_consolidados = cur.fetchall()
+
+    # Por cada cierre consolidado, traer el detalle agrupado de ese día
+    for c_con in cierres_consolidados:
+        # Traer nombres de cajeros que estuvieron en los turnos de ese día/sucursal
+        cur.execute("""
+            SELECT DISTINCT u.usuario 
+            FROM sesiones_caja s 
+            JOIN usuarios u ON s.usuario_id = u.id 
+            WHERE s.sucursal_id = %s AND DATE(s.fecha_apertura) = %s
+        """, (c_con['sucursal_id'], c_con['fecha_dia']))
+        cajeros_list = [row['usuario'] for row in cur.fetchall()]
+        c_con['cajeros'] = ", ".join(cajeros_list)
+
+        # Desglose global de tarjetas de ese día/sucursal
+        cur.execute("""
+            SELECT ct.nombre as tarjeta, SUM(v.total) as total 
+            FROM ventas v 
+            JOIN cat_tarjetas ct ON v.id_tarjeta = ct.id 
+            WHERE v.sucursal_id = %s AND DATE(v.fecha) = %s AND v.forma_pago = 'TARJETA'
+            GROUP BY ct.id
+        """, (c_con['sucursal_id'], c_con['fecha_dia']))
+        c_con['desglose_tarjetas'] = cur.fetchall()
+
+        # Lista global de egresos de ese día/sucursal
+        cur.execute("""
+            SELECT descripcion, monto FROM egresos 
+            WHERE sucursal_id = %s AND DATE(fecha) = %s
+        """, (c_con['sucursal_id'], c_con['fecha_dia']))
+        c_con['lista_egresos'] = cur.fetchall()
     
     cur.close()
-    return render_template('reportes.html', ventas=v, top_productos=t, rentabilidad=rent, franja_horaria=hor, formas_pago=pags, insumos_criticos=crit, stats=st, cierres_caja=cierres)
+    return render_template('reportes.html', ventas=v, top_productos=t, rentabilidad=rent, franja_horaria=hor, formas_pago=pags, insumos_criticos=crit, stats=st, cierres_caja=cierres, cierres_consolidados=cierres_consolidados)
 
 @app.route('/auditoria')
 @login_required

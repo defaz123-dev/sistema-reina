@@ -26,7 +26,7 @@
 
 <div class="row">
     <!-- COLUMNA IZQUIERDA: RESUMEN Y ACCIÓN -->
-    <div class="col-md-7 mb-4">
+    <div class="col-md-8 mb-4">
         {% if abiertas %}
         <div class="alert alert-danger border-0 shadow-sm rounded-4 mb-4">
             <h5 class="fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>¡Atención! Hay turnos abiertos</h5>
@@ -40,51 +40,147 @@
         {% endif %}
         
         <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
-            <div class="card-header bg-dark text-white border-0 py-3">
+            <div class="card-header bg-dark text-white border-0 py-3 d-flex justify-content-between align-items-center">
                 <h5 class="fw-bold mb-0">Resumen Consolidado de Hoy</h5>
+                <span class="badge bg-light text-dark fw-bold">{{ hoy }}</span>
             </div>
-            <div class="card-body p-4">
+            <div class="card-body p-0">
                 {% if resumen and resumen.turnos %}
-                <div class="row text-center mb-4">
-                    <div class="col-4 border-end">
-                        <div class="small text-muted text-uppercase fw-bold">Turnos</div>
-                        <div class="h3 fw-bold text-dark">{{ resumen.turnos }}</div>
-                    </div>
-                    <div class="col-4 border-end">
-                        <div class="small text-muted text-uppercase fw-bold">Egresos Totales</div>
-                        <div class="h3 fw-bold text-danger">$ {{ "%.2f"|format(resumen.t_egresos) }}</div>
-                    </div>
-                    <div class="col-4">
-                        <div class="small text-muted text-uppercase fw-bold">Saldo Entregado</div>
-                        <div class="h3 fw-bold text-success">$ {{ "%.2f"|format(resumen.saldo_real_entregado) }}</div>
-                    </div>
-                </div>
                 
-                <h6 class="fw-bold border-bottom pb-2 mb-3">Desglose de Ingresos</h6>
-                <div class="row mb-2">
-                    <div class="col-6 text-muted">Ventas Efectivo:</div>
-                    <div class="col-6 text-end fw-bold">$ {{ "%.2f"|format(resumen.t_efectivo) }}</div>
+                <!-- 1. DETALLE POR CAJERO PRIMERO -->
+                <div class="p-3 bg-light border-bottom">
+                    <h6 class="fw-bold text-primary mb-3"><i class="fas fa-users me-2"></i>1. Detalle de Turnos Cerrados</h6>
+                    <div class="table-responsive rounded-3 border">
+                        <table class="table table-hover align-middle mb-0 bg-white">
+                            <thead class="bg-light small text-uppercase fw-bold">
+                                <tr>
+                                    <th>Cajero</th>
+                                    <th>Horario</th>
+                                    <th class="text-end text-primary">Base</th>
+                                    <th class="text-end">Efectivo</th>
+                                    <th class="text-end">Tarjeta</th>
+                                    <th class="text-end">Transf.</th>
+                                    <th class="text-end text-danger">Egresos</th>
+                                    <th class="text-end fw-bold">Entregado</th>
+                                </tr>
+                            </thead>
+                            <tbody class="small">
+                                {% for d in detalle_cajeros %}
+                                <tr>
+                                    <td class="fw-bold text-dark">{{ d.usuario }}</td>
+                                    <td class="text-muted small">
+                                        {{ d.fecha_apertura.strftime('%H:%M') }} - {{ d.fecha_cierre.strftime('%H:%M') }}
+                                    </td>
+                                    <td class="text-end text-primary fw-bold">$ {{ "%.2f"|format(d.monto_inicial) }}</td>
+                                    <td class="text-end">$ {{ "%.2f"|format(d.monto_ventas_efectivo) }}</td>
+                                    <td class="text-end">
+                                        $ {{ "%.2f"|format(d.monto_ventas_tarjeta) }}
+                                        {% if d.desglose_tarjetas %}
+                                        <button class="btn btn-sm btn-outline-primary border-0 p-0 ms-1" data-bs-toggle="modal" data-bs-target="#modalTarjetas{{ d.id }}">
+                                            <i class="fas fa-eye small"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">$ {{ "%.2f"|format(d.monto_ventas_transferencia) }}</td>
+                                    <td class="text-end text-danger">
+                                        $ {{ "%.2f"|format(d.monto_egresos) }}
+                                        {% if d.lista_egresos %}
+                                        <button class="btn btn-sm btn-outline-danger border-0 p-0 ms-1" data-bs-toggle="modal" data-bs-target="#modalEgresos{{ d.id }}">
+                                            <i class="fas fa-eye small"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end fw-bold text-success">$ {{ "%.2f"|format(d.monto_final_real) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="row mb-2">
-                    <div class="col-6 text-muted">Ventas Tarjeta:</div>
-                    <div class="col-6 text-end fw-bold">$ {{ "%.2f"|format(resumen.t_tarjeta) }}</div>
+
+                <!-- 2. TOTALES CONSOLIDADOS DESPUÉS -->
+                <div class="p-4">
+                    <h6 class="fw-bold text-dark mb-3"><i class="fas fa-chart-line me-2"></i>2. Totales Consolidados del Día</h6>
+                    <div class="row text-center mb-4">
+                        <div class="col-4 border-end">
+                            <div class="small text-muted text-uppercase fw-bold">Turnos</div>
+                            <div class="h3 fw-bold text-dark">{{ resumen.turnos }}</div>
+                        </div>
+                        <div class="col-4 border-end">
+                            <div class="small text-muted text-uppercase fw-bold">Egresos Totales</div>
+                            <div class="h3 fw-bold text-danger">$ {{ "%.2f"|format(resumen.t_egresos) }}</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="small text-muted text-uppercase fw-bold">Saldo Entregado</div>
+                            <div class="h3 fw-bold text-success">$ {{ "%.2f"|format(resumen.saldo_real_entregado) }}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-light rounded-4 p-3 mb-4">
+                        <h6 class="fw-bold border-bottom pb-2 mb-3 small">DESGLOSE GLOBAL DE INGRESOS</h6>
+                        <div class="row mb-2">
+                            <div class="col-6 text-muted small">Ventas Efectivo:</div>
+                            <div class="col-6 text-end fw-bold">$ {{ "%.2f"|format(resumen.t_efectivo) }}</div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-6 text-muted small">Ventas Tarjeta:</div>
+                            <div class="col-6 text-end fw-bold">$ {{ "%.2f"|format(resumen.t_tarjeta) }}</div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 text-muted small">Ventas Transferencia:</div>
+                            <div class="col-6 text-end fw-bold">$ {{ "%.2f"|format(resumen.t_trans) }}</div>
+                        </div>
+                    </div>
+                    
+                    {% if not abiertas %}
+                    
+                    {# Verificar si hoy ya existe en el historial (el primer registro del historial si es de hoy) #}
+                    {% set ya_cerrado = false %}
+                    {% if historial and historial[0].fecha_dia.strftime('%Y-%m-%d') == hoy %}
+                        {% set ya_cerrado = true %}
+                    {% endif %}
+
+                    {% if ya_cerrado %}
+                    <div class="alert alert-success border-0 shadow-sm rounded-4 py-3 text-center">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <h6 class="fw-bold mb-0">CIERRE DIARIO COMPLETADO</h6>
+                        <p class="small mb-0">El proceso de consolidación para el día de hoy ya fue ejecutado exitosamente.</p>
+                    </div>
+                    {% else %}
+                    <form id="formCierreDiario" action="{{ url_for('ejecutar_cierre_diario') }}" method="POST">
+                        <textarea name="observaciones" class="form-control bg-light border-0 mb-3" rows="2" placeholder="Observaciones finales del día..."></textarea>
+                        <button type="button" class="btn btn-reina w-100 rounded-pill py-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalConfirmCierre">
+                            <i class="fas fa-check-double me-2"></i> EJECUTAR CIERRE FINAL DEL DÍA
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    <!-- Modal Confirmación Cierre Final -->
+                    <div class="modal fade" id="modalConfirmCierre" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow-lg rounded-4">
+                                <div class="modal-body text-center p-4">
+                                    <div class="mb-3">
+                                        <i class="fas fa-exclamation-triangle fa-4x text-warning"></i>
+                                    </div>
+                                    <h4 class="fw-bold text-dark">¿Confirmar Cierre Diario?</h4>
+                                    <p class="text-muted small">Esta acción consolidará todos los turnos del día y generará un registro histórico definitivo. Esta operación no se puede deshacer.</p>
+                                    
+                                    <div class="d-grid gap-2 d-md-flex justify-content-center mt-4">
+                                        <button type="button" class="btn btn-secondary rounded-pill px-4 fw-bold" data-bs-dismiss="modal">CANCELAR</button>
+                                        <button type="button" class="btn btn-reina rounded-pill px-4 fw-bold shadow-sm" onclick="document.getElementById('formCierreDiario').submit();">
+                                            SÍ, CONSOLIDAR DÍA
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
-                <div class="row mb-3">
-                    <div class="col-6 text-muted">Ventas Transferencia:</div>
-                    <div class="col-6 text-end fw-bold">$ {{ "%.2f"|format(resumen.t_trans) }}</div>
-                </div>
-                
-                {% if not abiertas %}
-                <form action="{{ url_for('ejecutar_cierre_diario') }}" method="POST" class="mt-4">
-                    <textarea name="observaciones" class="form-control bg-light border-0 mb-3" rows="2" placeholder="Observaciones del cierre diario (opcional)..."></textarea>
-                    <button type="submit" class="btn btn-reina w-100 rounded-pill py-3 fw-bold shadow-sm" onclick="return confirm('¿Seguro que deseas consolidar el cierre de hoy?')">
-                        <i class="fas fa-check-double me-2"></i> EJECUTAR CIERRE DIARIO
-                    </button>
-                </form>
-                {% endif %}
                 
                 {% else %}
-                <div class="text-center text-muted py-4">
+                <div class="text-center text-muted py-5">
                     <i class="fas fa-folder-open fa-3x mb-3 opacity-25"></i>
                     <p>No hay turnos cerrados en el día de hoy para consolidar.</p>
                 </div>
@@ -94,32 +190,89 @@
     </div>
     
     <!-- COLUMNA DERECHA: HISTORIAL -->
-    <div class="col-md-5 mb-4">
+    <div class="col-md-4 mb-4">
         <div class="card border-0 shadow-sm rounded-4 h-100">
             <div class="card-header bg-white border-0 py-3">
-                <h6 class="fw-bold mb-0">Historial de Cierres Diarios</h6>
+                <h6 class="fw-bold mb-0">Historial Reciente</h6>
             </div>
             <div class="list-group list-group-flush">
                 {% for h in historial %}
                 <div class="list-group-item p-3">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <strong class="text-dark"><i class="fas fa-calendar-day text-success me-2"></i>{{ h.fecha_dia.strftime('%d/%m/%Y') }}</strong>
-                        <span class="badge bg-light text-dark border">{{ h.fecha_cierre.strftime('%H:%M') }}</span>
+                        <strong class="text-dark small"><i class="fas fa-calendar-day text-success me-2"></i>{{ h.fecha_dia.strftime('%d/%m/%Y') }}</strong>
+                        <span class="badge bg-light text-dark border small">{{ h.fecha_cierre.strftime('%H:%M') }}</span>
                     </div>
-                    <div class="d-flex justify-content-between small text-muted">
+                    <div class="d-flex justify-content-between x-small text-muted">
                         <span>Total Ventas:</span>
                         <span class="fw-bold text-dark">$ {{ "%.2f"|format(h.total_ventas) }}</span>
                     </div>
-                    <div class="d-flex justify-content-between small text-muted">
+                    <div class="d-flex justify-content-between x-small text-muted">
                         <span>Caja Entregada:</span>
                         <span class="fw-bold text-success">$ {{ "%.2f"|format(h.saldo_final_caja) }}</span>
                     </div>
                 </div>
                 {% else %}
-                <div class="text-center p-4 text-muted small">No hay historial de cierres.</div>
+                <div class="text-center p-4 text-muted small">No hay historial.</div>
                 {% endfor %}
             </div>
         </div>
     </div>
 </div>
+
+<!-- MODALES DE AUDITORÍA (Fuera de los loops principales para evitar problemas de renderizado) -->
+{% if detalle_cajeros %}
+    {% for d in detalle_cajeros %}
+        <!-- Modal Tarjetas -->
+        {% if d.desglose_tarjetas %}
+        <div class="modal fade" id="modalTarjetas{{ d.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header bg-primary text-white border-0 py-2">
+                        <h6 class="modal-title fw-bold small">Tarjetas - {{ d.usuario }}</h6>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <ul class="list-group list-group-flush">
+                            {% for t in d.desglose_tarjetas %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2 small">
+                                <span>{{ t.tarjeta }}</span>
+                                <span class="fw-bold text-dark">$ {{ "%.2f"|format(t.total) }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Modal Egresos -->
+        {% if d.lista_egresos %}
+        <div class="modal fade" id="modalEgresos{{ d.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header bg-danger text-white border-0 py-2">
+                        <h6 class="modal-title fw-bold small">Egresos - {{ d.usuario }}</h6>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <ul class="list-group list-group-flush">
+                            {% for e in d.lista_egresos %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2 small">
+                                <span class="text-truncate me-3">{{ e.descripcion }}</span>
+                                <span class="fw-bold text-danger">$ {{ "%.2f"|format(e.monto) }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
+{% endif %}
+
+<style>
+    .x-small { font-size: 0.75rem; }
+</style>
 {% endblock %}

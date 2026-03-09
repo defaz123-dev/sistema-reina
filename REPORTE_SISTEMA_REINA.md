@@ -34,5 +34,5 @@ Para garantizar la máxima disponibilidad y rendimiento, el sistema opera bajo u
 
 ---
 **Fecha de última actualización:** 9 de marzo de 2026  
-**Estado:** Sistema en producción con interfaz premium unificada.
+**Estado:** Sistema en producción con interfaz premium unificada e IDs normalizados.
 ---

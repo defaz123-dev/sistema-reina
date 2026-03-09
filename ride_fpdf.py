@@ -92,7 +92,7 @@ def generar_pdf_fpdf(d, empresa):
     
     pdf.set_font('Arial', 'B', 16)
     pdf.set_x(110)
-    pdf.cell(85, 8, "FACTURA", 0, 1)
+    pdf.cell(85, 8, "NOTA DE CREDITO" if d.get('es_nota_credito') else "FACTURA", 0, 1)
     
     pdf.set_font('Arial', 'B', 11)
     pdf.set_x(110)
@@ -165,6 +165,16 @@ def generar_pdf_fpdf(d, empresa):
     pdf.cell(30, 5, "GUIA REMISION:", 0, 0)
     pdf.set_font('Arial', '', 9)
     pdf.cell(20, 5, "N/A", 0, 1)
+    
+    if d.get('es_nota_credito'):
+        pdf.set_y(pdf.get_y() + 2)
+        pdf.set_font('Arial', 'B', 8)
+        pdf.set_x(15)
+        pdf.cell(180, 4, "COMPROBANTE QUE SE MODIFICA: FACTURA " + d.get('doc_modificado', ''), 0, 1)
+        pdf.set_x(15)
+        pdf.cell(180, 4, "FECHA EMISION (COMPROBANTE A MODIFICAR): " + d.get('fecha_emision', ''), 0, 1)
+        pdf.set_x(15)
+        pdf.cell(180, 4, "RAZON DE MODIFICACION: " + d.get('motivo_anulacion', '').upper(), 0, 1)
     
     # --- Tabla Productos ---
     pdf.set_y(130)

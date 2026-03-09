@@ -63,7 +63,13 @@
             <button class="nav-link rounded-pill fw-bold" id="pills-pagos-tab" data-bs-toggle="pill" data-bs-target="#pills-pagos" type="button" role="tab"><i class="fas fa-credit-card me-2"></i>Formas de Pago</button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link rounded-pill fw-bold" id="pills-cierres-tab" data-bs-toggle="pill" data-bs-target="#pills-cierres" type="button" role="tab"><i class="fas fa-lock me-2"></i>Cierres de Caja</button>
+            <button class="nav-link rounded-pill fw-bold" id="pills-cierres-tab" data-bs-toggle="pill" data-bs-target="#pills-cierres" type="button" role="tab"><i class="fas fa-lock me-2"></i>Turnos</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-consolidados-tab" data-bs-toggle="pill" data-bs-target="#pills-consolidados" type="button" role="tab"><i class="fas fa-calendar-check me-2"></i>Cierres Diarios</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-anulaciones-tab" data-bs-toggle="pill" data-bs-target="#pills-anulaciones" type="button" role="tab"><i class="fas fa-file-excel me-2"></i>Anulaciones</button>
         </li>
     </ul>
 </div>
@@ -385,6 +391,161 @@
                         {% endfor %}
                         {% if not cierres_caja %}
                         <tr><td colspan="13" class="text-center py-5 text-muted">No hay cierres registrados.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA: CIERRES DIARIOS CONSOLIDADOS -->
+    <div class="tab-pane fade" id="pills-consolidados" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-dark text-white border-0 py-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">Historial de Cierres Diarios Consolidados</h5>
+                <button class="btn btn-sm btn-reina px-3 rounded-pill" onclick="exportTableToExcel('tableCierresConsolidados', 'Cierres_Diarios_Reina')">
+                    <i class="fas fa-file-excel me-1"></i> Excel
+                </button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="tableCierresConsolidados">
+                    <thead class="table-light text-uppercase small text-muted">
+                        <tr>
+                            <th class="ps-4">Fecha Día</th>
+                            <th>Sucursal</th>
+                            <th>Cajeros</th>
+                            <th class="text-center">Turnos</th>
+                            <th class="text-end">Ventas Efectivo</th>
+                            <th class="text-end">Tarjetas</th>
+                            <th class="text-end">Transferencias</th>
+                            <th class="text-end text-danger">Egresos</th>
+                            <th class="text-end fw-bold text-success pe-4">Total Consolidado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in cierres_consolidados %}
+                        <tr>
+                            <td class="ps-4 fw-bold text-dark">{{ c.fecha_dia.strftime('%d/%m/%Y') }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ c.sucursal_nombre }}</span></td>
+                            <td>
+                                <small class="text-muted fw-bold">{{ c.cajeros }}</small>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-info rounded-pill px-3">
+                                    <i class="fas fa-users me-1"></i> {{ c.cantidad_turnos }}
+                                </span>
+                            </td>
+                            <td class="text-end">$ {{ "%.2f"|format(c.total_efectivo) }}</td>
+                            <td class="text-end">
+                                $ {{ "%.2f"|format(c.total_tarjetas) }}
+                                {% if c.desglose_tarjetas %}
+                                <button class="btn btn-sm btn-outline-primary border-0 p-0 ms-1" data-bs-toggle="modal" data-bs-target="#modalTarjetasCons{{ c.id }}">
+                                    <i class="fas fa-eye small"></i>
+                                </button>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">$ {{ "%.2f"|format(c.total_transferencias) }}</td>
+                            <td class="text-end text-danger">
+                                $ {{ "%.2f"|format(c.total_egresos) }}
+                                {% if c.lista_egresos %}
+                                <button class="btn btn-sm btn-outline-danger border-0 p-0 ms-1" data-bs-toggle="modal" data-bs-target="#modalEgresosCons{{ c.id }}">
+                                    <i class="fas fa-eye small"></i>
+                                </button>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-bold text-success pe-4">$ {{ "%.2f"|format(c.saldo_final_caja) }}</td>
+                        </tr>
+
+                        <!-- Modal Tarjetas Consolidado -->
+                        {% if c.desglose_tarjetas %}
+                        <div class="modal fade" id="modalTarjetasCons{{ c.id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered modal-sm">
+                                <div class="modal-content border-0 shadow-lg rounded-4">
+                                    <div class="modal-header bg-primary text-white border-0 py-2">
+                                        <h6 class="modal-title fw-bold small">Desglose Tarjetas - {{ c.fecha_dia.strftime('%d/%m/%Y') }}</h6>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body p-0">
+                                        <ul class="list-group list-group-flush">
+                                            {% for t in c.desglose_tarjetas %}
+                                            <li class="list-group-item d-flex justify-content-between align-items-center py-2 small">
+                                                <span>{{ t.tarjeta }}</span>
+                                                <span class="fw-bold text-dark">$ {{ "%.2f"|format(t.total) }}</span>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Modal Egresos Consolidado -->
+                        {% if c.lista_egresos %}
+                        <div class="modal fade" id="modalEgresosCons{{ c.id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content border-0 shadow-lg rounded-4">
+                                    <div class="modal-header bg-danger text-white border-0 py-2">
+                                        <h6 class="modal-title fw-bold small">Detalle Egresos - {{ c.fecha_dia.strftime('%d/%m/%Y') }}</h6>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body p-0">
+                                        <ul class="list-group list-group-flush">
+                                            {% for e in c.lista_egresos %}
+                                            <li class="list-group-item d-flex justify-content-between align-items-center py-2 small">
+                                                <span class="text-truncate me-3">{{ e.descripcion }}</span>
+                                                <span class="fw-bold text-danger">$ {{ "%.2f"|format(e.monto) }}</span>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% if not cierres_consolidados %}
+                        <tr><td colspan="8" class="text-center py-5 text-muted">No hay cierres diarios consolidados registrados.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA: ANULACIONES -->
+    <div class="tab-pane fade" id="pills-anulaciones" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white border-0 py-3">
+                <h5 class="fw-bold mb-0 text-danger"><i class="fas fa-file-excel me-2"></i>Historial de Facturas Anuladas</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="tableAnulacionesRep">
+                    <thead class="table-light text-uppercase small text-muted">
+                        <tr>
+                            <th class="ps-4">Fecha Anulación</th>
+                            <th>Factura</th>
+                            <th>Cliente</th>
+                            <th class="text-end">Monto</th>
+                            <th>Motivo</th>
+                            <th class="text-center pe-4">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in ventas if v.anulada %}
+                        <tr>
+                            <td class="ps-4 small">{{ v.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="fw-bold small text-dark">{{ v.establecimiento }}-{{ v.punto_emision }}-{{ v.secuencial }}</td>
+                            <td><div class="small fw-bold">{{ v.nombres }} {{ v.apellidos }}</div></td>
+                            <td class="text-end fw-bold text-danger">$ {{ "%.2f"|format(v.total) }}</td>
+                            <td><small class="text-muted">{{ v.estado_sri }}</small></td>
+                            <td class="text-center pe-4">
+                                <span class="badge bg-danger rounded-pill px-3">ANULADA</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not ventas|selectattr('anulada')|list %}
+                        <tr><td colspan="6" class="text-center py-5 text-muted">No se registran facturas anuladas.</td></tr>
                         {% endif %}
                     </tbody>
                 </table>

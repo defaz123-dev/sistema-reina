@@ -2,7 +2,7 @@
 
 **Para:** Negocio con Gestión de Sucursales y Facturación SRI  
 **De:** Christian Defaz - Consultoría de Software  
-**Fecha:** 9 de marzo de 2026 (Actualizada con versión "Elegant Pro")  
+**Fecha:** 9 de marzo de 2026 (Actualizada con versión "Elegant Pro" v2.1)  
 **Vigencia:** 30 días  
 
 ---

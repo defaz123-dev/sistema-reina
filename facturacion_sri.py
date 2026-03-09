@@ -357,6 +357,198 @@ def consultar_comprobante_sri(clave):
         log_sri(f"Error parseando XML importacion: {str(e)}")
         return None
 
+def anular_factura_sri(venta_id, motivo, mysql, usuario_id):
+    """
+    Anula una factura generando y autorizando una NOTA DE CRÉDITO (04).
+    Reutiliza la clave si ya se intentó anular antes.
+    """
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("""
+            SELECT v.*, c.cedula_ruc, c.nombres, c.apellidos, c.direccion, c.telefono, c.email, 
+                   t.codigo_sri as tipo_id_sri
+            FROM ventas v 
+            JOIN clientes c ON v.cliente_id = c.id
+            JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id
+            WHERE v.id = %s
+        """, (venta_id,))
+        venta = cur.fetchone()
+        if not venta: raise Exception("Factura no encontrada.")
+        if not venta['autorizado_sri']: raise Exception("Solo se pueden anular facturas autorizadas.")
+        
+        cur.execute("SELECT * FROM empresa LIMIT 1")
+        empresa = cur.fetchone()
+        ambiente = empresa.get('ambiente', 1)
+        
+        # VERIFICAR SI YA EXISTE UN INTENTO DE ANULACIÓN (NOTA DE CRÉDITO)
+        cur.execute("SELECT * FROM anulaciones_factura WHERE venta_id = %s", (venta_id,))
+        anulacion_previa = cur.fetchone()
+        
+        if anulacion_previa and anulacion_previa['nc_clave_acceso']:
+            clave_nc = anulacion_previa['nc_clave_acceso']
+            fecha_nc = anulacion_previa['fecha_solicitud']
+            log_sri(f"REUTILIZANDO CLAVE NC: {clave_nc}")
+        else:
+            # Generar Clave de Acceso Nueva para la Nota de Crédito
+            fecha_nc = datetime.now()
+            sec_nc = str(venta['secuencial']).zfill(9) 
+            serie = f"{venta['establecimiento']}{venta['punto_emision']}"
+            ruc_empresa = empresa['ruc']
+            f_str = fecha_nc.strftime('%d%m%Y')
+            c_48 = f"{f_str}04{ruc_empresa}{ambiente}{serie}{sec_nc}876543211"
+            from app import calcular_modulo11
+            clave_nc = f"{c_48}{calcular_modulo11(c_48)}"
+            
+            # Registrar solicitud inicial si no existe
+            if not anulacion_previa:
+                cur.execute("""
+                    INSERT INTO anulaciones_factura (venta_id, motivo_anulacion, usuario_id, estado_anulacion, nc_clave_acceso) 
+                    VALUES (%s, %s, %s, 'PENDIENTE', %s)
+                """, (venta_id, motivo, usuario_id, clave_nc))
+                mysql.connection.commit()
+
+        log_sri(f"--- PROCESANDO NOTA DE CRÉDITO PARA VENTA {venta_id} ({clave_nc}) ---")
+
+        # 1. CONSULTA PREVIA (Por si ya se autorizó y hubo error de red antes)
+        est_aut, num_aut, xml_aut, msj_aut = solicitar_autorizacion_sri(clave_nc, ambiente)
+        if est_aut == 'AUTORIZADO':
+            cur.execute("""
+                UPDATE anulaciones_factura 
+                SET estado_anulacion = 'PROCESADO', nc_numero_autorizacion = %s, 
+                    nc_xml_autorizado = %s, mensaje_sri = 'AUTORIZADO (RECUPERADO)'
+                WHERE venta_id = %s
+            """, (num_aut, xml_aut, venta_id))
+            cur.execute("UPDATE ventas SET anulada = 1, estado_sri = 'ANULADA' WHERE id = %s", (venta_id,))
+            mysql.connection.commit()
+            return True, "Anulación sincronizada y autorizada."
+
+        # 2. GENERAR XML Y FIRMAR (Solo si no estaba autorizada)
+        cur.execute("""
+            SELECT dv.*, p.codigo as codigo_principal, p.nombre as descripcion 
+            FROM detalles_ventas dv 
+            JOIN productos p ON dv.producto_id = p.id 
+            WHERE dv.venta_id = %s
+        """, (venta_id,))
+        detalles = cur.fetchall()
+        xml_nc_bytes = generar_xml_nota_credito_bytes(venta, empresa, detalles, motivo, clave_nc, fecha_nc)
+        
+        from security_utils import descifrar_password
+        firma_path = os.path.join(os.path.dirname(__file__), 'certs', 'firma.p12')
+        firma_pass = descifrar_password(empresa.get('firma_password', ''))
+        
+        with open(firma_path, 'rb') as f: p12_data = f.read()
+        p_key, cert, o_certs = pkcs12.load_key_and_certificates(p12_data, firma_pass.encode('utf-8'))
+        c_bytes = cert.public_bytes(serialization.Encoding.DER)
+        def signproc(data, hashalgo): return p_key.sign(data, padding.PKCS1v15(), getattr(hashes, hashalgo.upper())())
+        
+        sri_signer = SRI_BES()
+        signed_tree = sri_signer.enveloped_sri(xml_nc_bytes, cert, c_bytes, signproc)
+        xml_firmado_str = etree.tostring(signed_tree, encoding='UTF-8', xml_declaration=True, standalone=None).decode('utf-8')
+
+        # 3. ENVIAR AL SRI
+        estado_recepcion, msj_recepcion = enviar_recepcion_sri(xml_firmado_str, ambiente)
+        
+        if estado_recepcion == 'RECIBIDA' or "EN PROCESAMIENTO" in msj_recepcion.upper():
+            # Actualizar estado visual inmediatamente
+            cur.execute("UPDATE ventas SET estado_sri = 'ANULACIÓN EN PROCESO' WHERE id = %s", (venta_id,))
+            mysql.connection.commit()
+            
+            time.sleep(4)
+            for i in range(3):
+                est_aut, num_aut, xml_aut, msj_aut = solicitar_autorizacion_sri(clave_nc, ambiente)
+                if est_aut == 'AUTORIZADO':
+                    cur.execute("""
+                        UPDATE anulaciones_factura 
+                        SET estado_anulacion = 'PROCESADO', nc_numero_autorizacion = %s, 
+                            nc_xml_autorizado = %s, mensaje_sri = 'NOTA DE CRÉDITO AUTORIZADA'
+                        WHERE venta_id = %s
+                    """, (num_aut, xml_aut, venta_id))
+                    cur.execute("UPDATE ventas SET anulada = 1, estado_sri = 'ANULADA' WHERE id = %s", (venta_id,))
+                    mysql.connection.commit()
+                    return True, "Factura anulada con Nota de Crédito autorizada."
+                time.sleep(3)
+            return False, "La Nota de Crédito sigue en procesamiento. El estado se ha actualizado en el historial."
+        else:
+            cur.execute("UPDATE anulaciones_factura SET mensaje_sri = %s WHERE venta_id = %s", (f"RECEPCIÓN: {msj_recepcion}"[:500], venta_id))
+            mysql.connection.commit()
+            return False, f"Error en recepción del SRI: {msj_recepcion}"
+
+    except Exception as e:
+        mysql.connection.rollback()
+        return False, str(e)
+    finally: cur.close()
+
+def generar_xml_nota_credito_bytes(venta, empresa, detalles, motivo, clave_nc, fecha_nc):
+    """
+    Genera el XML de una Nota de Crédito (Tipo 04) referenciando a la factura original.
+    """
+    sub0 = float(venta.get('subtotal_0') or 0); sub15 = float(venta.get('subtotal_15') or 0)
+    iva = float(venta.get('iva_valor') or 0); total = float(venta.get('total') or 0)
+
+    root = etree.Element("notaCredito", id="comprobante", version="1.0.0")
+    it = etree.SubElement(root, "infoTributaria")
+    etree.SubElement(it, "ambiente").text = str(empresa['ambiente'])
+    etree.SubElement(it, "tipoEmision").text = "1"
+    etree.SubElement(it, "razonSocial").text = limpiar_texto(empresa['razon_social'])
+    if empresa.get('nombre_comercial'): etree.SubElement(it, "nombreComercial").text = limpiar_texto(empresa['nombre_comercial'])
+    etree.SubElement(it, "ruc").text = str(empresa['ruc'])
+    etree.SubElement(it, "claveAcceso").text = str(clave_nc)
+    etree.SubElement(it, "codDoc").text = "04"
+    etree.SubElement(it, "estab").text = str(venta.get('establecimiento')).zfill(3)
+    etree.SubElement(it, "ptoEmi").text = str(venta.get('punto_emision')).zfill(3)
+    etree.SubElement(it, "secuencial").text = str(venta.get('secuencial')).zfill(9)
+    etree.SubElement(it, "dirMatriz").text = limpiar_texto(empresa['direccion_matriz'])
+
+    inf = etree.SubElement(root, "infoNotaCredito")
+    etree.SubElement(inf, "fechaEmision").text = fecha_nc.strftime('%d/%m/%Y')
+    etree.SubElement(inf, "dirEstablecimiento").text = limpiar_texto(empresa['direccion_matriz'])
+    etree.SubElement(inf, "tipoIdentificacionComprador").text = str(venta['tipo_id_sri']).zfill(2)
+    etree.SubElement(inf, "razonSocialComprador").text = limpiar_texto(f"{venta['nombres']} {venta['apellidos']}")
+    etree.SubElement(inf, "identificacionComprador").text = str(venta['cedula_ruc'])
+    etree.SubElement(inf, "obligadoContabilidad").text = empresa.get('obligado_contabilidad', 'NO')
+    
+    # Datos del comprobante modificado (Factura original)
+    etree.SubElement(inf, "codDocModificado").text = "01"
+    etree.SubElement(inf, "numDocModificado").text = f"{venta['establecimiento']}-{venta['punto_emision']}-{venta['secuencial']}"
+    etree.SubElement(inf, "fechaEmisionDocSustento").text = venta['fecha'].strftime('%d/%m/%Y')
+    etree.SubElement(inf, "totalSinImpuestos").text = f"{sub0 + sub15:.2f}"
+    etree.SubElement(inf, "valorModificacion").text = f"{total:.2f}"
+    etree.SubElement(inf, "moneda").text = "DOLAR"
+
+    tci = etree.SubElement(inf, "totalConImpuestos")
+    if sub15 > 0:
+        ti = etree.SubElement(tci, "totalImpuesto")
+        etree.SubElement(ti, "codigo").text = "2"; etree.SubElement(ti, "codigoPorcentaje").text = "4"
+        etree.SubElement(ti, "baseImponible").text = f"{sub15:.2f}"; etree.SubElement(ti, "valor").text = f"{iva:.2f}"
+    if sub0 > 0:
+        ti = etree.SubElement(tci, "totalImpuesto")
+        etree.SubElement(ti, "codigo").text = "2"; etree.SubElement(ti, "codigoPorcentaje").text = "0"
+        etree.SubElement(ti, "baseImponible").text = f"{sub0:.2f}"; etree.SubElement(ti, "valor").text = "0.00"
+    
+    etree.SubElement(inf, "motivo").text = limpiar_texto(motivo)
+
+    dets = etree.SubElement(root, "detalles")
+    for d in detalles:
+        det = etree.SubElement(dets, "detalle")
+        etree.SubElement(det, "codigoInterno").text = str(d['codigo_principal'] or d['producto_id'])[:25]
+        etree.SubElement(det, "descripcion").text = limpiar_texto(d['descripcion'])
+        etree.SubElement(det, "cantidad").text = f"{float(d['cantidad']):.6f}"
+        etree.SubElement(det, "precioUnitario").text = f"{float(d['precio_unitario']):.6f}"
+        etree.SubElement(det, "descuento").text = "0.00"
+        s_det = float(d['subtotal']); i_det = float(d['iva_valor'])
+        b_det = s_det / 1.15 if i_det > 0 else s_det
+        etree.SubElement(det, "precioTotalSinImpuesto").text = f"{b_det:.2f}"
+        imps = etree.SubElement(det, "impuestos"); imp = etree.SubElement(imps, "impuesto")
+        etree.SubElement(imp, "codigo").text = "2"
+        if i_det > 0:
+            etree.SubElement(imp, "codigoPorcentaje").text = "4"; etree.SubElement(imp, "tarifa").text = "15.00"
+            etree.SubElement(imp, "baseImponible").text = f"{b_det:.2f}"; etree.SubElement(imp, "valor").text = f"{i_det:.2f}"
+        else:
+            etree.SubElement(imp, "codigoPorcentaje").text = "0"; etree.SubElement(imp, "tarifa").text = "0.00"
+            etree.SubElement(imp, "baseImponible").text = f"{b_det:.2f}"; etree.SubElement(imp, "valor").text = "0.00"
+    
+    return etree.tostring(root, encoding='UTF-8', xml_declaration=False)
+
 def solicitar_autorizacion_sri(clave, ambiente):
     url = "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl" if ambiente == 1 else "https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl"
     soap = f"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ec="http://ec.gob.sri.ws.autorizacion"><soapenv:Header/><soapenv:Body><ec:autorizacionComprobante><claveAccesoComprobante>{clave}</claveAccesoComprobante></ec:autorizacionComprobante></soapenv:Body></soapenv:Envelope>"""
