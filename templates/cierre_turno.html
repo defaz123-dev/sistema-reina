@@ -4,8 +4,14 @@
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
-        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">{{ config_empresa.nombre_comercial|upper }}</a>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3"><i class="fas fa-home me-1"></i> Inicio</a>
+        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}" style="color: {{ config_empresa.color_tema }} !important;">
+            {{ config_empresa.nombre_comercial|upper }}
+        </a>
+        <div class="ms-auto">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm rounded-pill px-3 text-white fw-bold shadow-sm" style="background-color: {{ config_empresa.color_tema }};">
+                <i class="fas fa-home me-1"></i> INICIO
+            </a>
+        </div>
     </div>
 </nav>
 {% endblock %}
@@ -22,7 +28,7 @@
     <!-- COLUMNA IZQUIERDA: FORMULARIO DE CUADRE (col-md-8) -->
     <div class="col-md-8">
         <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
-            <div class="card-header bg-success text-white border-0 py-3">
+            <div class="card-header text-white border-0 py-3" style="background-color: {{ config_empresa.color_tema }};">
                 <h5 class="fw-bold mb-0">Cuadre Detallado de Turno</h5>
             </div>
             <div class="card-body p-4">

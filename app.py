@@ -191,16 +191,110 @@ def login():
     user = cur.fetchone()
     if user and user['activo'] and check_password_hash(user['password'], p):
         cur.execute("SELECT nombre, establecimiento, punto_emision FROM sucursales WHERE id=%s", (s_id,))
-        suc = cur.fetchone(); cur.close()
+        suc = cur.fetchone()
+        
+        # CARGAR MENÚS AUTORIZADOS PARA EL ROL
+        cur.execute("""
+            SELECT m.* FROM menus m 
+            JOIN rol_menus rm ON m.id = rm.menu_id 
+            WHERE rm.rol_id = %s 
+            ORDER BY m.categoria, m.orden
+        """, (user['rol_id'],))
+        user_menus = cur.fetchall()
+        cur.close()
+
         session.update({
             'user_id': user['id'], 'usuario': user['usuario'], 'rol': user['rol_nombre'], 
+            'rol_id': user['rol_id'],
             'sucursal_id': s_id, 'sucursal_nombre': suc['nombre'],
-            'establecimiento': suc['establecimiento'], 'punto_emision': suc['punto_emision']
+            'establecimiento': suc['establecimiento'], 'punto_emision': suc['punto_emision'],
+            'user_menus': user_menus # Guardamos los menús autorizados
         })
         registrar_auditoria('LOGIN', f"Inició sesión en {suc['nombre']}")
         return redirect(url_for('dashboard'))
     cur.close(); flash('Credenciales incorrectas o usuario inactivo', 'danger')
     return redirect(url_for('index'))
+
+# --- ROLES Y PERMISOS ---
+@app.route('/roles')
+@login_required
+@admin_required
+def listar_roles():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM roles")
+    roles = cur.fetchall()
+    cur.execute("SELECT * FROM menus ORDER BY categoria, orden")
+    todos_menus = cur.fetchall()
+    cur.close()
+    return render_template('roles.html', roles=roles, todos_menus=todos_menus)
+
+@app.route('/roles/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_rol():
+    d = request.form; cur = mysql.connection.cursor()
+    nom = d['nombre'].upper().strip()
+    if d.get('id'): cur.execute("UPDATE roles SET nombre=%s WHERE id=%s", (nom, d['id']))
+    else: cur.execute("INSERT INTO roles (nombre) VALUES (%s)", (nom,))
+    mysql.connection.commit(); cur.close(); flash('Rol guardado', 'success')
+    return redirect(url_for('listar_roles'))
+
+@app.route('/roles/permisos/<int:rol_id>')
+@login_required
+@admin_required
+def obtener_permisos(rol_id):
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT menu_id FROM rol_menus WHERE rol_id = %s", (rol_id,))
+    permisos = [row['menu_id'] for row in cur.fetchall()]
+    cur.close()
+    return jsonify({'success': True, 'permisos': permisos})
+
+@app.route('/roles/permisos/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_permisos():
+    data = request.get_json(); rol_id = data.get('rol_id'); menus = data.get('menus', [])
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("DELETE FROM rol_menus WHERE rol_id = %s", (rol_id,))
+        for m_id in menus:
+            cur.execute("INSERT INTO rol_menus (rol_id, menu_id) VALUES (%s, %s)", (rol_id, m_id))
+        mysql.connection.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        mysql.connection.rollback(); return jsonify({'success': False, 'message': str(e)})
+    finally: cur.close()
+
+# --- GESTIÓN DE MENÚS ---
+@app.route('/menus/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_menu():
+    d = request.form; cur = mysql.connection.cursor()
+    nom, url, ico, cat, ord = d['nombre'], d['url'], d['icono'], d['categoria'].upper(), d.get('orden', 0)
+    if d.get('id'):
+        cur.execute("UPDATE menus SET nombre=%s, url=%s, icono=%s, categoria=%s, orden=%s WHERE id=%s", (nom, url, ico, cat, ord, d['id']))
+    else:
+        cur.execute("INSERT INTO menus (nombre, url, icono, categoria, orden) VALUES (%s, %s, %s, %s, %s)", (nom, url, ico, cat, ord))
+    mysql.connection.commit(); cur.close(); flash('Menú guardado correctamente', 'success')
+    return redirect(url_for('listar_roles'))
+
+@app.route('/menus/eliminar/<int:id>')
+@login_required
+@admin_required
+def eliminar_menu(id):
+    cur = mysql.connection.cursor()
+    try:
+        # VALIDACIÓN: No eliminar si el menú está atado a un rol
+        cur.execute("SELECT COUNT(*) as c FROM rol_menus WHERE menu_id = %s", (id,))
+        if cur.fetchone()['c'] > 0:
+            flash('No se puede eliminar: El menú está siendo usado por uno o más roles.', 'danger')
+        else:
+            cur.execute("DELETE FROM menus WHERE id = %s", (id,))
+            mysql.connection.commit(); flash('Menú eliminado correctamente', 'info')
+    except Exception as e: flash(f'Error al eliminar: {str(e)}', 'danger')
+    finally: cur.close()
+    return redirect(url_for('listar_roles'))
 
 @app.route('/logout')
 def logout(): session.clear(); return redirect(url_for('index'))

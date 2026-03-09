@@ -4,10 +4,15 @@
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
-        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">REINA</a>
-        <div class="d-flex">
-            <a href="{{ url_for('productos') }}" class="btn btn-success btn-sm rounded-pill px-3">
+        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}" style="color: {{ config_empresa.color_tema }} !important;">
+            {{ config_empresa.nombre_comercial|upper }}
+        </a>
+        <div class="ms-auto d-flex gap-2">
+            <a href="{{ url_for('productos') }}" class="btn btn-outline-light btn-sm rounded-pill px-3">
                 <i class="fas fa-arrow-left me-1"></i> Volver a Productos
+            </a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm rounded-pill px-3 text-white fw-bold shadow-sm" style="background-color: {{ config_empresa.color_tema }};">
+                <i class="fas fa-home me-1"></i> INICIO
             </a>
         </div>
     </div>

@@ -4,8 +4,14 @@
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
-        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">{{ config_empresa.nombre_comercial|upper }}</a>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3"><i class="fas fa-home me-1"></i> Inicio</a>
+        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}" style="color: {{ config_empresa.color_tema }} !important;">
+            {{ config_empresa.nombre_comercial|upper }}
+        </a>
+        <div class="ms-auto">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm rounded-pill px-3 text-white fw-bold shadow-sm" style="background-color: {{ config_empresa.color_tema }};">
+                <i class="fas fa-home me-1"></i> INICIO
+            </a>
+        </div>
     </div>
 </nav>
 {% endblock %}
@@ -91,7 +97,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <form action="{{ url_for('guardar_producto') }}" method="POST" enctype="multipart/form-data">
-                <div class="modal-header bg-success text-white border-0 px-4 py-3">
+                <div class="modal-header text-white border-0 px-4 py-3" style="background-color: {{ config_empresa.color_tema }};">
                     <h5 class="fw-bold mb-0" id="modalProductoTitle"><i class="fas fa-box-open me-2"></i>Datos del Producto</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>

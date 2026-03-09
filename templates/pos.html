@@ -11,12 +11,14 @@
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm py-1" style="height: 56px;">
     <div class="container-fluid px-4">
-        <a class="navbar-brand fw-bold text-success" href="{{ url_for('dashboard') }}">{{ config_empresa.nombre_comercial|upper }} <span class="text-white">POS</span></a>
+        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}" style="color: {{ config_empresa.color_tema }} !important;">
+            {{ config_empresa.nombre_comercial|upper }} <span class="text-white">POS</span>
+        </a>
         <div class="d-flex align-items-center text-white small">
             <span class="me-3 d-none d-md-inline"><i class="fas fa-store me-1 text-warning"></i> {{ session['sucursal_nombre'] }}</span>    
             <span class="me-3"><i class="fas fa-user me-1 text-success"></i> {{ session['usuario'] }}</span>
-            <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-sm rounded-pill px-3">
-                <i class="fas fa-home me-1"></i> Inicio
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm rounded-pill px-3 text-white fw-bold shadow-sm" style="background-color: {{ config_empresa.color_tema }};">
+                <i class="fas fa-home me-1"></i> INICIO
             </a>
         </div>
     </div>
@@ -188,7 +190,7 @@
 <div class="modal fade" id="modalFinalizar" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg">
-            <div class="modal-header bg-success text-white border-0 p-4">
+            <div class="modal-header text-white border-0 p-4" style="background-color: {{ config_empresa.color_tema }};">
                 <h5 class="modal-title fw-bold"><i class="fas fa-cash-register me-2"></i> FINALIZAR ORDEN</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -282,7 +284,7 @@
 <div class="modal fade" id="modalCliente" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
         <div class="modal-content border-0 rounded-4 shadow">
-            <div class="modal-header bg-success text-white border-0"><h5 class="fw-bold mb-0">Nuevo Cliente</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header text-white border-0" style="background-color: {{ config_empresa.color_tema }};"><h5 class="fw-bold mb-0">Nuevo Cliente</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
             <div class="modal-body p-4">
                 <div class="mb-3">
                     <label class="small fw-bold text-muted">Tipo de Identificación</label>
