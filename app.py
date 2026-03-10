@@ -1099,15 +1099,15 @@ def sesion_caja():
         f_apertura = sesion_abierta['fecha_apertura']
         
         # Total Ventas Efectivo
-        cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'EFECTIVO'", (ses_id,))
+        cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'EFECTIVO' AND anulada = 0", (ses_id,))
         v_efectivo = float(cur.fetchone()['t'] or 0)
         
         # Total Ventas Tarjeta
-        cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TARJETA'", (ses_id,))
+        cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TARJETA' AND anulada = 0", (ses_id,))
         v_tarjeta = float(cur.fetchone()['t'] or 0)
         
         # Total Ventas Transferencia
-        cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TRANSFERENCIA'", (ses_id,))
+        cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TRANSFERENCIA' AND anulada = 0", (ses_id,))
         v_trans = float(cur.fetchone()['t'] or 0)
 
         # DESGLOSE DETALLADO POR TIPO DE TARJETA
@@ -1115,7 +1115,7 @@ def sesion_caja():
             SELECT ct.nombre as tarjeta, SUM(v.total) as total 
             FROM ventas v 
             JOIN cat_tarjetas ct ON v.id_tarjeta = ct.id 
-            WHERE v.sesion_caja_id = %s AND v.forma_pago = 'TARJETA'
+            WHERE v.sesion_caja_id = %s AND v.forma_pago = 'TARJETA' AND v.anulada = 0
             GROUP BY ct.id
         """, (ses_id,))
         desglose_tarjetas = cur.fetchall()
@@ -1194,11 +1194,11 @@ def cerrar_caja():
     ses_id = sesion['id']
     
     # Recalcular totales exactos del sistema
-    cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'EFECTIVO'", (ses_id,))
+    cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'EFECTIVO' AND anulada = 0", (ses_id,))
     v_efectivo = float(cur.fetchone()['t'] or 0)
-    cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TARJETA'", (ses_id,))
+    cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TARJETA' AND anulada = 0", (ses_id,))
     v_tarjeta = float(cur.fetchone()['t'] or 0)
-    cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TRANSFERENCIA'", (ses_id,))
+    cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TRANSFERENCIA' AND anulada = 0", (ses_id,))
     v_trans = float(cur.fetchone()['t'] or 0)
     cur.execute("SELECT SUM(monto) as t FROM egresos WHERE sesion_caja_id = %s", (ses_id,))
     t_egresos = float(cur.fetchone()['t'] or 0)
@@ -1644,7 +1644,13 @@ def ver_ride(id):
 @login_required
 def ver_ticket(id):
     cur = mysql.connection.cursor(); cur.execute("SELECT * FROM ventas WHERE id=%s", (id,)); v = cur.fetchone()
-    if not v: return "No existe", 404
+    if not v: cur.close(); return "No existe", 404
+    
+    if v['anulada']:
+        cur.close()
+        flash('No se puede imprimir el ticket de una factura anulada.', 'danger')
+        return redirect(url_for('historial_ventas'))
+
     cur.execute("SELECT * FROM clientes WHERE id=%s", (v['cliente_id'],)); c = cur.fetchone()
     cur.execute("SELECT * FROM sucursales WHERE id=%s", (v['sucursal_id'],)); s = cur.fetchone()
     cur.execute("SELECT usuario FROM usuarios WHERE id=%s", (v['usuario_id'],)); u = cur.fetchone()
@@ -1745,7 +1751,7 @@ def utilidad_real():
     s_id = session['sucursal_id']
     
     # 1. Total Ventas (Ingresos reales)
-    cur.execute("SELECT SUM(total) as total FROM ventas WHERE sucursal_id = %s", (s_id,))
+    cur.execute("SELECT SUM(total) as total FROM ventas WHERE sucursal_id = %s AND anulada = 0", (s_id,))
     total_ventas = float(cur.fetchone()['total'] or 0)
     
     # 2. Total Compras (Gastos con factura/insumos)
@@ -1785,12 +1791,12 @@ def reportes():
     kardex_movs = cur.fetchall()
 
     cur.execute("SELECT v.*, c.nombres, c.apellidos, u.usuario FROM ventas v JOIN clientes c ON v.cliente_id=c.id JOIN usuarios u ON v.usuario_id=u.id ORDER BY v.fecha DESC"); v = cur.fetchall()
-    cur.execute("SELECT p.nombre, SUM(dv.cantidad) as total_vendido FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id GROUP BY p.id ORDER BY total_vendido DESC LIMIT 5"); t = cur.fetchall()
+    cur.execute("SELECT p.nombre, SUM(dv.cantidad) as total_vendido FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id JOIN ventas v ON dv.venta_id = v.id WHERE v.anulada = 0 GROUP BY p.id ORDER BY total_vendido DESC LIMIT 5"); t = cur.fetchall()
     cur.execute("SELECT p.nombre, p.precio, (SELECT SUM(r.cantidad_requerida * IFNULL((SELECT dc.costo_unitario FROM detalles_compras dc WHERE dc.insumo_id = r.insumo_id ORDER BY dc.id DESC LIMIT 1), 0)) FROM recetas r WHERE r.producto_id = p.id) as costo_receta FROM productos p ORDER BY (p.precio - IFNULL(costo_receta, 0)) DESC"); rent = cur.fetchall()
-    cur.execute("SELECT HOUR(fecha) as hora, COUNT(*) as cantidad, SUM(total) as total FROM ventas GROUP BY hora ORDER BY hora"); hor = cur.fetchall()
-    cur.execute("SELECT forma_pago, COUNT(*) as cantidad, SUM(total) as total FROM ventas GROUP BY forma_pago"); pags = cur.fetchall()
+    cur.execute("SELECT HOUR(fecha) as hora, COUNT(*) as cantidad, SUM(total) as total FROM ventas WHERE anulada = 0 GROUP BY hora ORDER BY hora"); hor = cur.fetchall()
+    cur.execute("SELECT forma_pago, COUNT(*) as cantidad, SUM(total) as total FROM ventas WHERE anulada = 0 GROUP BY forma_pago"); pags = cur.fetchall()
     cur.execute("SELECT i.nombre, i.stock_actual, i.stock_minimo, u.nombre as unidad_medida, s.nombre as sucursal FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id JOIN sucursales s ON i.sucursal_id = s.id WHERE i.stock_actual <= i.stock_minimo"); crit = cur.fetchall()
-    cur.execute("SELECT COUNT(*) as total_ventas, SUM(total) as monto_total, AVG(total) as ticket_promedio FROM ventas"); st = cur.fetchone()
+    cur.execute("SELECT COUNT(*) as total_ventas, SUM(total) as monto_total, AVG(total) as ticket_promedio FROM ventas WHERE anulada = 0"); st = cur.fetchone()
     
     # HISTORIAL DE CIERRES DE CAJA (SESIONES)
     cur.execute("""
@@ -1832,7 +1838,7 @@ def reportes():
             SELECT ct.nombre as tarjeta, SUM(v.total) as total 
             FROM ventas v 
             JOIN cat_tarjetas ct ON v.id_tarjeta = ct.id 
-            WHERE v.sucursal_id = %s AND DATE(v.fecha) = %s AND v.forma_pago = 'TARJETA'
+            WHERE v.sucursal_id = %s AND DATE(v.fecha) = %s AND v.forma_pago = 'TARJETA' AND v.anulada = 0
             GROUP BY ct.id
         """, (c_con['sucursal_id'], c_con['fecha_dia']))
         c_con['desglose_tarjetas'] = cur.fetchall()

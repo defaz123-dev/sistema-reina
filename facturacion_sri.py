@@ -528,15 +528,11 @@ def revertir_transaccion_venta(venta_id, mysql, usuario_id):
                     VALUES (%s, %s, 'ANULACION', %s, %s, %s, %s, %s, %s)
                 """, (ins_id, sucursal_id, f"ENTRADA POR ANULACIÓN DE FACTURA [{nro_factura}]", venta_id, cant_a_devolver, saldo_ant, saldo_post, usuario_id))
 
-        # 6. Actualizar montos de la venta a cero y marcar como anulada
+        # 6. Marcar como anulada (Manteniendo montos para el historial)
         cur.execute("""
             UPDATE ventas 
             SET anulada = 1, 
-                estado_sri = 'ANULADA',
-                subtotal_0 = 0, 
-                subtotal_15 = 0, 
-                iva_valor = 0, 
-                total = 0 
+                estado_sri = 'ANULADA'
             WHERE id = %s
         """, (venta_id,))
 

@@ -98,9 +98,15 @@
                             {% endif %}
                         </td>
                         <td class="text-center">
+                            {% if not v.anulada %}
                             <a href="{{ url_for('ver_ticket', id=v.id) }}" target="_blank" class="btn btn-outline-secondary border-0" title="Imprimir Ticket">
                                 <i class="fas fa-print fa-lg action-icon"></i>
                             </a>
+                            {% else %}
+                            <button class="btn btn-outline-secondary border-0 opacity-25" title="No se puede imprimir ticket de venta anulada" disabled>
+                                <i class="fas fa-print fa-lg"></i>
+                            </button>
+                            {% endif %}
 
                             {% if v.autorizado_sri or v.anulada %}
                             <a href="{{ url_for('ver_ride', id=v.id) }}" target="_blank" class="btn btn-outline-danger border-0" title="Ver RIDE PDF">
