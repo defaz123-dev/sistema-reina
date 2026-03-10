@@ -60,6 +60,9 @@
             <button class="nav-link rounded-pill fw-bold" id="pills-criticos-tab" data-bs-toggle="pill" data-bs-target="#pills-criticos" type="button" role="tab"><i class="fas fa-exclamation-triangle me-2"></i>Insumos Críticos</button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-kardex-tab" data-bs-toggle="pill" data-bs-target="#pills-kardex" type="button" role="tab"><i class="fas fa-clipboard-list me-2"></i>Kardex</button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link rounded-pill fw-bold" id="pills-pagos-tab" data-bs-toggle="pill" data-bs-target="#pills-pagos" type="button" role="tab"><i class="fas fa-credit-card me-2"></i>Formas de Pago</button>
         </li>
         <li class="nav-item" role="presentation">
@@ -547,6 +550,55 @@
                         {% if not ventas|selectattr('anulada')|list %}
                         <tr><td colspan="6" class="text-center py-5 text-muted">No se registran facturas anuladas.</td></tr>
                         {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA: KARDEX -->
+    <div class="tab-pane fade" id="pills-kardex" role="tabpanel">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">Historial de Movimientos (Kardex)</h5>
+                <button class="btn btn-sm btn-reina px-3 rounded-pill" onclick="exportTableToExcel('tableKardexRep', 'Kardex_Reina')">
+                    <i class="fas fa-file-excel me-1"></i> Excel
+                </button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="tableKardexRep">
+                    <thead class="table-light text-uppercase small text-muted">
+                        <tr>
+                            <th class="ps-4">Fecha</th>
+                            <th>Insumo</th>
+                            <th>Tipo</th>
+                            <th>Motivo / Ref.</th>
+                            <th class="text-end">Entrada</th>
+                            <th class="text-end">Salida</th>
+                            <th class="text-end">Saldo Ant.</th>
+                            <th class="text-end pe-4">Saldo Post.</th>
+                        </tr>
+                    </thead>
+                    <tbody class="small">
+                        {% for m in kardex_movs %}
+                        <tr>
+                            <td class="ps-4 text-muted">{{ m.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="fw-bold text-dark">{{ m.insumo_nombre }}</td>
+                            <td>
+                                {% if m.tipo_movimiento in ['COMPRA', 'AJUSTE_INGRESO', 'ANULACION'] %}
+                                    <span class="badge bg-success rounded-pill px-2" style="font-size: 0.7rem;">INGRESO</span>
+                                {% else %}
+                                    <span class="badge bg-danger rounded-pill px-2" style="font-size: 0.7rem;">EGRESO</span>
+                                {% endif %}
+                                <br><small class="text-muted" style="font-size: 0.65rem;">{{ m.tipo_movimiento }}</small>
+                            </td>
+                            <td>{{ m.motivo or 'N/A' }} <br><small class="text-muted">Ref: {{ m.referencia_id or '---' }}</small></td>
+                            <td class="text-end text-success fw-bold">{% if m.cantidad_entrada > 0 %}+{{ "%.2f"|format(m.cantidad_entrada) }}{% else %}-{% endif %}</td>
+                            <td class="text-end text-danger fw-bold">{% if m.cantidad_salida > 0 %}-{{ "%.2f"|format(m.cantidad_salida) }}{% else %}-{% endif %}</td>
+                            <td class="text-end text-muted">{{ "%.2f"|format(m.saldo_anterior) }}</td>
+                            <td class="text-end fw-bold pe-4 text-dark">{{ "%.2f"|format(m.saldo_posterior) }}</td>
+                        </tr>
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>

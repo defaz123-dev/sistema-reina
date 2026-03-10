@@ -6,14 +6,14 @@ Este documento detalla la evolución final y la arquitectura de despliegue en la
 Para garantizar la máxima disponibilidad y rendimiento, el sistema opera bajo una arquitectura distribuida:
 - **Servidor de Aplicación**: [Render.com](https://render.com) (Plataforma PaaS para el motor Flask).
 - **Base de Datos**: [Aiven.io](https://aiven.io) (Managed MySQL de alto rendimiento).
-- **Servicio de Mensajería**: [Resend.com](https://resend.com) (API de correo profesional para el envío de facturas).
+- **Servicio de Mensajería**: [Brevo.com (Bravo)](https://brevo.com) (API de correo profesional para el envío de facturas).
 
 ## 2. Facturación Electrónica SRI
 - **Motor**: Generación y firma digital XAdES-BES nativa.
 - **Validación**: Motor SRI que verifica RUC/Cédula en tiempo real y cumple la ley de montos máximos ($50 para Consumidor Final).
 - **PDF de Alta Fidelidad**: Motor **FPDF** que genera RIDE profesional idéntico al diseño corporativo.
 
-## 3. Notificaciones Automáticas (Resend API)
+## 3. Notificaciones Automáticas (Bravo API)
 - **Tecnología**: Envío vía HTTPS/443 (Salto de bloqueos SMTP).
 - **Contenido**: Envío automático de XML autorizado y RIDE PDF al cliente.
 - **Trazabilidad**: Control de entrega visual en el historial de ventas.
@@ -27,7 +27,7 @@ Para garantizar la máxima disponibilidad y rendimiento, el sistema opera bajo u
 - **Interfaz Unificada**: Estandarización estética de botones de navegación ("Botón Inicio Elegante") y encabezados de módulos.
 - **Whitelabel Dinámico**: Personalización total de nombre, colores e iconografía de espera que se propaga a todo el sistema (Modales, Navbar, Tablas).
 - **Seguridad**: Cifrado AES para firmas y PBKDF2 para usuarios.
-- **Roles y Permisos**: Control granular de acceso con asignación dinámica de menús por perfil.
+- **Roles y Permisos**: Control granular de acceso con asignación dinámica de menús por perfil, incorporando nuevos módulos avanzados de **Auditoría** (trazabilidad de acciones), **Anulaciones** (reversión segura de ventas), y **Kardex** (movimientos detallados de inventario).
 
 ## 6. Sincronización y Respaldo
 - **Scripts de Restauración Pro**: Automatización de limpieza y recreación de base de datos con persistencia de datos maestros (Usuarios, Sucursales, Productos, Configuraciones).

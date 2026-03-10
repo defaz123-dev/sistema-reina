@@ -14,12 +14,12 @@ Propuesta integral para la implementación del **Sistema Reina (Versión Enterpr
 *   **Interfaz Premium Unificada:** Navegación optimizada con botones dinámicos y diseño estético en todos los módulos (POS, Inventario, Reportes, Usuarios).
 *   **Whitelabel Dinámico Total:** El sistema adopta automáticamente el color del tema y el nombre comercial de la empresa en cada ventana, modal y botón.
 *   **Gestión Multi-Plataforma:** Control de precios diferenciados para canales de venta (Local, Uber Eats, Pedidos Ya) integrados directamente en el POS.
-*   **Seguridad y Auditoría:** Registro de acciones de usuario y control de permisos por menús dinámicos.
+*   **Seguridad y Auditoría:** Registro de acciones de usuario y control de permisos por menús dinámicos, incorporando módulos avanzados como **Auditoría**, **Anulaciones** seguras de ventas y control **Kardex** de inventario.
 
 ### Infraestructura Multi-Cloud de Clase Mundial:
 *   **Application Server (Render):** Procesamiento de alto rendimiento para el motor Flask.
 *   **Managed Database (Aiven):** Clúster seguro y redundante de base de datos MySQL.
-*   **Delivery API (Resend):** Garantía del 100% en la entrega de facturas mediante protocolos HTTPS.
+*   **Delivery API (Bravo):** Garantía del 100% en la entrega de facturas mediante protocolos HTTPS.
 
 ---
 
@@ -31,16 +31,26 @@ Propuesta integral para la implementación del **Sistema Reina (Versión Enterpr
 | Concepto | Detalle | Total |
 | :--- | :--- | :---: |
 | **Licencia ENTERPRISE v2.1** | Motor SRI + Elegant Pro Interface + Whitelabel | $ 2,500.00 |
-| **Configuración Cloud** | Setup de Infraestructura Render, Aiven y Resend API | $ 500.00 |
+| **Configuración Cloud** | Setup de Infraestructura Render, Aiven y Bravo API | $ 500.00 |
 | **Capacitación y Auditoría** | Formación en gestión de costos y control de roles | $ 200.00 |
 | **TOTAL INVERSIÓN INICIAL** | | **$ 3,200.00** |
 | *Cloud Maintenance* | *Soporte VIP y Actualizaciones del SRI* | *$ 600.00/año* |
+
+### OPCIÓN B: ARRIENDO DE SOFTWARE (SaaS - MENSUAL)
+*Ideal para un inicio con baja inversión inicial.*
+
+| Concepto | Detalle | Mensualidad |
+| :--- | :--- | :---: |
+| **Plan RENTAL PRO** | Uso de Sistema Reina + Hosting + Soporte | $ 85.00 |
+| **Configuración Inicial** | Setup único de empresa y firma electrónica | $ 150.00 (único) |
+| **TOTAL INVERSIÓN INICIAL** | **Incluye Setup + 1er Mes de Arriendo** | **$ 235.00** |
+| **ACTUALIZACIONES** | Incluye todas las mejoras del SRI sin costo extra | INCLUIDO |
 
 ---
 
 ## 3. VENTAJAS COMPETITIVAS
 1.  **Diseño Corporativo de Alto Impacto:** El sistema se adapta a la identidad visual de su negocio de forma profesional.
-2.  **Fiabilidad en Facturación:** Uso de Resend API para asegurar que sus documentos lleguen siempre al cliente.
+2.  **Fiabilidad en Facturación:** Uso de Bravo API para asegurar que sus documentos lleguen siempre al cliente.
 3.  **Control Multicanal:** Ajuste de márgenes de ganancia por plataforma de venta externa.
 4.  **Recuperación Ante Desastres:** Incluye scripts de restauración rápida con persistencia de datos maestros.
 

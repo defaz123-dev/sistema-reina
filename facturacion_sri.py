@@ -418,9 +418,12 @@ def anular_factura_sri(venta_id, motivo, mysql, usuario_id):
                     nc_xml_autorizado = %s, mensaje_sri = 'AUTORIZADO (RECUPERADO)'
                 WHERE venta_id = %s
             """, (num_aut, xml_aut, venta_id))
-            cur.execute("UPDATE ventas SET anulada = 1, estado_sri = 'ANULADA' WHERE id = %s", (venta_id,))
+            
+            # Revertir transacción comercial (Stock, Kardex, Montos)
+            revertir_transaccion_venta(venta_id, mysql, usuario_id)
+            
             mysql.connection.commit()
-            return True, "Anulación sincronizada y autorizada."
+            return True, "Factura anulada con éxito. El inventario ha sido actualizado y los insumos han retornado al stock."
 
         # 2. GENERAR XML Y FIRMAR (Solo si no estaba autorizada)
         cur.execute("""
@@ -463,9 +466,12 @@ def anular_factura_sri(venta_id, motivo, mysql, usuario_id):
                             nc_xml_autorizado = %s, mensaje_sri = 'NOTA DE CRÉDITO AUTORIZADA'
                         WHERE venta_id = %s
                     """, (num_aut, xml_aut, venta_id))
-                    cur.execute("UPDATE ventas SET anulada = 1, estado_sri = 'ANULADA' WHERE id = %s", (venta_id,))
+                    
+                    # Revertir transacción comercial (Stock, Kardex, Montos)
+                    revertir_transaccion_venta(venta_id, mysql, usuario_id)
+                    
                     mysql.connection.commit()
-                    return True, "Factura anulada con Nota de Crédito autorizada."
+                    return True, "Factura anulada con Nota de Crédito autorizada. El inventario ha sido actualizado."
                 time.sleep(3)
             return False, "La Nota de Crédito sigue en procesamiento. El estado se ha actualizado en el historial."
         else:
@@ -477,6 +483,68 @@ def anular_factura_sri(venta_id, motivo, mysql, usuario_id):
         mysql.connection.rollback()
         return False, str(e)
     finally: cur.close()
+
+def revertir_transaccion_venta(venta_id, mysql, usuario_id):
+    """
+    Realiza la reversión total de una transacción comercial:
+    1. Marca la venta como ANULADA y pone montos en cero.
+    2. Identifica insumos por receta y devuelve al stock.
+    3. Registra movimientos de entrada en el historial de inventario (Kardex/Ajustes).
+    """
+    cur = mysql.connection.cursor()
+    try:
+        # 1. Obtener datos de la venta para el motivo del Kardex
+        cur.execute("SELECT establecimiento, punto_emision, secuencial, sucursal_id FROM ventas WHERE id = %s", (venta_id,))
+        v = cur.fetchone()
+        if not v: return
+        
+        nro_factura = f"{v['establecimiento']}-{v['punto_emision']}-{v['secuencial']}"
+        sucursal_id = v['sucursal_id']
+
+        # 2. Obtener detalles de la venta
+        cur.execute("SELECT producto_id, cantidad FROM detalles_ventas WHERE venta_id = %s", (venta_id,))
+        detalles = cur.fetchall()
+
+        for d in detalles:
+            p_id = d['producto_id']
+            cant_vendida = float(d['cantidad'])
+
+            # 3. Buscar receta del producto para saber qué insumos devolver
+            cur.execute("SELECT insumo_id, cantidad_requerida FROM recetas WHERE producto_id = %s", (p_id,))
+            receta = cur.fetchall()
+
+            for r in receta:
+                ins_id = r['insumo_id']
+                cant_a_devolver = float(r['cantidad_requerida']) * cant_vendida
+
+                # 4. Actualizar Stock de Insumo y Registrar en Kardex
+                cur.execute("SELECT stock_actual FROM insumos WHERE id = %s", (ins_id,))
+                saldo_ant = float(cur.fetchone()['stock_actual'])
+                saldo_post = saldo_ant + cant_a_devolver
+                cur.execute("UPDATE insumos SET stock_actual = %s WHERE id = %s", (saldo_post, ins_id))
+
+                cur.execute("""
+                    INSERT INTO kardex (insumo_id, sucursal_id, tipo_movimiento, motivo, referencia_id, cantidad_entrada, saldo_anterior, saldo_posterior, usuario_id)
+                    VALUES (%s, %s, 'ANULACION', %s, %s, %s, %s, %s, %s)
+                """, (ins_id, sucursal_id, f"ENTRADA POR ANULACIÓN DE FACTURA [{nro_factura}]", venta_id, cant_a_devolver, saldo_ant, saldo_post, usuario_id))
+
+        # 6. Actualizar montos de la venta a cero y marcar como anulada
+        cur.execute("""
+            UPDATE ventas 
+            SET anulada = 1, 
+                estado_sri = 'ANULADA',
+                subtotal_0 = 0, 
+                subtotal_15 = 0, 
+                iva_valor = 0, 
+                total = 0 
+            WHERE id = %s
+        """, (venta_id,))
+
+    except Exception as e:
+        log_sri(f"ERROR EN REVERSION: {str(e)}")
+        raise e # Re-lanzar para que anular_factura_sri haga el rollback
+    finally:
+        cur.close()
 
 def generar_xml_nota_credito_bytes(venta, empresa, detalles, motivo, clave_nc, fecha_nc):
     """

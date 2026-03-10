@@ -1,9 +1,11 @@
 {% extends "layout.html" %}
 {% block title %}Gestión de Anulaciones - {{ config_empresa.nombre_comercial }}{% endblock %}
 
+{% block container_class %}container-fluid px-4{% endblock %}
+
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-    <div class="container">
+    <div class="container-fluid px-4">
         <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}" style="color: {{ config_empresa.color_tema }} !important;">
             {{ config_empresa.nombre_comercial|upper }}
         </a>
@@ -17,70 +19,147 @@
 {% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12 mt-2">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h2 class="fw-bold mb-0">Gestión de Anulaciones</h2>
-                <p class="text-muted small">Historial de facturas dadas de baja ante el SRI.</p>
+<style>
+    /* Forzar ancho completo para esta pantalla específica */
+    .container.py-4 { max-width: 100% !important; width: 100% !important; padding-left: 30px !important; padding-right: 30px !important; }
+    .table-responsive { overflow-x: auto; }
+    #tablaAnulaciones th, #tablaAnulaciones td { white-space: nowrap; }
+    .action-icon { transition: transform 0.2s; }
+    .action-icon:hover { transform: scale(1.2); }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+    <div>
+        <h2 class="brand-logo mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Gestión de Anulaciones</h2>
+        <p class="text-muted small mb-0">Historial de facturas dadas de baja ante el SRI.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn-excel-reina" onclick="exportTableToExcel('tablaAnulaciones', 'anulaciones_reina')">
+            <i class="fas fa-file-excel me-2"></i> Excel
+        </button>
+        <button class="btn btn-reina btn-sm rounded-pill px-4 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalBuscarFactura" onclick="limpiarBuscador()">
+            <i class="fas fa-plus me-1"></i> NUEVA ANULACIÓN
+        </button>
+    </div>
+</div>
+
+<!-- Modal Buscador de Factura -->
+<div class="modal fade" id="modalBuscarFactura" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header text-white border-0 py-3" style="background-color: {{ config_empresa.color_tema }};">
+                <h5 class="modal-title fw-bold"><i class="fas fa-search me-2"></i> Buscar Factura para Anular</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <a href="{{ url_for('historial_ventas') }}" class="btn btn-outline-dark btn-sm rounded-pill px-4">
-                <i class="fas fa-search me-1"></i> BUSCAR FACTURA PARA ANULAR
-            </a>
+            <div class="modal-body p-4">
+                <div class="input-group mb-4 shadow-sm rounded-pill overflow-hidden border">
+                    <span class="input-group-text bg-white border-0 ps-3"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" id="inputBusquedaVenta" class="form-control border-0 py-2" placeholder="Buscar por Secuencial, Cédula o Nombre..." onkeyup="if(event.key==='Enter') buscarFacturasParaAnular()">
+                    <button class="btn text-white px-4 fw-bold" style="background-color: {{ config_empresa.color_tema }};" onclick="buscarFacturasParaAnular()">BUSCAR</button>
+                </div>
+                
+                <div id="resultadosBusqueda" class="list-group list-group-flush rounded-3 border d-none">
+                    <!-- Resultados vía JS -->
+                </div>
+                
+                <!-- Formulario de Motivo (Se muestra al seleccionar una factura) -->
+                <div id="formMotivoAnulacion" class="mt-4 p-3 bg-light rounded-4 d-none border border-danger">
+                    <h6 class="fw-bold text-danger mb-3"><i class="fas fa-exclamation-triangle me-2"></i> Detalles de la Anulación</h6>
+                    <form id="formFinalAnulacion" method="POST">
+                        <input type="hidden" name="venta_id" id="inputVentaId">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Factura Seleccionada:</label>
+                            <input type="text" id="infoFacturaSel" class="form-control bg-white fw-bold" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Motivo de la Baja:</label>
+                            <textarea name="motivo" class="form-control" rows="2" placeholder="Ej: Error en datos, devolución de mercadería..." required></textarea>
+                        </div>
+                        <div class="text-end">
+                            <button type="button" class="btn btn-light rounded-pill px-3 me-2" onclick="cancelarSeleccion()">CANCELAR</button>
+                            <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">CONFIRMAR BAJA ANTE EL SRI</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-    <div class="card-body p-0">
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" id="tablaAnulaciones">
-                <thead class="bg-light">
-                    <tr>
-                        <th class="ps-4">Solicitud</th>
+            <table class="table table-hover align-middle" id="tablaAnulaciones">
+                <thead class="table-light">
+                    <tr class="small text-muted text-uppercase">
+                        <th>Fecha Solicitud</th>
                         <th>Factura</th>
                         <th>Cliente</th>
-                        <th>Motivo</th>
-                        <th>Estado</th>
-                        <th class="text-end pe-4">Cajero</th>
+                        <th>Cajero</th>
+                        <th>Motivo de Baja</th>
+                        <th class="text-center">Estado SRI</th>
+                        <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for a in anulaciones %}
                     <tr>
-                        <td class="ps-4">
-                            <div class="fw-bold">{{ a.fecha_solicitud.strftime('%Y-%m-%d') }}</div>
-                            <div class="extra-small text-muted">{{ a.fecha_solicitud.strftime('%H:%M') }}</div>
+                        <td>
+                            <div class="small fw-bold">{{ a.fecha_solicitud.strftime('%Y-%m-%d %H:%M') }}</div>
                         </td>
                         <td>
-                            <div class="fw-bold text-dark">{{ a.establecimiento }}-{{ a.punto_emision }}-{{ a.secuencial }}</div>
+                            <div class="fw-bold small text-dark">{{ a.establecimiento }}-{{ a.punto_emision }}-{{ a.secuencial }}</div>
                             <div class="extra-small text-muted">Venta: {{ a.fecha_venta.strftime('%Y-%m-%d') }}</div>
                         </td>
                         <td>
                             <div class="small fw-bold">{{ a.nombres }} {{ a.apellidos }}</div>
                         </td>
+                        <td><small>{{ a.cajero }}</small></td>
                         <td>
-                            <div class="small text-muted text-truncate" style="max-width: 200px;" title="{{ a.motivo_anulacion }}">
+                            <div class="small text-muted text-truncate" style="max-width: 250px;" title="{{ a.motivo_anulacion }}">
                                 {{ a.motivo_anulacion }}
                             </div>
                         </td>
-                        <td>
+                        <td class="text-center">
                             {% if a.estado_anulacion == 'PROCESADO' %}
-                                <span class="badge bg-success-subtle text-success rounded-pill px-3">
-                                    <i class="fas fa-check-circle me-1"></i> PROCESADO
+                                <span class="badge bg-success rounded-pill px-3">
+                                    <i class="fas fa-check-circle me-1"></i> AUTORIZADO
+                                </span>
+                            {% elif a.mensaje_sri == 'REINTENTOS_AGOTADOS' %}
+                                <span class="badge bg-secondary text-white rounded-pill px-3" title="Se superaron los 10 intentos automáticos. Revise manualmente.">
+                                    <i class="fas fa-exclamation-circle me-1"></i> REINTENTOS AGOTADOS
+                                </span>
+                            {% elif a.mensaje_sri and (a.mensaje_sri.startswith('DEVUELTA') or a.mensaje_sri.startswith('ERROR_DATOS')) %}
+                                <span class="badge bg-danger text-white rounded-pill px-3" title="{{ a.mensaje_sri }}">
+                                    <i class="fas fa-times-circle me-1"></i> ERROR SRI (CORREGIR)
                                 </span>
                             {% elif a.estado_anulacion == 'PENDIENTE' %}
-                                <span class="badge bg-warning-subtle text-warning rounded-pill px-3">
-                                    <i class="fas fa-clock me-1"></i> PENDIENTE
+                                <span class="badge bg-info text-dark rounded-pill px-3 sri-nc-pending" id="badge-nc-{{ a.venta_id }}" title="{{ a.mensaje_sri or 'Esperando...' }}">
+                                    <i class="fas fa-sync-alt fa-spin me-1"></i> REINTENTO AUTOMÁTICO
                                 </span>
                             {% else %}
-                                <span class="badge bg-danger-subtle text-danger rounded-pill px-3">
-                                    <i class="fas fa-times-circle me-1"></i> ERROR
+                                <span class="badge bg-danger text-white rounded-pill px-3">
+                                    <i class="fas fa-times-circle me-1"></i> {{ a.estado_anulacion }}
                                 </span>
                             {% endif %}
                         </td>
-                        <td class="text-end pe-4">
-                            <div class="small fw-bold">{{ a.cajero }}</div>
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center align-items-center gap-1">
+                                {% if a.estado_anulacion == 'PROCESADO' %}
+                                <a href="{{ url_for('ver_ride', id=a.venta_id) }}" target="_blank" class="btn btn-outline-danger border-0" title="Ver RIDE Nota de Crédito">
+                                    <i class="fas fa-file-pdf fa-lg action-icon"></i>
+                                </a>
+                                <a href="{{ url_for('reenviar_email_venta', id=a.venta_id) }}" class="btn btn-outline-primary border-0" title="Enviar Email al Cliente" onclick="showLoading()">
+                                    <i class="fas fa-paper-plane fa-lg action-icon"></i>
+                                </a>
+                                {% endif %}
+
+                                {% if a.estado_anulacion != 'PROCESADO' %}
+                                <a href="{{ url_for('reintentar_anulacion_sri', id=a.venta_id) }}" class="btn btn-outline-primary border-0" title="Reintentar Envío SRI" onclick="showLoading()">
+                                    <i class="fas fa-cloud-upload-alt fa-lg action-icon"></i>
+                                </a>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% else %}
@@ -101,16 +180,101 @@
     .bg-success-subtle { background-color: rgba(25, 135, 84, 0.1) !important; }
     .bg-warning-subtle { background-color: rgba(255, 193, 7, 0.1) !important; }
     .bg-danger-subtle { background-color: rgba(220, 53, 69, 0.1) !important; }
+    .bg-info-subtle { background-color: rgba(13, 202, 240, 0.1) !important; }
     .extra-small { font-size: 0.75rem; }
 </style>
 
 {% block scripts %}
 <script>
+    // Hacer funciones disponibles globalmente
+    window.limpiarBuscador = function() {
+        document.getElementById('inputBusquedaVenta').value = '';
+        document.getElementById('resultadosBusqueda').innerHTML = '';
+        document.getElementById('resultadosBusqueda').classList.add('d-none');
+        document.getElementById('formMotivoAnulacion').classList.add('d-none');
+    };
+
+    window.buscarFacturasParaAnular = function() {
+        const termino = document.getElementById('inputBusquedaVenta').value.trim();
+        if (termino.length < 3) {
+            reinaAlert('Búsqueda', 'Ingrese al menos 3 caracteres para buscar.', 'info');
+            return;
+        }
+        
+        const contenedor = document.getElementById('resultadosBusqueda');
+        contenedor.innerHTML = '<div class="p-3 text-center"><i class="fas fa-spinner fa-spin me-2"></i> Buscando...</div>';
+        contenedor.classList.remove('d-none');
+        document.getElementById('formMotivoAnulacion').classList.add('d-none');
+
+        fetch(`/ventas/buscar_para_anular/${termino}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.ventas.length > 0) {
+                let html = '';
+                data.ventas.forEach(v => {
+                    html += `
+                        <button type="button" class="list-group-item list-group-item-action p-3" onclick="seleccionarFactura(${v.id}, '${v.establecimiento}-${v.punto_emision}-${v.secuencial}', '${v.nombres} ${v.apellidos}', ${v.total})">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1 fw-bold text-dark">${v.establecimiento}-${v.punto_emision}-${v.secuencial}</h6>
+                                    <small class="text-muted"><i class="fas fa-user me-1"></i> ${v.nombres} ${v.apellidos} | <i class="fas fa-calendar me-1"></i> ${v.fecha}</small>
+                                </div>
+                                <span class="badge bg-success rounded-pill px-3">$${parseFloat(v.total).toFixed(2)}</span>
+                            </div>
+                        </button>
+                    `;
+                });
+                contenedor.innerHTML = html;
+            } else {
+                contenedor.innerHTML = '<div class="p-3 text-center text-muted">No se encontraron facturas autorizadas pendientes de anulación.</div>';
+            }
+        })
+        .catch(err => {
+            contenedor.innerHTML = '<div class="p-3 text-center text-danger">Error al conectar con el servidor.</div>';
+        });
+    };
+
+    window.seleccionarFactura = function(id, nro, cliente, total) {
+        document.getElementById('inputVentaId').value = id;
+        document.getElementById('infoFacturaSel').value = `${nro} - ${cliente} ($${parseFloat(total).toFixed(2)})`;
+        document.getElementById('formFinalAnulacion').action = `/ventas/anular/${id}`;
+        
+        document.getElementById('resultadosBusqueda').classList.add('d-none');
+        document.getElementById('formMotivoAnulacion').classList.remove('d-none');
+    };
+
+    window.cancelarSeleccion = function() {
+        document.getElementById('formMotivoAnulacion').classList.add('d-none');
+        document.getElementById('resultadosBusqueda').classList.remove('d-none');
+    };
+
     $(document).ready(function() {
         $('#tablaAnulaciones').DataTable({
             "order": [[ 0, "desc" ]],
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" }
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
+            "dom": '<"row mb-3"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
         });
+
+        // Refresco automático silencioso para Notas de Crédito en proceso
+        setInterval(function() {
+            const pendingItems = document.querySelectorAll('.sri-nc-pending');
+            if (pendingItems.length > 0) {
+                fetch("{{ url_for('sri_nc_status') }}")
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        let needsReload = false;
+                        pendingItems.forEach(badge => {
+                            let id = badge.id.split('-')[2];
+                            if (!data.estados || !data.estados[id] || data.estados[id].estado !== 'PENDIENTE') {
+                                needsReload = true;
+                            }
+                        });
+                        if (needsReload) location.reload();
+                    }
+                });
+            }
+        }, 30000);
     });
 </script>
 {% endblock %}

@@ -425,24 +425,28 @@ CREATE TABLE `auditoria` (
   CONSTRAINT `auditoria_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4;
 
-DROP TABLE IF EXISTS `ajustes_inventario`;
-CREATE TABLE `ajustes_inventario` (
+DROP TABLE IF EXISTS `kardex`;
+CREATE TABLE `kardex` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `insumo_id` int(11) DEFAULT NULL,
-  `cantidad` decimal(10,2) DEFAULT NULL,
-  `tipo` enum('INGRESO','EGRESO') DEFAULT NULL,
+  `insumo_id` int(11) NOT NULL,
+  `sucursal_id` int(11) NOT NULL,
+  `tipo_movimiento` varchar(50) NOT NULL,
   `motivo` varchar(255) DEFAULT NULL,
-  `usuario_id` int(11) DEFAULT NULL,
+  `referencia_id` int(11) DEFAULT NULL,
+  `cantidad_entrada` decimal(10,4) DEFAULT '0.0000',
+  `cantidad_salida` decimal(10,4) DEFAULT '0.0000',
+  `saldo_anterior` decimal(10,4) NOT NULL,
+  `saldo_posterior` decimal(10,4) NOT NULL,
+  `costo_unitario` decimal(10,4) DEFAULT NULL,
+  `usuario_id` int(11) NOT NULL,
   `fecha` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `usuario_creacion_id` int(11) DEFAULT NULL,
-  `fecha_creacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `usuario_modificacion_id` int(11) DEFAULT NULL,
-  `fecha_modificacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `insumo_id` (`insumo_id`),
+  KEY `sucursal_id` (`sucursal_id`),
   KEY `usuario_id` (`usuario_id`),
-  CONSTRAINT `ajustes_inventario_ibfk_1` FOREIGN KEY (`insumo_id`) REFERENCES `insumos` (`id`),
-  CONSTRAINT `ajustes_inventario_ibfk_2` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`)
+  CONSTRAINT `kardex_ibfk_1` FOREIGN KEY (`insumo_id`) REFERENCES `insumos` (`id`),
+  CONSTRAINT `kardex_ibfk_2` FOREIGN KEY (`sucursal_id`) REFERENCES `sucursales` (`id`),
+  CONSTRAINT `kardex_ibfk_3` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `anulaciones_factura`;
@@ -571,6 +575,8 @@ INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUE
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (14, 'Empresa', 'configuracion_empresa', 'fas fa-building', 'ADMINISTRATIVO', 14);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (15, 'Auditoría', 'ver_auditoria', 'fas fa-history', 'ADMINISTRATIVO', 15);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (16, 'Reportes', 'reportes', 'fas fa-chart-pie', 'ADMINISTRATIVO', 16);
+INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (17, 'Anulaciones', 'listar_anulaciones', 'fas fa-ban', 'OPERATIVO', 17);
+INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (18, 'Kardex', 'kardex_movimientos', 'fas fa-exchange-alt', 'ADMINISTRATIVO', 18);
 
 -- Datos para rol_menus
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (1, 1, 1);
@@ -589,6 +595,8 @@ INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (13, 1, 13);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (14, 1, 14);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (15, 1, 15);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (16, 1, 16);
+INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (22, 1, 17);
+INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (23, 1, 18);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (17, 2, 1);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (18, 2, 2);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (19, 2, 3);

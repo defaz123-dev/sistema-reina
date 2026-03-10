@@ -1,9 +1,11 @@
 {% extends "layout.html" %}
 {% block title %}Administración de Roles y Menús - {{ config_empresa.nombre_comercial }}{% endblock %}
 
+{% block container_class %}container-fluid px-4{% endblock %}
+
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-    <div class="container">
+    <div class="container-fluid px-4">
         <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}" style="color: {{ config_empresa.color_tema }} !important;">
             {{ config_empresa.nombre_comercial|upper }}
         </a>

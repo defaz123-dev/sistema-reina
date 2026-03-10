@@ -60,6 +60,46 @@
     {% endif %}
 </div>
 
+{% if alerta_sri %}
+<div class="row mt-3 justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="alert alert-danger shadow-sm border-0 d-flex align-items-center" role="alert" style="border-radius: 15px;">
+            <i class="fas fa-exclamation-triangle fa-2x me-3 animate__animated animate__flash animate__infinite"></i>
+            <div>
+                <h6 class="fw-bold mb-1">¡Alerta de Conectividad SRI!</h6>
+                <p class="mb-0 small">Existen documentos (facturas o notas de crédito) con múltiples intentos fallidos de envío. Por favor, verifique si el SRI está inactivo o revise el detalle de errores en el módulo de Ventas.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if session['rol'] == 'ADMINISTRADOR' and ultimo_movimiento %}
+<div class="row mt-4 justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 border-start border-info border-4">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-muted mb-0"><i class="fas fa-history text-info me-2"></i>Último Movimiento Kardex</h6>
+                    <small class="text-muted">{{ ultimo_movimiento.fecha.strftime('%d/%m %H:%M') }}</small>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="fw-bold text-dark">{{ ultimo_movimiento.insumo }}</div>
+                    <div>
+                        {% if ultimo_movimiento.cantidad_entrada > 0 %}
+                            <span class="badge bg-success rounded-pill">+{{ "%.2f"|format(ultimo_movimiento.cantidad_entrada) }}</span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill">-{{ "%.2f"|format(ultimo_movimiento.cantidad_salida) }}</span>
+                        {% endif %}
+                        <small class="text-muted d-block text-end mt-1" style="font-size: 0.65rem;">{{ ultimo_movimiento.tipo_movimiento }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <style>
     .main-card { 
         transition: all 0.3s cubic-bezier(.25,.8,.25,1); 

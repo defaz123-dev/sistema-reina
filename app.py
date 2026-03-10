@@ -301,7 +301,30 @@ def logout(): session.clear(); return redirect(url_for('index'))
 
 @app.route('/dashboard')
 @login_required
-def dashboard(): return render_template('dashboard.html')
+def dashboard(): 
+    cur = mysql.connection.cursor()
+    ultimo_movimiento = None
+    alerta_sri = False
+    
+    if session.get('rol') == 'ADMINISTRADOR':
+        cur.execute("""
+            SELECT k.tipo_movimiento, k.fecha, i.nombre as insumo, k.cantidad_entrada, k.cantidad_salida 
+            FROM kardex k 
+            JOIN insumos i ON k.insumo_id = i.id 
+            ORDER BY k.fecha DESC LIMIT 1
+        """)
+        ultimo_movimiento = cur.fetchone()
+        
+        # Verificar documentos atascados
+        cur.execute("SELECT COUNT(*) as c FROM ventas WHERE intentos_envio > 5")
+        atascos_v = cur.fetchone()['c']
+        cur.execute("SELECT COUNT(*) as c FROM anulaciones_factura WHERE intentos_envio > 5")
+        atascos_a = cur.fetchone()['c']
+        if atascos_v > 0 or atascos_a > 0:
+            alerta_sri = True
+
+    cur.close()
+    return render_template('dashboard.html', ultimo_movimiento=ultimo_movimiento, alerta_sri=alerta_sri)
 
 # --- CLIENTES ---
 @app.route('/clientes')
@@ -495,16 +518,47 @@ def guardar_insumo():
 def ajustar_inventario():
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
     ins_id, cant, tipo, mot = d['insumo_id'], float(d['cantidad']), d['tipo'], d['motivo'].upper()
-    cur.execute("INSERT INTO ajustes_inventario (insumo_id, cantidad, tipo, motivo, usuario_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s)", (ins_id, cant, tipo, mot, u_id, u_id, u_id))
-    if tipo == 'INGRESO': cur.execute("UPDATE insumos SET stock_actual = stock_actual + %s WHERE id = %s", (cant, ins_id))
-    else: cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (cant, ins_id))
     
-    # Obtener nombre del insumo para auditoría
-    cur.execute("SELECT nombre FROM insumos WHERE id = %s", (ins_id,))
-    nom_ins = cur.fetchone()['nombre']
+    cur.execute("SELECT nombre, stock_actual, sucursal_id FROM insumos WHERE id = %s", (ins_id,))
+    ins_data = cur.fetchone()
+    nom_ins = ins_data['nombre']
+    saldo_anterior = float(ins_data['stock_actual'])
+    suc_id = ins_data['sucursal_id']
+    
+    if tipo == 'INGRESO': 
+        saldo_posterior = saldo_anterior + cant
+        cur.execute("UPDATE insumos SET stock_actual = %s WHERE id = %s", (saldo_posterior, ins_id))
+        cur.execute("""INSERT INTO kardex (insumo_id, sucursal_id, tipo_movimiento, motivo, cantidad_entrada, saldo_anterior, saldo_posterior, usuario_id) 
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", 
+                    (ins_id, suc_id, 'AJUSTE_INGRESO', mot, cant, saldo_anterior, saldo_posterior, u_id))
+    else: 
+        saldo_posterior = saldo_anterior - cant
+        cur.execute("UPDATE insumos SET stock_actual = %s WHERE id = %s", (saldo_posterior, ins_id))
+        cur.execute("""INSERT INTO kardex (insumo_id, sucursal_id, tipo_movimiento, motivo, cantidad_salida, saldo_anterior, saldo_posterior, usuario_id) 
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", 
+                    (ins_id, suc_id, 'AJUSTE_EGRESO', mot, cant, saldo_anterior, saldo_posterior, u_id))
+    
     registrar_auditoria('INVENTARIO', f"Ajuste manual ({tipo}): {nom_ins} x {cant} - Motivo: {mot}")
     
     mysql.connection.commit(); cur.close(); flash('Ajuste realizado', 'success'); return redirect(url_for('inventario'))
+
+@app.route('/inventario/kardex')
+@login_required
+@admin_required
+def kardex_movimientos():
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        SELECT k.*, i.nombre as insumo_nombre, u.usuario as usuario_nombre, s.nombre as sucursal_nombre
+        FROM kardex k
+        JOIN insumos i ON k.insumo_id = i.id
+        JOIN usuarios u ON k.usuario_id = u.id
+        JOIN sucursales s ON k.sucursal_id = s.id
+        ORDER BY k.fecha DESC
+        LIMIT 500
+    """)
+    movimientos = cur.fetchall()
+    cur.close()
+    return render_template('kardex.html', movimientos=movimientos)
 
 # --- COMPRAS ---
 @app.route('/compras')
@@ -537,7 +591,16 @@ def guardar_compra():
         if not f_cad or str(f_cad).strip() == '': f_cad = None
         if id_c:
             cur.execute("SELECT insumo_id, cantidad FROM detalles_compras WHERE compra_id = %s", (id_c,))
-            for iv in cur.fetchall(): cur.execute("UPDATE insumos SET stock_actual = stock_actual - %s WHERE id = %s", (iv['cantidad'], iv['insumo_id']))
+            for iv in cur.fetchall(): 
+                # Revertir compra anterior en Kardex
+                cur.execute("SELECT stock_actual FROM insumos WHERE id = %s", (iv['insumo_id'],))
+                saldo_ant = float(cur.fetchone()['stock_actual'])
+                saldo_post = saldo_ant - float(iv['cantidad'])
+                cur.execute("UPDATE insumos SET stock_actual = %s WHERE id = %s", (saldo_post, iv['insumo_id']))
+                cur.execute("""INSERT INTO kardex (insumo_id, sucursal_id, tipo_movimiento, motivo, referencia_id, cantidad_salida, saldo_anterior, saldo_posterior, usuario_id) 
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
+                            (iv['insumo_id'], s_id, 'AJUSTE_EGRESO', 'EDICIÓN DE COMPRA (REVERSIÓN)', id_c, iv['cantidad'], saldo_ant, saldo_post, u_id))
+            
             cur.execute("UPDATE compras SET proveedor_id=%s, sucursal_id=%s, establecimiento=%s, punto_emision=%s, numero_comprobante=%s, total=%s, fecha=%s, clave_acceso=%s, numero_autorizacion=%s, fecha_caducidad=%s, usuario_modificacion_id=%s WHERE id=%s", (data['proveedor_id'], s_id, est, pto, sec, data['total'], f, data.get('clave_acceso'), n_aut, f_cad, u_id, id_c))
             cur.execute("DELETE FROM detalles_compras WHERE compra_id = %s", (id_c,)); comp_id = id_c
         else:
@@ -546,7 +609,14 @@ def guardar_compra():
             comp_id = cur.lastrowid
         for i in data['items']:
             cur.execute("INSERT INTO detalles_compras (compra_id, insumo_id, cantidad, costo_unitario, subtotal, iva_valor) VALUES (%s,%s,%s,%s,%s,%s)", (comp_id, i['insumo_id'], i['cantidad'], i['costo'], i['subtotal'], i['iva_valor']))
-            cur.execute("UPDATE insumos SET stock_actual = stock_actual + %s WHERE id = %s", (i['cantidad'], i['insumo_id']))
+            
+            cur.execute("SELECT stock_actual FROM insumos WHERE id = %s", (i['insumo_id'],))
+            saldo_ant = float(cur.fetchone()['stock_actual'])
+            saldo_post = saldo_ant + float(i['cantidad'])
+            cur.execute("UPDATE insumos SET stock_actual = %s WHERE id = %s", (saldo_post, i['insumo_id']))
+            cur.execute("""INSERT INTO kardex (insumo_id, sucursal_id, tipo_movimiento, motivo, referencia_id, cantidad_entrada, saldo_anterior, saldo_posterior, costo_unitario, usuario_id) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
+                        (i['insumo_id'], s_id, 'COMPRA', f"FACTURA DE COMPRA {est}-{pto}-{sec}", comp_id, i['cantidad'], saldo_ant, saldo_post, i['costo'], u_id))
         
         # REGISTRAR AUDITORÍA (Si es nueva compra)
         if not id_c:
@@ -1081,118 +1151,70 @@ def cerrar_caja():
 def cierre_diario():
     cur = mysql.connection.cursor()
     s_id = session['sucursal_id']
+    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
     
-    # Verificar si hay sesiones abiertas
-    cur.execute("SELECT u.usuario, s.fecha_apertura FROM sesiones_caja s JOIN usuarios u ON s.usuario_id = u.id WHERE s.sucursal_id = %s AND s.estado = 'ABIERTA'", (s_id,))
-    abiertas = cur.fetchall()
+    # 1. Verificar si ya existe un cierre para hoy en esta sucursal
+    cur.execute("SELECT id FROM cierres_diarios WHERE sucursal_id = %s AND fecha_dia = %s", (s_id, fecha_hoy))
+    if cur.fetchone():
+        cur.close()
+        flash('Ya se ha realizado el cierre consolidado de este día.', 'warning')
+        return redirect(url_for('reportes'))
+
+    # 2. Resumen de Turnos del Día
+    cur.execute("""
+        SELECT COUNT(*) as turnos, SUM(monto_ventas_efectivo) as efe, SUM(monto_ventas_tarjeta) as tar, 
+               SUM(monto_ventas_transferencia) as tra, SUM(monto_egresos) as egr
+        FROM sesiones_caja 
+        WHERE sucursal_id = %s AND DATE(fecha_apertura) = %s AND estado = 'CERRADA'
+    """, (s_id, fecha_hoy))
+    res = cur.fetchone()
     
-    hoy = datetime.now().strftime('%Y-%m-%d')
-    # Sumar todo lo de hoy que esté CERRADO y no consolidado
-    cur.execute("""
-        SELECT 
-            COUNT(id) as turnos,
-            SUM(monto_ventas_efectivo) as t_efectivo,
-            SUM(monto_ventas_tarjeta) as t_tarjeta,
-            SUM(monto_ventas_transferencia) as t_trans,
-            SUM(monto_egresos) as t_egresos,
-            SUM(monto_final_real) as saldo_real_entregado
-        FROM sesiones_caja
-        WHERE sucursal_id = %s AND estado = 'CERRADA' AND DATE(fecha_cierre) = %s
-    """, (s_id, hoy))
-    resumen = cur.fetchone()
-
-    # Detalle por cajero (sesiones cerradas hoy)
-    cur.execute("""
-        SELECT 
-            s.id,
-            u.usuario,
-            s.fecha_apertura,
-            s.fecha_cierre,
-            s.monto_inicial,
-            s.monto_ventas_efectivo,
-            s.monto_ventas_tarjeta,
-            s.monto_ventas_transferencia,
-            s.monto_egresos,
-            s.monto_final_real
-        FROM sesiones_caja s
-        JOIN usuarios u ON s.usuario_id = u.id
-        WHERE s.sucursal_id = %s AND s.estado = 'CERRADA' AND DATE(s.fecha_cierre) = %s
-        ORDER BY s.fecha_cierre DESC
-    """, (s_id, hoy))
-    detalle_cajeros = cur.fetchall()
-
-    # Por cada sesión, traer su desglose de tarjetas y lista de egresos
-    for ses in detalle_cajeros:
-        # Desglose tarjetas
-        cur.execute("""
-            SELECT ct.nombre as tarjeta, SUM(v.total) as total 
-            FROM ventas v 
-            JOIN cat_tarjetas ct ON v.id_tarjeta = ct.id 
-            WHERE v.sesion_caja_id = %s AND v.forma_pago = 'TARJETA'
-            GROUP BY ct.id
-        """, (ses['id'],))
-        ses['desglose_tarjetas'] = cur.fetchall()
-
-        # Lista egresos
-        cur.execute("SELECT descripcion, monto FROM egresos WHERE sesion_caja_id = %s", (ses['id'],))
-        ses['lista_egresos'] = cur.fetchall()
-
-    cur.execute("SELECT * FROM cierres_diarios WHERE sucursal_id = %s ORDER BY fecha_cierre DESC LIMIT 5", (s_id,))
-    historial = cur.fetchall()
-
+    # 3. Validar si hay turnos abiertos
+    cur.execute("SELECT COUNT(*) as c FROM sesiones_caja WHERE sucursal_id = %s AND DATE(fecha_apertura) = %s AND estado = 'ABIERTA'", (s_id, fecha_hoy))
+    abiertos = cur.fetchone()['c']
+    
     cur.close()
-    return render_template('cierre_diario.html', abiertas=abiertas, resumen=resumen, historial=historial, hoy=hoy, detalle_cajeros=detalle_cajeros)
-@app.route('/caja/ejecutar_cierre_diario', methods=['POST'])
+    return render_template('cierre_diario.html', res=res, fecha=fecha_hoy, abiertos=abiertos)
+
+@app.route('/caja/ejecutar_cierre', methods=['POST'])
 @login_required
 @admin_required
 def ejecutar_cierre_diario():
     cur = mysql.connection.cursor()
-    s_id = session['sucursal_id']
-    u_id = session['user_id']
-    obs = request.form.get('observaciones', '')
-    hoy = datetime.now().strftime('%Y-%m-%d')
-    
-    # 1. VALIDACIÓN CRÍTICA: ¿Ya se hizo el cierre hoy?
-    cur.execute("SELECT id FROM cierres_diarios WHERE sucursal_id = %s AND fecha_dia = %s", (s_id, hoy))
-    if cur.fetchone():
+    try:
+        s_id = session['sucursal_id']
+        u_id = session['user_id']
+        fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+        
+        # Recalcular totales para seguridad
+        cur.execute("""
+            SELECT COUNT(*) as turnos, SUM(monto_ventas_efectivo) as efe, SUM(monto_ventas_tarjeta) as tar, 
+                   SUM(monto_ventas_transferencia) as tra, SUM(monto_egresos) as egr
+            FROM sesiones_caja 
+            WHERE sucursal_id = %s AND DATE(fecha_apertura) = %s AND estado = 'CERRADA'
+        """, (s_id, fecha_hoy))
+        r = cur.fetchone()
+        
+        if not r or r['turnos'] == 0:
+            return redirect(url_for('dashboard'))
+
+        total_ventas = float(r['efe'] or 0) + float(r['tar'] or 0) + float(r['tra'] or 0)
+        saldo_final = total_ventas - float(r['egr'] or 0)
+
+        cur.execute("""
+            INSERT INTO cierres_diarios (sucursal_id, usuario_id, fecha_dia, total_efectivo, total_tarjetas, total_transferencias, total_egresos, saldo_final_caja, cantidad_turnos)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (s_id, u_id, fecha_hoy, r['efe'], r['tar'], r['tra'], r['egr'], saldo_final, r['turnos']))
+        
+        mysql.connection.commit()
+        registrar_auditoria('CIERRE', f"Cierre diario consolidado sucursal ID {s_id}")
+        flash('Cierre diario realizado con éxito y consolidado en reportes.', 'success')
+    except Exception as e:
+        mysql.connection.rollback()
+        flash(f'Error al cerrar: {str(e)}', 'danger')
+    finally:
         cur.close()
-        flash('El Cierre Diario para hoy ya fue realizado previamente.', 'warning')
-        return redirect(url_for('cierre_diario'))
-    
-    # Verificar sesiones abiertas
-    cur.execute("SELECT id FROM sesiones_caja WHERE sucursal_id = %s AND estado = 'ABIERTA'", (s_id,))
-    if cur.fetchone():
-        flash('No se puede hacer el cierre diario. Hay turnos de empleados aún abiertos.', 'danger')
-        return redirect(url_for('cierre_diario'))
-        
-    cur.execute("""
-        SELECT 
-            COUNT(id) as turnos_conteo,
-            SUM(monto_ventas_efectivo + monto_ventas_tarjeta + monto_ventas_transferencia) as total_v,
-            SUM(monto_ventas_efectivo) as t_efectivo,
-            SUM(monto_ventas_tarjeta) as t_tarjeta,
-            SUM(monto_ventas_transferencia) as t_trans,
-            SUM(monto_egresos) as t_egresos,
-            SUM(monto_final_real) as saldo_real
-        FROM sesiones_caja 
-        WHERE sucursal_id = %s AND estado = 'CERRADA' AND DATE(fecha_cierre) = %s
-    """, (s_id, hoy))
-    res = cur.fetchone()
-    
-    if not res or res['total_v'] is None:
-        flash('No hay movimientos en turnos cerrados hoy para consolidar.', 'warning')
-        return redirect(url_for('cierre_diario'))
-        
-    cur.execute("""
-        INSERT INTO cierres_diarios (sucursal_id, usuario_id, cantidad_turnos, fecha_dia, total_ventas, total_efectivo, total_tarjetas, total_transferencias, total_egresos, saldo_final_caja, observaciones)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """, (s_id, u_id, res['turnos_conteo'], hoy, res['total_v'], res['t_efectivo'], res['t_tarjeta'], res['t_trans'], res['t_egresos'], res['saldo_real'], obs))
-    
-    mysql.connection.commit()
-    registrar_auditoria('CAJA_ADMIN', f"Ejecutó Cierre Diario. Saldo Consolidado: ${res['saldo_real']:.2f}")
-    cur.close()
-    flash('Cierre Diario Consolidado exitosamente.', 'success')
-    return redirect(url_for('cierre_diario'))
+    return redirect(url_for('reportes'))
 
 # --- POS ---
 @app.route('/pos')
@@ -1259,7 +1281,17 @@ def procesar_venta_v2():
             i_tot = float(i['precio']) * int(i['cantidad']); i_iva = i_tot - (i_tot / divisor)
             cur.execute("INSERT INTO detalles_ventas (venta_id, producto_id, cantidad, precio_unitario, subtotal, iva_valor) VALUES (%s,%s,%s,%s,%s,%s)", (v_id, i['id'], i['cantidad'], i['precio'], i_tot, i_iva))
             cur.execute("SELECT insumo_id, cantidad_requerida FROM recetas WHERE producto_id=%s", (i['id'],))
-            for r in cur.fetchall(): cur.execute("UPDATE insumos SET stock_actual=stock_actual-%s WHERE id=%s AND sucursal_id=%s", (float(r['cantidad_requerida']) * int(i['cantidad']), r['insumo_id'], s_id))
+            for r in cur.fetchall(): 
+                cant_descontar = float(r['cantidad_requerida']) * int(i['cantidad'])
+                cur.execute("SELECT stock_actual FROM insumos WHERE id = %s AND sucursal_id = %s", (r['insumo_id'], s_id))
+                ins_data = cur.fetchone()
+                if ins_data:
+                    saldo_ant = float(ins_data['stock_actual'])
+                    saldo_post = saldo_ant - cant_descontar
+                    cur.execute("UPDATE insumos SET stock_actual=%s WHERE id=%s", (saldo_post, r['insumo_id']))
+                    cur.execute("""INSERT INTO kardex (insumo_id, sucursal_id, tipo_movimiento, motivo, referencia_id, cantidad_salida, saldo_anterior, saldo_posterior, usuario_id) 
+                                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
+                                (r['insumo_id'], s_id, 'VENTA', f"VENTA FACTURA {est}-{pto}-{sec_str}", v_id, cant_descontar, saldo_ant, saldo_post, u_id))
         mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta ID: {v_id} registrada")
         
         # REGISTRAR INGRESO EN FLUJO DE CAJA SI ES EFECTIVO
@@ -1307,12 +1339,86 @@ def historial_ventas():
 def reintentar_sri(id):
     import facturacion_sri
     try:
+        # Resetear intentos para que el worker o el proceso manual tengan vía libre
+        cur = mysql.connection.cursor()
+        cur.execute("UPDATE ventas SET intentos_envio = 0, proximo_reintento = NOW(), estado_sri = 'PENDIENTE' WHERE id = %s", (id,))
+        mysql.connection.commit()
+        cur.close()
+
         if facturacion_sri.procesar_factura_electronica(id, mysql): 
             flash('Sincronización completada', 'success')
             enviar_comprobante_email(id)
-        else: flash('El SRI reportó novedades', 'warning')
+        else: flash('El SRI reportó novedades. El sistema seguirá reintentando automáticamente.', 'warning')
     except Exception as e: flash(str(e), 'danger')
     return redirect(url_for('historial_ventas'))
+
+@app.route('/ventas/reintentar_anulacion/<int:id>')
+@login_required
+@admin_required
+def reintentar_anulacion_sri(id):
+    import facturacion_sri
+    try:
+        cur = mysql.connection.cursor()
+        # Traer motivo para el reintento
+        cur.execute("SELECT motivo_anulacion FROM anulaciones_factura WHERE venta_id = %s", (id,))
+        anul = cur.fetchone()
+        
+        # Resetear intentos
+        cur.execute("UPDATE anulaciones_factura SET intentos_envio = 0, proximo_reintento = NOW(), estado_anulacion = 'PENDIENTE' WHERE venta_id = %s", (id,))
+        mysql.connection.commit()
+        cur.close()
+
+        if anul:
+            success, message = facturacion_sri.anular_factura_sri(id, anul['motivo_anulacion'], mysql, session.get('user_id'))
+            if success:
+                enviar_comprobante_email(id, forzar=True)
+                flash('Nota de Crédito autorizada y enviada.', 'success')
+            else:
+                flash(f'Novedad: {message}. El sistema seguirá reintentando automáticamente.', 'warning')
+        else:
+            flash('No se encontró el registro de anulación.', 'danger')
+    except Exception as e: flash(str(e), 'danger')
+    return redirect(url_for('listar_anulaciones'))
+
+@app.route('/ventas/sri_status')
+@login_required
+def sri_status():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id, estado_sri, autorizado_sri FROM ventas WHERE autorizado_sri = 0 OR estado_sri = 'ANULACIÓN EN PROCESO'")
+    estados = cur.fetchall()
+    cur.close()
+    return jsonify({'success': True, 'estados': {str(e['id']): {'estado': e['estado_sri'], 'autorizado': e['autorizado_sri']} for e in estados}})
+
+@app.route('/ventas/sri_nc_status')
+@login_required
+def sri_nc_status():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT venta_id, estado_anulacion, mensaje_sri FROM anulaciones_factura WHERE estado_anulacion = 'PENDIENTE'")
+    estados = cur.fetchall()
+    cur.close()
+    return jsonify({'success': True, 'estados': {str(e['venta_id']): {'estado': e['estado_anulacion'], 'mensaje': e['mensaje_sri']} for e in estados}})
+
+@app.route('/ventas/buscar_para_anular/<string:termino>')
+@login_required
+@admin_required
+def buscar_para_anular(termino):
+    cur = mysql.connection.cursor()
+    search = f"%{termino}%"
+    cur.execute("""
+        SELECT v.id, v.establecimiento, v.punto_emision, v.secuencial, v.total, v.fecha, 
+               c.nombres, c.apellidos, c.cedula_ruc
+        FROM ventas v
+        JOIN clientes c ON v.cliente_id = c.id
+        WHERE (v.secuencial LIKE %s OR c.cedula_ruc LIKE %s OR c.nombres LIKE %s OR c.apellidos LIKE %s)
+          AND v.autorizado_sri = 1 
+          AND v.anulada = 0
+        LIMIT 10
+    """, (search, search, search, search))
+    ventas = cur.fetchall()
+    cur.close()
+    # Formatear fechas para JSON
+    for v in ventas: v['fecha'] = v['fecha'].strftime('%Y-%m-%d %H:%M')
+    return jsonify({'success': True, 'ventas': ventas})
 
 @app.route('/ventas/anulaciones')
 @login_required
@@ -1431,12 +1537,16 @@ def ver_ride(id):
 
         # Detalles
         for d_node in f_xml.find('detalles').findall('detalle'):
+            cp = d_node.find('codigoPrincipal')
+            ci = d_node.find('codigoInterno')
+            codigo_val = (cp.text if cp is not None else (ci.text if ci is not None else "S/C"))
+            
             datos['detalles'].append({
-                'codigo': (d_node.find('codigoPrincipal') or d_node.find('codigoInterno')).text, 
-                'descripcion': d_node.find('descripcion').text, 
-                'cantidad': float(d_node.find('cantidad').text), 
-                'precio_unitario': float(d_node.find('precioUnitario').text), 
-                'total': float(d_node.find('precioTotalSinImpuesto').text)
+                'codigo': codigo_val, 
+                'descripcion': d_node.find('descripcion').text if d_node.find('descripcion') is not None else "PRODUCTO", 
+                'cantidad': float(d_node.find('cantidad').text or 0), 
+                'precio_unitario': float(d_node.find('precioUnitario').text or 0), 
+                'total': float(d_node.find('precioTotalSinImpuesto').text or 0)
             })
 
         cur.execute("SELECT * FROM empresa LIMIT 1"); emp = cur.fetchone(); cur.close()
@@ -1578,6 +1688,18 @@ def utilidad_real():
 @admin_required
 def reportes():
     cur = mysql.connection.cursor()
+    # 1. Movimientos de Kardex
+    cur.execute("""
+        SELECT k.*, i.nombre as insumo_nombre, u.usuario as usuario_nombre, s.nombre as sucursal_nombre
+        FROM kardex k
+        JOIN insumos i ON k.insumo_id = i.id
+        JOIN usuarios u ON k.usuario_id = u.id
+        JOIN sucursales s ON k.sucursal_id = s.id
+        ORDER BY k.fecha DESC
+        LIMIT 500
+    """)
+    kardex_movs = cur.fetchall()
+
     cur.execute("SELECT v.*, c.nombres, c.apellidos, u.usuario FROM ventas v JOIN clientes c ON v.cliente_id=c.id JOIN usuarios u ON v.usuario_id=u.id ORDER BY v.fecha DESC"); v = cur.fetchall()
     cur.execute("SELECT p.nombre, SUM(dv.cantidad) as total_vendido FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id GROUP BY p.id ORDER BY total_vendido DESC LIMIT 5"); t = cur.fetchall()
     cur.execute("SELECT p.nombre, p.precio, (SELECT SUM(r.cantidad_requerida * IFNULL((SELECT dc.costo_unitario FROM detalles_compras dc WHERE dc.insumo_id = r.insumo_id ORDER BY dc.id DESC LIMIT 1), 0)) FROM recetas r WHERE r.producto_id = p.id) as costo_receta FROM productos p ORDER BY (p.precio - IFNULL(costo_receta, 0)) DESC"); rent = cur.fetchall()
@@ -1639,7 +1761,7 @@ def reportes():
         c_con['lista_egresos'] = cur.fetchall()
     
     cur.close()
-    return render_template('reportes.html', ventas=v, top_productos=t, rentabilidad=rent, franja_horaria=hor, formas_pago=pags, insumos_criticos=crit, stats=st, cierres_caja=cierres, cierres_consolidados=cierres_consolidados)
+    return render_template('reportes.html', ventas=v, top_productos=t, rentabilidad=rent, franja_horaria=hor, formas_pago=pags, insumos_criticos=crit, stats=st, cierres_caja=cierres, cierres_consolidados=cierres_consolidados, kardex_movs=kardex_movs)
 
 @app.route('/auditoria')
 @login_required
@@ -1652,6 +1774,84 @@ def producto_imagen(id):
     cur = mysql.connection.cursor(); cur.execute("SELECT imagen, mimetype FROM productos WHERE id=%s", (id,)); p = cur.fetchone(); cur.close()
     if p and p['imagen']: return Response(p['imagen'], mimetype=p['mimetype'] or 'image/jpeg')
     return redirect(url_for('static', filename='img/default.png'))
+
+import threading
+import time
+
+def sri_background_worker(app_context):
+    with app_context:
+        import facturacion_sri
+        while True:
+            try:
+                cur = mysql.connection.cursor()
+                
+                # 1. PROCESAR FACTURAS PENDIENTES
+                cur.execute("""
+                    SELECT id, intentos_envio FROM ventas 
+                    WHERE estado_sri != 'AUTORIZADO' 
+                      AND estado_sri NOT LIKE 'DEVUELTA%' 
+                      AND estado_sri NOT LIKE 'ERROR_DATOS%'
+                      AND estado_sri != 'REINTENTOS_AGOTADOS'
+                      AND intentos_envio < 10 
+                      AND proximo_reintento <= NOW()
+                """)
+                facturas = cur.fetchall()
+                
+                for f in facturas:
+                    v_id = f['id']
+                    # Si ya va a alcanzar el límite en este intento
+                    if f['intentos_envio'] >= 9:
+                        cur.execute("UPDATE ventas SET estado_sri = 'REINTENTOS_AGOTADOS' WHERE id = %s", (v_id,))
+                        mysql.connection.commit()
+                        continue
+
+                    # Intentar procesar
+                    exito = facturacion_sri.procesar_factura_electronica(v_id, mysql)
+                    
+                    if not exito:
+                        # ... resto de la lógica de incremento ...
+                        cur.execute("SELECT estado_sri FROM ventas WHERE id = %s", (v_id,))
+                        est_actual = cur.fetchone()['estado_sri']
+                        
+                        if est_actual and not est_actual.startswith('DEVUELTA'):
+                            cur.execute("""
+                                UPDATE ventas 
+                                SET intentos_envio = intentos_envio + 1, 
+                                    proximo_reintento = DATE_ADD(NOW(), INTERVAL 5 MINUTE) 
+                                WHERE id = %s
+                            """, (v_id,))
+                            mysql.connection.commit()
+
+                # 2. PROCESAR NOTAS DE CRÉDITO PENDIENTES
+                cur.execute("""
+                    SELECT venta_id, motivo_anulacion, intentos_envio FROM anulaciones_factura 
+                    WHERE estado_anulacion != 'PROCESADO'
+                      AND (mensaje_sri IS NULL OR (mensaje_sri NOT LIKE 'DEVUELTA%' AND mensaje_sri NOT LIKE 'ERROR_DATOS%'))
+                      AND estado_anulacion != 'REINTENTOS_AGOTADOS'
+                      AND intentos_envio < 10 
+                      AND proximo_reintento <= NOW()
+                """)
+                ncs = cur.fetchall()
+                
+                for nc in ncs:
+                    v_id = nc['venta_id']
+                    if nc['intentos_envio'] >= 9:
+                        cur.execute("UPDATE anulaciones_factura SET estado_anulacion = 'ERROR', mensaje_sri = 'REINTENTOS_AGOTADOS' WHERE venta_id = %s", (v_id,))
+                        mysql.connection.commit()
+                        continue
+
+                cur.close()
+            except Exception as e:
+                print(f"Error en SRI Worker: {e}")
+            
+            # Revisar cada 30 segundos
+            time.sleep(30)
+
+# Iniciar el hilo del worker en background solo una vez
+if not os.environ.get("WERKZEUG_RUN_MAIN"):
+    worker_thread = threading.Thread(target=sri_background_worker, args=(app.app_context(),))
+    worker_thread.daemon = True
+    worker_thread.start()
 
 if __name__ == '__main__':
     app.run(debug=True)
