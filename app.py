@@ -826,6 +826,90 @@ def guardar_empresa():
     registrar_auditoria('CONFIG', f"Actualizó configuración general de la empresa: {nom}")
     return redirect(url_for('configuracion_empresa'))
 
+# --- TARJETAS Y PLATAFORMAS ---
+@app.route('/config/tarjetas_plataformas')
+@login_required
+@admin_required
+def tarjetas_plataformas():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM cat_tarjetas ORDER BY nombre")
+    tarjetas = cur.fetchall()
+    cur.execute("SELECT * FROM plataformas ORDER BY nombre")
+    plataformas = cur.fetchall()
+    cur.close()
+    return render_template('tarjetas_plataformas.html', tarjetas=tarjetas, plataformas=plataformas)
+
+@app.route('/config/tarjetas/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_tarjeta():
+    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
+    nom, activo = d['nombre'].upper().strip(), 1 if 'activo' in d else 0
+    if d.get('id'):
+        cur.execute("UPDATE cat_tarjetas SET nombre=%s, activo=%s WHERE id=%s", (nom, activo, d['id']))
+        registrar_auditoria('CONFIG', f"Actualizó tarjeta: {nom}")
+    else:
+        cur.execute("INSERT INTO cat_tarjetas (nombre, activo) VALUES (%s, %s)", (nom, activo))
+        registrar_auditoria('CONFIG', f"Creó nueva tarjeta: {nom}")
+    mysql.connection.commit(); cur.close()
+    flash('Tarjeta guardada correctamente', 'success')
+    return redirect(url_for('tarjetas_plataformas'))
+
+@app.route('/config/tarjetas/eliminar/<int:id>')
+@login_required
+@admin_required
+def eliminar_tarjeta(id):
+    cur = mysql.connection.cursor()
+    # VALIDACIÓN DE INTEGRIDAD REFERENCIAL
+    cur.execute("SELECT COUNT(*) as c FROM ventas WHERE id_tarjeta = %s", (id,))
+    if cur.fetchone()['c'] > 0:
+        flash('No se puede eliminar: Esta tarjeta ya tiene ventas asociadas', 'danger')
+        cur.close(); return redirect(url_for('tarjetas_plataformas'))
+    
+    cur.execute("DELETE FROM cat_tarjetas WHERE id = %s", (id,))
+    mysql.connection.commit(); cur.close()
+    flash('Tarjeta eliminada correctamente', 'success')
+    registrar_auditoria('CONFIG', f"Eliminó tarjeta ID: {id}")
+    return redirect(url_for('tarjetas_plataformas'))
+
+@app.route('/config/plataformas/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_plataforma():
+    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
+    nom = d['nombre'].upper().strip()
+    if d.get('id'):
+        cur.execute("UPDATE plataformas SET nombre=%s WHERE id=%s", (nom, d['id']))
+        registrar_auditoria('CONFIG', f"Actualizó plataforma: {nom}")
+    else:
+        cur.execute("INSERT INTO plataformas (nombre) VALUES (%s)", (nom,))
+        registrar_auditoria('CONFIG', f"Creó nueva plataforma: {nom}")
+    mysql.connection.commit(); cur.close()
+    flash('Plataforma guardada correctamente', 'success')
+    return redirect(url_for('tarjetas_plataformas'))
+
+@app.route('/config/plataformas/eliminar/<int:id>')
+@login_required
+@admin_required
+def eliminar_plataforma(id):
+    cur = mysql.connection.cursor()
+    # VALIDACIÓN DE INTEGRIDAD REFERENCIAL
+    cur.execute("SELECT COUNT(*) as c FROM ventas WHERE plataforma_id = %s", (id,))
+    if cur.fetchone()['c'] > 0:
+        flash('No se puede eliminar: Esta plataforma ya tiene ventas asociadas', 'danger')
+        cur.close(); return redirect(url_for('tarjetas_plataformas'))
+    
+    cur.execute("SELECT COUNT(*) as c FROM producto_precios WHERE plataforma_id = %s", (id,))
+    if cur.fetchone()['c'] > 0:
+        flash('No se puede eliminar: Esta plataforma ya tiene precios de productos asociados', 'danger')
+        cur.close(); return redirect(url_for('tarjetas_plataformas'))
+
+    cur.execute("DELETE FROM plataformas WHERE id = %s", (id,))
+    mysql.connection.commit(); cur.close()
+    flash('Plataforma eliminada correctamente', 'success')
+    registrar_auditoria('CONFIG', f"Eliminó plataforma ID: {id}")
+    return redirect(url_for('tarjetas_plataformas'))
+
 def enviar_comprobante_email(venta_id, forzar=False):
     """
     Genera PDF y XML basándose ÚNICAMENTE en el XML autorizado del SRI.
@@ -1800,7 +1884,7 @@ def sri_background_worker(app_context):
                 for f in facturas:
                     v_id = f['id']
                     # Si ya va a alcanzar el límite en este intento
-                    if f['intentos_envio'] >= 9:
+                    if f['intentos_envio'] >= 10:
                         cur.execute("UPDATE ventas SET estado_sri = 'REINTENTOS_AGOTADOS' WHERE id = %s", (v_id,))
                         mysql.connection.commit()
                         continue
@@ -1809,22 +1893,26 @@ def sri_background_worker(app_context):
                     exito = facturacion_sri.procesar_factura_electronica(v_id, mysql)
                     
                     if not exito:
-                        # ... resto de la lógica de incremento ...
+                        # Si falló, verificamos el estado actual para ver si debemos seguir reintentando
                         cur.execute("SELECT estado_sri FROM ventas WHERE id = %s", (v_id,))
                         est_actual = cur.fetchone()['estado_sri']
                         
-                        if est_actual and not est_actual.startswith('DEVUELTA'):
+                        if est_actual and not est_actual.startswith('DEVUELTA') and not est_actual.startswith('ERROR_DATOS'):
                             cur.execute("""
                                 UPDATE ventas 
                                 SET intentos_envio = intentos_envio + 1, 
-                                    proximo_reintento = DATE_ADD(NOW(), INTERVAL 5 MINUTE) 
+                                    proximo_reintento = DATE_ADD(NOW(), INTERVAL 10 MINUTE) 
                                 WHERE id = %s
                             """, (v_id,))
                             mysql.connection.commit()
+                        elif est_actual and (est_actual.startswith('DEVUELTA') or est_actual.startswith('ERROR_DATOS')):
+                            # Si es un error de datos o devuelta, ya no reintentamos automáticamente
+                            # porque requiere intervención manual (corregir datos del cliente o producto)
+                            pass
 
                 # 2. PROCESAR NOTAS DE CRÉDITO PENDIENTES
                 cur.execute("""
-                    SELECT venta_id, motivo_anulacion, intentos_envio FROM anulaciones_factura 
+                    SELECT venta_id, motivo_anulacion, intentos_envio, usuario_id FROM anulaciones_factura 
                     WHERE estado_anulacion != 'PROCESADO'
                       AND (mensaje_sri IS NULL OR (mensaje_sri NOT LIKE 'DEVUELTA%' AND mensaje_sri NOT LIKE 'ERROR_DATOS%'))
                       AND estado_anulacion != 'REINTENTOS_AGOTADOS'
@@ -1840,6 +1928,20 @@ def sri_background_worker(app_context):
                         mysql.connection.commit()
                         continue
 
+                    # Intentar procesar la anulación
+                    exito, mensaje = facturacion_sri.anular_factura_sri(v_id, nc['motivo_anulacion'], mysql, nc['usuario_id'] or 1)
+                    
+                    if not exito:
+                        # Si falló, incrementamos intentos y programamos siguiente reintento
+                        cur.execute("""
+                            UPDATE anulaciones_factura 
+                            SET intentos_envio = intentos_envio + 1, 
+                                proximo_reintento = DATE_ADD(NOW(), INTERVAL 10 MINUTE),
+                                mensaje_sri = %s
+                            WHERE venta_id = %s
+                        """, (mensaje[:490] if mensaje else 'ERROR DESCONOCIDO', v_id))
+                        mysql.connection.commit()
+                    
                 cur.close()
             except Exception as e:
                 print(f"Error en SRI Worker: {e}")

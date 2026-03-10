@@ -1,0 +1,230 @@
+{% extends "layout.html" %}
+{% block title %}Tarjetas y Plataformas - {{ config_empresa.nombre_comercial }}{% endblock %}
+
+{% block container_class %}container-fluid px-4{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}" style="color: {{ config_empresa.color_tema }} !important;">
+            {{ config_empresa.nombre_comercial|upper }}
+        </a>
+        <div class="ms-auto">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm rounded-pill px-3 text-white fw-bold shadow-sm" style="background-color: {{ config_empresa.color_tema }};">
+                <i class="fas fa-home me-1"></i> INICIO
+            </a>
+        </div>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-3 border-bottom-0">
+            <h5 class="mb-0 fw-bold" style="color: {{ config_empresa.color_tema }};">
+                <i class="fas fa-cogs me-2"></i>CONFIGURACIÓN DE PAGOS Y CANALES
+            </h5>
+        </div>
+        <div class="card-body">
+            <!-- Nav Tabs -->
+            <ul class="nav nav-tabs mb-4" id="configTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active fw-bold" id="tarjetas-tab" data-bs-toggle="tab" data-bs-target="#tarjetas" type="button" role="tab">
+                        <i class="fas fa-credit-card me-2"></i>Catálogo de Tarjetas
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold" id="plataformas-tab" data-bs-toggle="tab" data-bs-target="#plataformas" type="button" role="tab">
+                        <i class="fas fa-store me-2"></i>Plataformas de Venta
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="configTabsContent">
+                <!-- PANEL DE TARJETAS -->
+                <div class="tab-pane fade show active" id="tarjetas" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold mb-0 text-muted">TARJETAS ACEPTADAS</h6>
+                        <button class="btn text-white btn-sm px-3" style="background-color: {{ config_empresa.color_tema }};" onclick="nuevaTarjeta()">
+                            <i class="fas fa-plus me-1"></i> NUEVA TARJETA
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle border">
+                            <thead class="table-light text-center">
+                                <tr>
+                                    <th width="80">ID</th>
+                                    <th>NOMBRE DE LA TARJETA</th>
+                                    <th>ESTADO</th>
+                                    <th width="150">ACCIONES</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for t in tarjetas %}
+                                <tr class="text-center">
+                                    <td>{{ t.id }}</td>
+                                    <td class="fw-bold text-uppercase" style="color: {{ config_empresa.color_tema }};">{{ t.nombre }}</td>
+                                    <td>
+                                        {% if t.activo %}
+                                            <span class="badge bg-success rounded-pill">ACTIVO</span>
+                                        {% else %}
+                                            <span class="badge bg-danger rounded-pill">INACTIVO</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex justify-content-center gap-1">
+                                            <button class="btn btn-outline-primary border-0 p-1" onclick='editarTarjeta({{ t | tojson }})' title="Editar">
+                                                <i class="fas fa-edit fa-lg action-icon"></i>
+                                            </button>
+                                            <a href="{{ url_for('eliminar_tarjeta', id=t.id) }}" class="btn btn-outline-danger border-0 p-1" onclick="return confirm('¿Está seguro de eliminar esta tarjeta?')" title="Eliminar">
+                                                <i class="fas fa-trash-alt fa-lg action-icon"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- PANEL DE PLATAFORMAS -->
+                <div class="tab-pane fade" id="plataformas" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold mb-0 text-muted">CANALES DE VENTA / DELIVERY</h6>
+                        <button class="btn text-white btn-sm px-3" style="background-color: {{ config_empresa.color_tema }};" onclick="nuevaPlataforma()">
+                            <i class="fas fa-plus me-1"></i> NUEVA PLATAFORMA
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle border">
+                            <thead class="table-light text-center">
+                                <tr>
+                                    <th width="80">ID</th>
+                                    <th>NOMBRE DE LA PLATAFORMA</th>
+                                    <th width="150">ACCIONES</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in plataformas %}
+                                <tr class="text-center">
+                                    <td>{{ p.id }}</td>
+                                    <td class="fw-bold text-uppercase" style="color: {{ config_empresa.color_tema }};">{{ p.nombre }}</td>
+                                    <td>
+                                        <div class="d-flex justify-content-center gap-1">
+                                            <button class="btn btn-outline-primary border-0 p-1" onclick='editarPlataforma({{ p | tojson }})' title="Editar">
+                                                <i class="fas fa-edit fa-lg action-icon"></i>
+                                            </button>
+                                            <a href="{{ url_for('eliminar_plataforma', id=p.id) }}" class="btn btn-outline-danger border-0 p-1" onclick="return confirm('¿Está seguro de eliminar esta plataforma?')" title="Eliminar">
+                                                <i class="fas fa-trash-alt fa-lg action-icon"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL TARJETA -->
+<div class="modal fade" id="modalTarjeta" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form action="{{ url_for('guardar_tarjeta') }}" method="POST">
+                <div class="modal-header text-white border-0 py-3" style="background-color: {{ config_empresa.color_tema }};">
+                    <h5 class="modal-title fw-bold" id="tarjetaTitle">NUEVA TARJETA</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" name="id" id="tarjeta_id">
+                    <div class="mb-3">
+                        <label class="extra-small fw-bold text-muted text-uppercase mb-1">Nombre de la Tarjeta</label>
+                        <input type="text" name="nombre" id="tarjeta_nombre" class="form-control form-control-sm bg-light border-0 text-uppercase" required placeholder="EJ: VISA">
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="activo" id="tarjeta_activo" checked>
+                        <label class="form-check-label fw-bold text-muted extra-small text-uppercase" for="tarjeta_activo">Tarjeta Activa</label>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-4 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">CANCELAR</button>
+                    <button type="submit" class="btn text-white rounded-pill px-4 fw-bold" style="background-color: {{ config_empresa.color_tema }};">GUARDAR</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL PLATAFORMA -->
+<div class="modal fade" id="modalPlataforma" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form action="{{ url_for('guardar_plataforma') }}" method="POST">
+                <div class="modal-header text-white border-0 py-3" style="background-color: {{ config_empresa.color_tema }};">
+                    <h5 class="modal-title fw-bold" id="plataformaTitle">NUEVA PLATAFORMA</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" name="id" id="plataforma_id">
+                    <div class="mb-0">
+                        <label class="extra-small fw-bold text-muted text-uppercase mb-1">Nombre de la Plataforma</label>
+                        <input type="text" name="nombre" id="plataforma_nombre" class="form-control form-control-sm bg-light border-0 text-uppercase" required placeholder="EJ: PEDIDOS YA">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-4 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">CANCELAR</button>
+                    <button type="submit" class="btn text-white rounded-pill px-4 fw-bold" style="background-color: {{ config_empresa.color_tema }};">GUARDAR</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function nuevaTarjeta() {
+        document.getElementById('tarjetaTitle').innerText = 'NUEVA TARJETA';
+        document.getElementById('tarjeta_id').value = '';
+        document.getElementById('tarjeta_nombre').value = '';
+        document.getElementById('tarjeta_activo').checked = true;
+        new bootstrap.Modal(document.getElementById('modalTarjeta')).show();
+    }
+
+    function editarTarjeta(t) {
+        document.getElementById('tarjetaTitle').innerText = 'EDITAR TARJETA';
+        document.getElementById('tarjeta_id').value = t.id;
+        document.getElementById('tarjeta_nombre').value = t.nombre;
+        document.getElementById('tarjeta_activo').checked = t.activo == 1;
+        new bootstrap.Modal(document.getElementById('modalTarjeta')).show();
+    }
+
+    function nuevaPlataforma() {
+        document.getElementById('plataformaTitle').innerText = 'NUEVA PLATAFORMA';
+        document.getElementById('plataforma_id').value = '';
+        document.getElementById('plataforma_nombre').value = '';
+        new bootstrap.Modal(document.getElementById('modalPlataforma')).show();
+    }
+
+    function editarPlataforma(p) {
+        document.getElementById('plataformaTitle').innerText = 'EDITAR PLATAFORMA';
+        document.getElementById('plataforma_id').value = p.id;
+        document.getElementById('plataforma_nombre').value = p.nombre;
+        new bootstrap.Modal(document.getElementById('modalPlataforma')).show();
+    }
+</script>
+
+<style>
+    .nav-tabs .nav-link { color: #6c757d; border: none; border-bottom: 3px solid transparent; padding: 12px 20px; }
+    .nav-tabs .nav-link.active { color: {{ config_empresa.color_tema }} !important; border-bottom: 3px solid {{ config_empresa.color_tema }}; background: transparent; }
+    .action-icon { transition: transform 0.2s; }
+    .action-icon:hover { transform: scale(1.2); }
+    .extra-small { font-size: 0.75rem; }
+</style>
+{% endblock %}
