@@ -136,34 +136,41 @@
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header text-white border-0 py-3" style="background-color: {{ config_empresa.color_tema }};">
                 <h5 class="modal-title d-flex align-items-center fw-bold">
-                    <i class="fas fa-user-shield me-2"></i>
-                    ASIGNAR PERMISOS A: <span id="nombreRolPermiso" class="ms-2 text-uppercase"></span>
+                    <i class="fas fa-shield-alt me-2"></i>
+                    PERMISOS DEL ROL: <span id="nombreRolPermiso" class="ms-2 text-uppercase"></span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body bg-light p-4">
                 <input type="hidden" id="permiso_rol_id">
                 
-                <p class="text-muted small mb-4 fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">
-                    <i class="fas fa-info-circle me-1"></i> Seleccione los módulos de acceso para este rol.
-                </p>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <p class="text-muted small mb-0 fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                        <i class="fas fa-mouse-pointer me-1"></i> Seleccione los módulos permitidos para este perfil
+                    </p>
+                    <div class="d-flex gap-3">
+                        <span class="badge bg-white text-success border small rounded-pill px-3"><i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i> OPERATIVO</span>
+                        <span class="badge bg-white text-primary border small rounded-pill px-3"><i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i> ABASTECIMIENTO</span>
+                        <span class="badge bg-white text-info border small rounded-pill px-3"><i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i> ADMINISTRATIVO</span>
+                    </div>
+                </div>
 
                 <div class="row g-3">
                     {% for m in todos_menus %}
                     <div class="col-xl-3 col-lg-4 col-md-6">
                         <label class="menu-option w-100" for="m_{{ m.id }}">
                             <input class="menu-checkbox d-none" type="checkbox" id="m_{{ m.id }}" value="{{ m.id }}">
-                            <div class="card border-0 shadow-sm rounded-3 menu-card-visual transition-all">
+                            <div class="card border-0 shadow-sm rounded-4 menu-card-visual transition-all category-{{ m.categoria|lower }}">
                                 <div class="card-body d-flex align-items-center p-3">
                                     <div class="icon-circle me-3 d-flex align-items-center justify-content-center">
-                                        <i class="fas {{ m.icono }} fa-lg text-muted icon-main"></i>
+                                        <i class="fas {{ m.icono }} fa-lg icon-main"></i>
                                     </div>
                                     <div class="flex-grow-1">
                                         <span class="fw-bold d-block text-dark menu-label small">{{ m.nombre }}</span>
-                                        <span class="text-uppercase text-muted extra-small" style="letter-spacing: 0.5px;">{{ m.categoria }}</span>
+                                        <span class="text-uppercase text-muted extra-small" style="letter-spacing: 0.5px; font-size: 0.65rem;">{{ m.categoria }}</span>
                                     </div>
                                     <div class="check-mark">
-                                        <i class="far fa-square text-muted fa-lg"></i>
+                                        <i class="far fa-circle text-muted fa-lg"></i>
                                     </div>
                                 </div>
                             </div>
@@ -173,11 +180,11 @@
                 </div>
             </div>
             <div class="modal-footer bg-white border-0 py-3 px-4">
-                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">CANCELAR</button>
+                <button type="button" class="btn btn-light rounded-pill px-4 fw-bold text-muted" data-bs-dismiss="modal">DESCARTAR</button>
                 <button type="button" class="btn text-white rounded-pill px-5 fw-bold shadow-sm" 
                         style="background-color: {{ config_empresa.color_tema }};"
                         onclick="guardarPermisos()">
-                    <i class="fas fa-save me-2"></i> GUARDAR CAMBIOS
+                    <i class="fas fa-check-circle me-2"></i> APLICAR PERMISOS
                 </button>
             </div>
         </div>
@@ -234,7 +241,7 @@
                             <select name="categoria" id="menu_categoria" class="form-select form-select-sm bg-light border-0">
                                 <option value="OPERATIVO">OPERATIVO</option>
                                 <option value="ABASTECIMIENTO">ABASTECIMIENTO</option>
-                                <option value="ADMINISTRACION">ADMINISTRACION</option>
+                                <option value="ADMINISTRATIVO">ADMINISTRATIVO</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -350,45 +357,65 @@
     
     .menu-option { cursor: pointer; display: block; }
     .menu-card-visual { 
-        border-radius: 10px;
-        transition: all 0.25s ease;
-        border: 1px solid #dee2e6 !important;
+        border-radius: 15px;
+        transition: all 0.2s ease;
+        border: 1px solid #edf2f7 !important;
+        background: white;
     }
-    .menu-option:hover .menu-card-visual {
-        border-color: {{ config_empresa.color_tema }} !important;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-    }
-
+    
     .icon-circle {
-        width: 45px;
-        height: 45px;
-        background: #f8f9fa;
-        border-radius: 50%;
-        transition: all 0.25s ease;
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        background: #f8fafc;
     }
 
-    /* Estado Seleccionado */
+    /* Colores por Categoría */
+    .category-operativo .icon-main { color: #28a745; }
+    .category-operativo .icon-circle { background: #eafaf1; }
+    
+    .category-abastecimiento .icon-main { color: #007bff; }
+    .category-abastecimiento .icon-circle { background: #e7f1ff; }
+    
+    .category-administrativo .icon-main { color: #17a2b8; }
+    .category-administrativo .icon-circle { background: #e1f5f7; }
+
+    /* Hover State */
+    .menu-option:hover .menu-card-visual {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Estado Seleccionado (Checked) */
     .menu-checkbox:checked + .menu-card-visual {
-        border-color: {{ config_empresa.color_tema }} !important;
-        background-color: rgba(0,0,0,0.02);
+        border-width: 2px !important;
     }
-    .menu-checkbox:checked + .menu-card-visual .icon-circle {
-        background-color: {{ config_empresa.color_tema }};
-    }
-    .menu-checkbox:checked + .menu-card-visual .icon-main {
-        color: white !important;
-    }
-    .menu-checkbox:checked + .menu-card-visual .check-mark i {
-        color: {{ config_empresa.color_tema }} !important;
-    }
+    
+    /* Variaciones de Check */
+    .menu-checkbox:checked + .category-operativo { border-color: #28a745 !important; background: #f0fff4; }
+    .menu-checkbox:checked + .category-operativo .icon-circle { background: #28a745; }
+    .menu-checkbox:checked + .category-operativo .icon-main { color: white; }
+    .menu-checkbox:checked + .category-operativo .check-mark i { color: #28a745 !important; }
+
+    .menu-checkbox:checked + .category-abastecimiento { border-color: #007bff !important; background: #f0f7ff; }
+    .menu-checkbox:checked + .category-abastecimiento .icon-circle { background: #007bff; }
+    .menu-checkbox:checked + .category-abastecimiento .icon-main { color: white; }
+    .menu-checkbox:checked + .category-abastecimiento .check-mark i { color: #007bff !important; }
+
+    .menu-checkbox:checked + .category-administrativo { border-color: #17a2b8 !important; background: #f0fbff; }
+    .menu-checkbox:checked + .category-administrativo .icon-circle { background: #17a2b8; }
+    .menu-checkbox:checked + .category-administrativo .icon-main { color: white; }
+    .menu-checkbox:checked + .category-administrativo .check-mark i { color: #17a2b8 !important; }
+
+    /* Cambio de Icono Check */
     .menu-checkbox:checked + .menu-card-visual .check-mark i::before {
-        content: "\f14a"; /* fa-check-square */
+        content: "\f058"; /* fa-check-circle */
         font-family: "Font Awesome 5 Free";
         font-weight: 900;
     }
 
-    .transition-all { transition: all 0.25s ease; }
-    .text-primary { color: {{ config_empresa.color_tema }} !important; }
+    .transition-all { transition: all 0.2s ease; }
+    .extra-small { font-size: 0.7rem; }
 </style>
 {% endblock %}
