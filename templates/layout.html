@@ -315,6 +315,29 @@
         if (l === 13 && numero.substring(10, 13) !== "001") return false;
         return true;
     }
+
+    // --- ATAJOS DE TECLADO GLOBALES (Ctrl + I / Ctrl + O) ---
+    document.addEventListener('keydown', function(event) {
+        const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+        const key = event.key.toLowerCase();
+
+        if (isCtrlOrCmd && (key === 'i' || key === 'o')) {
+            
+            // Evitamos la redirección si el usuario está escribiendo en un input o textarea
+            const target = event.target.tagName.toLowerCase();
+            if (target === 'input' || target === 'textarea' || event.target.isContentEditable) {
+                return;
+            }
+
+            event.preventDefault(); // Prevenir comportamiento por defecto del navegador
+
+            if (key === 'i') {
+                window.location.href = "{{ url_for('dashboard') }}";
+            } else if (key === 'o') {
+                window.location.href = "{{ url_for('pos') }}";
+            }
+        }
+    });
 </script>
 
 {% block scripts %}{% endblock %}
