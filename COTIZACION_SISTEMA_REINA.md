@@ -2,7 +2,7 @@
 
 **Para:** Negocio con Gestión de Sucursales y Facturación SRI  
 **De:** Christian Defaz - Consultoría de Software  
-**Fecha:** 9 de marzo de 2026 (Actualizada con versión "Elegant Pro" v2.1)  
+**Fecha:** 10 de marzo de 2026 (Actualizada con versión "Enterprise Pro" v2.5)  
 **Vigencia:** 30 días  
 
 ---
@@ -10,11 +10,12 @@
 ## 1. DESCRIPCIÓN DE LA SOLUCIÓN
 Propuesta integral para la implementación del **Sistema Reina (Versión Enterprise Pro)**, un ecosistema diseñado bajo arquitectura distribuida de alto rendimiento.
 
-### Innovaciones "Elegant Pro" v2.1:
-*   **Interfaz Premium Unificada:** Navegación optimizada con botones dinámicos y diseño estético en todos los módulos (POS, Inventario, Reportes, Usuarios).
-*   **Whitelabel Dinámico Total:** El sistema adopta automáticamente el color del tema y el nombre comercial de la empresa en cada ventana, modal y botón.
-*   **Gestión Multi-Plataforma:** Control de precios diferenciados para canales de venta (Local, Uber Eats, Pedidos Ya) integrados directamente en el POS.
-*   **Seguridad y Auditoría:** Registro de acciones de usuario y control de permisos por menús dinámicos, incorporando módulos avanzados como **Auditoría**, **Anulaciones** seguras de ventas y control **Kardex** de inventario.
+### Innovaciones "Enterprise Pro" v2.5:
+*   **Atajos Globales de Productividad:** Navegación ultrarrápida mediante teclado (`Ctrl+I` para Inicio, `Ctrl+O` para Ventas), optimizando el tiempo de atención al cliente.
+*   **Gestión de Pagos y Canales 360°:** Módulo centralizado para administrar tarjetas bancarias y plataformas de delivery (Uber Eats, Pedidos Ya) con reportes consolidados.
+*   **Motor SRI de Alta Disponibilidad:** Agente de segundo plano que gestiona reintentos automáticos y previene bloqueos por errores de datos.
+*   **Whitelabel Dinámico Total:** El sistema adopta automáticamente la identidad visual de la empresa (Colores, Logos, Iconografía) en cada componente.
+*   **Seguridad y Auditoría:** Control granular de permisos con diseño visual mejorado y trazabilidad absoluta de cada transacción.
 
 ### Infraestructura Multi-Cloud de Clase Mundial:
 *   **Application Server (Render):** Procesamiento de alto rendimiento para el motor Flask.
@@ -23,17 +24,17 @@ Propuesta integral para la implementación del **Sistema Reina (Versión Enterpr
 
 ---
 
-## 2. INVERSIÓN (ACTUALIZADA)
+## 2. INVERSIÓN (ACTUALIZADA V2.5)
 
 ### OPCIÓN A: PROPIEDAD TOTAL (LICENCIA PERPETUA)
 *Ideal para el control absoluto del ecosistema tecnológico.*
 
 | Concepto | Detalle | Total |
 | :--- | :--- | :---: |
-| **Licencia ENTERPRISE v2.1** | Motor SRI + Elegant Pro Interface + Whitelabel | $ 2,500.00 |
+| **Licencia ENTERPRISE v2.5** | Motor SRI + Atajos Productividad + Pagos & Canales | $ 2,800.00 |
 | **Configuración Cloud** | Setup de Infraestructura Render, Aiven y Bravo API | $ 500.00 |
 | **Capacitación y Auditoría** | Formación en gestión de costos y control de roles | $ 200.00 |
-| **TOTAL INVERSIÓN INICIAL** | | **$ 3,200.00** |
+| **TOTAL INVERSIÓN INICIAL** | | **$ 3,500.00** |
 | *Cloud Maintenance* | *Soporte VIP y Actualizaciones del SRI* | *$ 600.00/año* |
 
 ### OPCIÓN B: ARRIENDO DE SOFTWARE (SaaS - MENSUAL)
@@ -41,18 +42,18 @@ Propuesta integral para la implementación del **Sistema Reina (Versión Enterpr
 
 | Concepto | Detalle | Mensualidad |
 | :--- | :--- | :---: |
-| **Plan RENTAL PRO** | Uso de Sistema Reina + Hosting + Soporte | $ 85.00 |
+| **Plan RENTAL PRO v2.5** | Uso de Sistema Reina + Hosting + Soporte | $ 95.00 |
 | **Configuración Inicial** | Setup único de empresa y firma electrónica | $ 150.00 (único) |
-| **TOTAL INVERSIÓN INICIAL** | **Incluye Setup + 1er Mes de Arriendo** | **$ 235.00** |
+| **TOTAL INVERSIÓN INICIAL** | **Incluye Setup + 1er Mes de Arriendo** | **$ 245.00** |
 | **ACTUALIZACIONES** | Incluye todas las mejoras del SRI sin costo extra | INCLUIDO |
 
 ---
 
 ## 3. VENTAJAS COMPETITIVAS
-1.  **Diseño Corporativo de Alto Impacto:** El sistema se adapta a la identidad visual de su negocio de forma profesional.
-2.  **Fiabilidad en Facturación:** Uso de Bravo API para asegurar que sus documentos lleguen siempre al cliente.
-3.  **Control Multicanal:** Ajuste de márgenes de ganancia por plataforma de venta externa.
-4.  **Recuperación Ante Desastres:** Incluye scripts de restauración rápida con persistencia de datos maestros.
+1.  **Velocidad de Atención:** Único sistema con atajos de teclado nativos para agilizar el punto de venta.
+2.  **Fiabilidad en Facturación:** Motor robusto de reintentos que asegura la legalidad de cada venta ante el SRI.
+3.  **Control Multicanal:** Ajuste preciso de precios por plataforma externa de venta.
+4.  **Recuperación Ante Desastres:** Scripts de restauración rápida con persistencia total de configuraciones.
 
 ---
 
