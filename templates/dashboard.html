@@ -28,7 +28,8 @@
     <!-- MENÚS DINÁMICOS POR ROL -->
     {% for m in session['user_menus'] %}
         <div class="col-6 col-md-3 col-lg-2">
-            <a href="{{ url_for(m.url) }}" class="text-decoration-none">
+            {% set menu_url = 'listar_promociones' if m.url == 'promociones' else m.url %}
+            <a href="{{ url_for(menu_url) }}" class="text-decoration-none">
                 <div class="card h-100 border-0 shadow main-card {{ 'bg-dark' if m.nombre == 'Reportes' else '' }}">
                     <div class="card-body p-3 text-center">
                         <div class="icon-box {{ 'border-success text-success' if m.categoria == 'OPERATIVO' else 'border-primary text-primary' if m.categoria == 'ABASTECIMIENTO' else 'border-info text-info' }} mb-3">
