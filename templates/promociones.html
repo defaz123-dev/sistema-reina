@@ -304,6 +304,7 @@ function prepararEdicionPromo(btn) {
     document.getElementById('promo_fin').value = btn.dataset.fin;
     document.getElementById('promo_activo').value = btn.dataset.activo;
     
+    // IMPORTANTE: Actualizar labels visuales según el tipo cargado
     actualizarLabels();
     
     // Marcar plataformas y sus valores

@@ -1319,6 +1319,17 @@ def listar_promociones():
     
     # Obtener detalles de plataformas para cada promo
     for p in promos:
+        # Normalización exhaustiva de tipos para compatibilidad total
+        t = str(p['tipo']).upper().strip()
+        if t in ['PORCENTAJE', 'DESCUENTO_PORCENTAJE', 'PORC']: 
+            p['tipo'] = 'DESCUENTO'
+        elif t in ['VALOR_FIJO', 'VALOR', 'PRECIO', 'FIJO', 'PRECIO_FIJO']: 
+            p['tipo'] = 'PRECIO_FIJO'
+        elif t in ['2X1', 'DOBLE', 'PROMO_2X1']:
+            p['tipo'] = '2X1'
+        else:
+            p['tipo'] = t # Mantener original si no coincide para debug visual
+        
         cur.execute("SELECT plataforma_id, valor_especifico FROM promocion_plataformas WHERE promocion_id = %s", (p['id'],))
         p['plataformas_detalle'] = {r['plataforma_id']: float(r['valor_especifico']) if r['valor_especifico'] else None for r in cur.fetchall()}
 
