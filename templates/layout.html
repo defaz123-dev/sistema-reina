@@ -154,25 +154,133 @@
     {% block content %}{% endblock %}
 </div>
 
-<!-- Modal Genérico para Alertas -->
-<div class="modal fade" id="reinaModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" style="max-width: 350px;">
-        <div class="modal-content border-0 rounded-4 shadow-lg text-center">
-            <div class="modal-header border-0 pb-0">
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- Modal Previsualización Ticket -->
+<div class="modal fade" id="modalTicketPreview" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg">
+            <div class="modal-header bg-light border-0 py-2">
+                <h6 class="modal-title fw-bold small"><i class="fas fa-ticket-alt me-2"></i>Vista Previa de Ticket</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4 pt-0">
-                <div id="modalIcon" class="mb-3" style="font-size: 3rem;"></div>
-                <h5 id="modalTitle" class="fw-bold"></h5>
-                <p id="modalMessage" class="text-muted small mb-4"></p>
-                <div class="d-flex gap-2 justify-content-center">
-                    <button type="button" id="btnModalCancel" class="btn btn-light px-4 rounded-pill d-none" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" id="btnModalOk" class="btn btn-reina px-4 rounded-pill">Aceptar</button>
+            <div class="modal-body p-0">
+                <div id="ticketContentPreview" class="bg-white p-3 font-monospace extra-small" style="white-space: pre; border: 1px dashed #ccc; margin: 10px; max-height: 400px; overflow-y: auto; font-size: 10px; line-height: 1.2;">
+                    <!-- Se carga el texto aquí -->
                 </div>
+            </div>
+            <div class="modal-footer border-0 p-3">
+                <button type="button" class="btn btn-reina w-100 py-2 fw-bold" id="btnConfirmPrintTicket">
+                    <i class="fas fa-print me-2"></i>IMPRIMIR TICKET
+                </button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Modal Previsualización RIDE -->
+<div class="modal fade" id="modalRidePreview" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg" style="height: 90vh;">
+            <div class="modal-header bg-dark text-white border-0 py-2">
+                <h6 class="modal-title fw-bold"><i class="fas fa-file-pdf me-2"></i>Vista Previa Factura (A4)</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0 bg-secondary">
+                <iframe id="iframeRidePreview" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+            <div class="modal-footer border-0 p-3 bg-light">
+                <button type="button" class="btn btn-reina px-5 fw-bold" id="btnConfirmPrintRide">
+                    <i class="fas fa-print me-2"></i>IMPRIMIR FACTURA (A4)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Variables globales para los modales (se inicializan luego de cargar el DOM)
+    let mTicket, mRide;
+    let currentTicketContent = "";
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicialización segura de modales una vez cargado Bootstrap
+        mTicket = new bootstrap.Modal(document.getElementById('modalTicketPreview'));
+        mRide = new bootstrap.Modal(document.getElementById('modalRidePreview'));
+
+        // Botón Imprimir Ticket desde el Modal
+        document.getElementById('btnConfirmPrintTicket').onclick = function() {
+            fetch("http://localhost:5001/imprimir-ticket", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content: currentTicketContent })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    mTicket.hide();
+                    console.log("Ticket enviado correctamente");
+                } else {
+                    throw new Error(res.error);
+                }
+            })
+            .catch(err => {
+                reinaConfirm("Error Bridge", "¿El bridge está cerrado? <br> ¿Desea usar la impresión del navegador?").then(ok => {
+                    if(ok) window.print();
+                });
+            });
+        };
+
+        // Botón Imprimir RIDE desde el Modal (A4)
+        document.getElementById('btnConfirmPrintRide').onclick = function() {
+            const iframe = document.getElementById('iframeRidePreview');
+            iframe.contentWindow.print();
+        };
+    });
+
+    // Función universal para mostrar el ticket en modal
+    function abrirModalTicket(ventaId) {
+        if (typeof showLoading === "function") showLoading();
+        fetch(`/venta/ticket_data/${ventaId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (typeof hideLoading === "function") hideLoading();
+            if (data.error) throw new Error(data.error);
+            
+            const v = data.venta; const e = data.empresa; const s = data.sucursal; 
+            const cl = data.cliente; const u = data.usuario; const det = data.detalles;
+            
+            let ticket = "";
+            const line = "------------------------------------------\r\n";
+            ticket += e.nombre_comercial.toUpperCase() + "\r\n";
+            ticket += `RUC: ${e.ruc}\r\n${e.razon_social}\r\n${e.direccion_matriz}\r\nSUCURSAL: ${s.nombre}\r\n` + line;
+            ticket += `ORDEN: #${v.id}\r\nFECHA: ${v.fecha}\r\nCAJERO: ${u.usuario}\r\nPAGO: ${v.forma_pago}\r\n` + line;
+            ticket += `CLIENTE: ${cl.nombres} ${cl.apellidos}\r\nCI/RUC: ${cl.cedula_ruc}\r\n` + line;
+            ticket += "CANT  DESCRIPCION                TOTAL\r\n";
+            det.forEach(d => {
+                ticket += d.cantidad.toString().padEnd(6) + d.nombre.substring(0, 24).padEnd(25) + parseFloat(d.subtotal).toFixed(2).padStart(11) + "\r\n";
+            });
+            ticket += line;
+            const subB = (v.total / 1.15).toFixed(2);
+            ticket += `SUBTOTAL:                $ ${subB.padStart(10)}\r\nIVA (15%):               $ ${(v.total - subB).toFixed(2).padStart(10)}\r\nTOTAL A PAGAR:           $ ${parseFloat(v.total).toFixed(2).padStart(10)}\r\n` + line;
+            if (v.clave_acceso_sri) ticket += `CLAVE ACCESO SRI:\r\n${v.clave_acceso_sri}\r\n` + line;
+            ticket += "\r\n    *** GRACIAS POR PREFERIRNOS ***\r\n        FACTURACION ELECTRONICA\r\n\r\n\r\n";
+
+            currentTicketContent = ticket;
+            document.getElementById('ticketContentPreview').textContent = ticket;
+            mTicket.show();
+        })
+        .catch(err => {
+            if (typeof hideLoading === "function") hideLoading();
+            reinaAlert("Error", "No se pudo cargar la vista previa: " + err.message, "danger");
+        });
+    }
+
+    // Función universal para mostrar el RIDE en modal
+    function abrirModalRide(ventaId) {
+        const iframe = document.getElementById('iframeRidePreview');
+        iframe.src = `/venta/ride/${ventaId}`;
+        mRide.show();
+    }
+</script>
 
 <!-- Overlay de Carga Temático (CSS Puro para velocidad instantánea) -->
 <div id="reina-loader" class="d-none" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); backdrop-filter: blur(5px); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column;">

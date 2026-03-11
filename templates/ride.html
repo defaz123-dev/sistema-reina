@@ -89,7 +89,19 @@
             .paper { box-shadow: none; padding: 10mm; width: 100%; }
             .btn-print { display: none; } 
         }
+
+        /* Ocultar botón si está en un iframe (dentro del modal) */
+        @media screen {
+            body:has(iframe), body:not(:has(.paper)) { /* Selector genérico */ }
+            /* Si window.self !== window.top */
+        }
     </style>
+    <script>
+        // Ocultar botón de impresión si estamos dentro de un iframe
+        if (window.self !== window.top) {
+            document.write('<style>.btn-print { display: none !important; }</style>');
+        }
+    </script>
 </head>
 <body>
     <button class="btn-print" onclick="window.print()">🖨️ IMPRIMIR {% if d.es_nota_credito %}NOTA DE CRÉDITO{% else %}FACTURA{% endif %}</button>

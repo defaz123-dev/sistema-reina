@@ -888,42 +888,55 @@ async function confirmarOrden() {
     }
 
     showLoading();
-    const res = await fetch('/pos/venta', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            items: carrito.map(i => ({
-                id: i.id, 
-                cantidad: i.cantidad, 
-                precio: i.precio_final * (1 - (descManual / 100))
-            })), 
-            subtotal_0: 0, 
-            subtotal_15: baseIVA, 
-            iva_valor: ivaVal, 
-            total: totalFinal, 
-            cliente_id: c_id, 
-            forma_pago: f_pago, 
-            id_tarjeta: id_tarjeta, 
-            plataforma_id: plat_id,
-            descuento_promo_id: promoId,
-            descuento_manual_instante: descManual,
-            motivo_descuento_manual: motivoManual
-        })
-    });
-    const data = await res.json();
-    if (data.success) {
-        hideLoading();
-        cleanupModals();
+    try {
+        const res = await fetch('/pos/venta', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                items: carrito.map(i => ({
+                    id: i.id, 
+                    cantidad: i.cantidad, 
+                    precio: i.precio_final * (1 - (descManual / 100))
+                })), 
+                subtotal_0: 0, 
+                subtotal_15: baseIVA, 
+                iva_valor: ivaVal, 
+                total: totalFinal, 
+                cliente_id: c_id, 
+                forma_pago: f_pago, 
+                id_tarjeta: id_tarjeta, 
+                plataforma_id: plat_id,
+                descuento_promo_id: promoId,
+                descuento_manual_instante: descManual,
+                motivo_descuento_manual: motivoManual
+            })
+        });
+        const data = await res.json();
         
-        // --- APERTURA DE CAJA AUTOMÁTICA (SOLO EFECTIVO) ---
-        if (f_pago === 'EFECTIVO') {
-            abrirCajaLocal();
-        }
+        if (data.success) {
+            hideLoading();
+            cleanupModals();
+            
+            // --- APERTURA DE CAJA AUTOMÁTICA (SOLO EFECTIVO) ---
+            if (f_pago === 'EFECTIVO') {
+                abrirCajaLocal();
+            }
 
-        reinaAlert('Orden Generada', `<p class="mb-3">La venta se registró correctamente.</p><a href="/venta/ticket/${data.venta_id}" target="_blank" class="btn btn-reina w-100 py-3"><i class="fas fa-print me-2"></i> IMPRIMIR TICKET</a>`).then(() => { window.location.reload(); });
-    } else { 
+            // ABRIR VISTA PREVIA DEL TICKET (NUEVO FLUJO)
+            abrirModalTicket(data.venta_id);
+
+            // Al cerrar el modal del ticket, recargar para nueva venta
+            document.getElementById('modalTicketPreview').addEventListener('hidden.bs.modal', function () {
+                window.location.reload();
+            }, { once: true });
+
+        } else { 
+            hideLoading();
+            reinaAlert('Error', data.message, 'danger'); 
+        }
+    } catch (error) {
         hideLoading();
-        reinaAlert('Error', data.message, 'danger'); 
+        reinaAlert('Error Crítico', 'No se pudo procesar la venta: ' + error.message, 'danger');
     }
 }
 

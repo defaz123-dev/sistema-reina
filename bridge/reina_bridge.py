@@ -18,20 +18,27 @@ VERSION = "1.0.0"
 app = Flask(__name__)
 CORS(app) # Permitir que el Sistema Reina en la nube se conecte
 
-def get_pos_printer():
-    """Busca automáticamente una impresora POS en el sistema."""
+def get_pos_printer(strict=False):
+    """
+    Busca una impresora térmica.
+    Si strict=True (para el cajón), solo devuelve térmicas.
+    Si strict=False (para impresión), devuelve la predeterminada si no hay térmica.
+    """
     try:
         printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)
-        
-        # Palabras clave para identificar impresoras térmicas
         keywords = ["POS", "80mm", "58mm", "TICKET", "EPSON", "ZJIANG", "TERMIC"]
         
-        # 1. Buscar por palabras clave
+        # 1. Buscar térmica por palabras clave
         for (_, _, name, _) in printers:
             if any(kw in name.upper() for kw in keywords):
                 return name, True
                 
-        # 2. Si no hay coincidencias, informar que no se halló impresora específica
+        # 2. Si no es estricto y no hay térmica, usar la predeterminada
+        if not strict:
+            default_printer = win32print.GetDefaultPrinter()
+            if default_printer:
+                return default_printer, True
+
         return None, False
     except Exception:
         return None, False
@@ -39,9 +46,7 @@ def get_pos_printer():
 def open_cash_drawer(printer_name):
     """Envía el pulso ESC/POS para abrir el cajón."""
     try:
-        # Comando estándar ESC/POS para apertura de cajón: ESC p m t1 t2
-        # \x1b\x70\x00\x19\xfa (Abre el pin 2)
-        # Algunos drivers aceptan \x07 (Pulse)
+        # Comando estándar ESC/POS para apertura de cajón
         COMMAND = b"\x1b\x70\x00\x19\xfa"
         
         handle = win32print.OpenPrinter(printer_name)
@@ -59,7 +64,7 @@ def open_cash_drawer(printer_name):
 
 @app.route('/status', methods=['GET'])
 def status():
-    printer, found = get_pos_printer()
+    printer, found = get_pos_printer(strict=False)
     return jsonify({
         "status": "online",
         "app": APP_NAME,
@@ -69,15 +74,59 @@ def status():
 
 @app.route('/abrir-caja', methods=['GET'])
 def trigger_open():
-    printer, found = get_pos_printer()
+    # Para abrir caja, requerimos estrictamente una térmica
+    printer, found = get_pos_printer(strict=True)
     if not found:
         return jsonify({
             "success": False, 
-            "error": "No se detectó ninguna impresora térmica (POS) instalada. Por favor, asegúrese de que el nombre de su impresora contenga 'POS', 'TICKET' o '80mm' en el Panel de Control."
+            "error": "No se detectó ninguna impresora térmica (POS) instalada para abrir el cajón. Verifique la conexión física."
         }), 404
     
     success, msg = open_cash_drawer(printer)
     return jsonify({"success": success, "message": msg})
+
+@app.route('/imprimir-ticket', methods=['POST'])
+def trigger_print():
+    from flask import request
+    data = request.get_json()
+    content = data.get('content', '')
+    
+    # Para imprimir, permitimos usar la predeterminada si no hay térmica
+    printer, found = get_pos_printer(strict=False)
+    if not found:
+        return jsonify({"success": False, "error": "No se encontró ninguna impresora configurada."}), 404
+
+    try:
+        handle = win32print.OpenPrinter(printer)
+        try:
+            # Si no es térmica, intentamos usar tipo "TEXT" que es más amigable con drivers normales
+            keywords = ["POS", "80mm", "58mm", "TICKET", "EPSON", "ZJIANG", "TERMIC"]
+            is_thermal = any(kw in printer.upper() for kw in keywords)
+            
+            job_type = "RAW" # RAW sigue siendo lo más directo
+            job = win32print.StartDocPrinter(handle, 1, ("Ticket Sistema Reina", None, job_type))
+            win32print.StartPagePrinter(handle)
+            
+            # Asegurar que el contenido use saltos de línea Windows (\r\n)
+            content = content.replace('\r\n', '\n').replace('\n', '\r\n')
+            
+            # Enviar el contenido (cp1252 es mejor para Windows español)
+            win32print.WritePrinter(handle, content.encode('cp1252', errors='replace'))
+            
+            if is_thermal:
+                # Avanzar papel y corte parcial (GS V 66 0) para térmicas
+                win32print.WritePrinter(handle, b"\r\n\r\n\r\n\x1d\x56\x42\x00")
+            else:
+                # Solo avance de página para impresoras normales
+                win32print.WritePrinter(handle, b"\r\n\r\n\r\n\f") # \f es Form Feed (nueva hoja)
+            
+            win32print.EndPagePrinter(handle)
+            win32print.EndDocPrinter(handle)
+        finally:
+            win32print.ClosePrinter(handle)
+        return jsonify({"success": True, "message": f"Ticket enviado a: {printer}"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 def create_image():
     # Generar un icono simple (Una corona amarilla)

@@ -1783,6 +1783,38 @@ def ver_ticket(id):
     cur.execute("SELECT * FROM empresa LIMIT 1"); emp = cur.fetchone(); cur.close()
     return render_template('ticket.html', venta=v, cliente=c, sucursal=s, usuario=u, detalles=det, empresa=emp)
 
+@app.route('/venta/ticket_data/<int:id>')
+@login_required
+def get_ticket_data(id):
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM ventas WHERE id=%s", (id,))
+    v = cur.fetchone()
+    if not v: cur.close(); return jsonify({"error": "No existe"}), 404
+
+    cur.execute("SELECT * FROM clientes WHERE id=%s", (v['cliente_id'],))
+    c = cur.fetchone()
+    cur.execute("SELECT * FROM sucursales WHERE id=%s", (v['sucursal_id'],))
+    s = cur.fetchone()
+    cur.execute("SELECT usuario FROM usuarios WHERE id=%s", (v['usuario_id'],))
+    u = cur.fetchone()
+    cur.execute("SELECT dv.*, p.nombre FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id WHERE dv.venta_id=%s", (id,))
+    det = cur.fetchall()
+    cur.execute("SELECT * FROM empresa LIMIT 1")
+    emp = cur.fetchone()
+    cur.close()
+
+    # Formatear fechas para JSON
+    v['fecha'] = v['fecha'].strftime('%d/%m/%Y %H:%M')
+    
+    return jsonify({
+        "venta": v,
+        "cliente": c,
+        "sucursal": s,
+        "usuario": u,
+        "detalles": det,
+        "empresa": emp
+    })
+
 # --- EGRESOS Y FLUJO DE CAJA ---
 @app.route('/egresos')
 @login_required

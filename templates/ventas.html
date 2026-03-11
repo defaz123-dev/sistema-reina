@@ -99,9 +99,9 @@
                         </td>
                         <td class="text-center">
                             {% if not v.anulada %}
-                            <a href="{{ url_for('ver_ticket', id=v.id) }}" target="_blank" class="btn btn-outline-secondary border-0" title="Imprimir Ticket">
+                            <button class="btn btn-outline-secondary border-0" title="Ver/Imprimir Ticket" onclick="abrirModalTicket({{ v.id }})">
                                 <i class="fas fa-print fa-lg action-icon"></i>
-                            </a>
+                            </button>
                             {% else %}
                             <button class="btn btn-outline-secondary border-0 opacity-25" title="No se puede imprimir ticket de venta anulada" disabled>
                                 <i class="fas fa-print fa-lg"></i>
@@ -109,9 +109,9 @@
                             {% endif %}
 
                             {% if v.autorizado_sri or v.anulada %}
-                            <a href="{{ url_for('ver_ride', id=v.id) }}" target="_blank" class="btn btn-outline-danger border-0" title="Ver RIDE PDF">
+                            <button class="btn btn-outline-danger border-0" title="Ver RIDE PDF" onclick="abrirModalRide({{ v.id }})">
                                 <i class="fas fa-file-pdf fa-lg action-icon"></i>
-                            </a>
+                            </button>
                             <a href="{{ url_for('reenviar_email_venta', id=v.id) }}" class="btn btn-outline-primary border-0" title="Enviar/Reenviar Email" onclick="showLoading()">
                                 <i class="fas fa-paper-plane fa-lg action-icon"></i>
                             </a>
@@ -137,6 +137,98 @@
 
 {% block scripts %}
 <script>
+    function imprimirTicketDirecto(ventaId) {
+        fetch(`/venta/ticket_data/${ventaId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) throw new Error(data.error);
+            
+            const v = data.venta;
+            const e = data.empresa;
+            const s = data.sucursal;
+            const c = data.cliente;
+            const u = data.usuario;
+            const det = data.detalles;
+            
+            let ticket = "";
+            const line = "------------------------------------------\r\n";
+            
+            // Header
+            ticket += e.nombre_comercial.toUpperCase() + "\r\n";
+            ticket += `RUC: ${e.ruc}\r\n`;
+            ticket += `${e.razon_social}\r\n`;
+            ticket += `${e.direccion_matriz}\r\n`;
+            ticket += `SUCURSAL: ${s.nombre}\r\n`;
+            ticket += line;
+            
+            // Info
+            ticket += `ORDEN: #${v.id}\r\n`;
+            ticket += `FECHA: ${v.fecha}\r\n`;
+            ticket += `CAJERO: ${u.usuario}\r\n`;
+            ticket += `PAGO: ${v.forma_pago}\r\n`;
+            ticket += line;
+            ticket += `CLIENTE: ${c.nombres} ${c.apellidos}\r\n`;
+            ticket += `CI/RUC: ${c.cedula_ruc}\r\n`;
+            ticket += line;
+            
+            // Details
+            ticket += "CANT  DESCRIPCION                TOTAL\r\n";
+            det.forEach(d => {
+                const cant = d.cantidad.toString().padEnd(6, ' ');
+                const desc = d.nombre.substring(0, 24).padEnd(25, ' ');
+                const sub = parseFloat(d.subtotal).toFixed(2).padStart(11, ' ');
+                ticket += `${cant}${desc}${sub}\r\n`;
+            });
+            ticket += line;
+            
+            // Totals
+            const subTotal = (v.total / 1.15).toFixed(2);
+            const iva = (v.total - subTotal).toFixed(2);
+            const total = parseFloat(v.total).toFixed(2);
+            
+            ticket += `SUBTOTAL:                $ ${subTotal.padStart(10, ' ')}\r\n`;
+            ticket += `IVA (15%):               $ ${iva.padStart(10, ' ')}\r\n`;
+            ticket += `TOTAL A PAGAR:           $ ${total.padStart(10, ' ')}\r\n`;
+            ticket += line;
+            
+            if (v.clave_acceso_sri) {
+                ticket += "CLAVE DE ACCESO SRI:\r\n";
+                ticket += `${v.clave_acceso_sri}\r\n`;
+                ticket += line;
+            }
+            
+            ticket += "\r\n    *** GRACIAS POR PREFERIRNOS ***\r\n";
+            ticket += "        FACTURACION ELECTRONICA\r\n\r\n\r\n";
+
+            return fetch("http://localhost:5001/imprimir-ticket", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content: ticket })
+            });
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                // Éxito silencioso
+                console.log("Ticket enviado correctamente");
+            } else {
+                throw new Error(res.error);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            // Uso de reinaConfirm en lugar del confirm nativo
+            reinaConfirm(
+                "Error de Impresión Directa", 
+                "No se pudo conectar con el Reina Bridge (¿está cerrado?). <br><br>¿Desea abrir el ticket en PDF como respaldo?"
+            ).then((ok) => {
+                if (ok) {
+                    window.open(`/venta/ticket/${ventaId}`, '_blank');
+                }
+            });
+        });
+    }
+
     $(document).ready(function() {
         if (!$.fn.DataTable.isDataTable('#tablaVentas')) {
             $('#tablaVentas').DataTable({
