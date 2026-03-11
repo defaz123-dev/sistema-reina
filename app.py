@@ -1304,7 +1304,7 @@ def ejecutar_cierre_diario():
 @app.route('/promociones')
 @login_required
 @admin_required
-def promociones():
+def listar_promociones():
     cur = mysql.connection.cursor()
     cur.execute("""
         SELECT p.*, 
