@@ -1345,7 +1345,9 @@ def listar_promociones():
 @admin_required
 def guardar_promocion():
     d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    nom, tipo, val = d['nombre'].upper(), d['tipo'], d['valor']
+    nom, val = d['nombre'].upper(), d['valor']
+    # Normalizar el tipo para que coincida exactamente con el ENUM de la base de datos
+    tipo = str(d['tipo']).upper().strip()
     f_ini, f_fin, act = d['fecha_inicio'], d['fecha_fin'], d['activo']
     
     # Plataformas seleccionadas

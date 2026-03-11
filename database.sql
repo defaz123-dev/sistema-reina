@@ -291,6 +291,27 @@ CREATE TABLE `sesiones_caja` (
   CONSTRAINT `sesiones_caja_ibfk_2` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
 
+DROP TABLE IF EXISTS `clientes`;
+CREATE TABLE `clientes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `cedula_ruc` varchar(13) NOT NULL,
+  `tipo_identificacion_id` int(11) DEFAULT NULL,
+  `tipo_documento` enum('CEDULA','RUC') DEFAULT NULL,
+  `nombres` varchar(255) NOT NULL,
+  `apellidos` varchar(255) NOT NULL,
+  `direccion` varchar(255) DEFAULT NULL,
+  `telefono` varchar(20) DEFAULT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `usuario_creacion_id` int(11) DEFAULT NULL,
+  `fecha_creacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `usuario_modificacion_id` int(11) DEFAULT NULL,
+  `fecha_modificacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `cedula_ruc` (`cedula_ruc`),
+  KEY `tipo_identificacion_id` (`tipo_identificacion_id`),
+  CONSTRAINT `clientes_ibfk_1` FOREIGN KEY (`tipo_identificacion_id`) REFERENCES `tipos_identificacion` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
+
 DROP TABLE IF EXISTS `ventas`;
 CREATE TABLE `ventas` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -654,5 +675,8 @@ INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (18, 2, 2);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (19, 2, 3);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (20, 2, 5);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (21, 2, 6);
+
+-- Datos para clientes
+INSERT INTO `clientes` (`id`, `cedula_ruc`, `tipo_identificacion_id`, `tipo_documento`, `nombres`, `apellidos`, `direccion`, `telefono`, `email`) VALUES (1, '9999999999', 4, 'CEDULA', 'CONSUMIDOR', 'FINAL', 'QUITO', '0000000000', 'consumidor@final.com');
 
 SET FOREIGN_KEY_CHECKS = 1;

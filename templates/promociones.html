@@ -101,7 +101,7 @@
                                     data-bs-target="#modalPromo"
                                     data-id="{{ p.id }}"
                                     data-nombre="{{ p.nombre }}"
-                                    data-tipo="{{ p.tipo }}"
+                                    data-tipo="{{ p.tipo | string | upper }}"
                                     data-valor="{{ p.valor }}"
                                     data-inicio="{{ p.fecha_inicio.strftime('%Y-%m-%dT%H:%M') }}"
                                     data-fin="{{ p.fecha_fin.strftime('%Y-%m-%dT%H:%M') }}"
