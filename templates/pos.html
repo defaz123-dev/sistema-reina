@@ -486,7 +486,8 @@ function buscarPromocionesAutomaticas() {
             
             let valorReal = platsJson[platId] !== undefined ? platsJson[platId] : opt.dataset.valor;
             let tipoPromo = opt.dataset.tipo;
-            let valorTxt = (tipoPromo === 'PORCENTAJE') ? `${parseFloat(valorReal)}%` : `$${parseFloat(valorReal).toFixed(2)}`;
+            let valorTxt = (tipoPromo === 'DESCUENTO') ? `${parseFloat(valorReal)}%` : `$${parseFloat(valorReal).toFixed(2)}`;
+            if (tipoPromo === '2X1') valorTxt = '2X1';
 
             encontrada = { 
                 id: opt.value, 

@@ -53,12 +53,16 @@
                     <tr>
                         <td class="fw-bold">{{ p.nombre }}</td>
                         <td>
-                            <span class="badge {{ 'bg-info' if p.tipo == 'PORCENTAJE' else 'bg-primary' }}">
+                            <span class="badge {{ 'bg-info' if p.tipo == 'DESCUENTO' else 'bg-primary' if p.tipo == 'PRECIO_FIJO' else 'bg-dark' }}">
                                 {{ p.tipo }}
                             </span>
                         </td>
                         <td class="fw-bold">
-                            {{ p.valor }}{{ '%' if p.tipo == 'PORCENTAJE' else '$' }}
+                            {% if p.tipo == '2X1' %}
+                                <span class="badge bg-success">2X1</span>
+                            {% else %}
+                                {{ p.valor }}{{ '%' if p.tipo == 'DESCUENTO' else '$' }}
+                            {% endif %}
                         </td>
                         <td>
                             {% if p.plataformas_nombres %}
@@ -136,14 +140,15 @@
                             </div>
                             <div class="row mb-3">
                                 <div class="col-6">
-                                    <label class="small fw-bold text-muted text-uppercase mb-1">Tipo</label>
-                                    <select name="tipo" id="promo_tipo" class="form-select bg-white border-0 shadow-sm" required>
-                                        <option value="PORCENTAJE">PORCENTAJE (%)</option>
-                                        <option value="VALOR">VALOR ($)</option>
+                                    <label class="small fw-bold text-muted text-uppercase mb-1">Tipo de Oferta</label>
+                                    <select name="tipo" id="promo_tipo" class="form-select bg-white border-0 shadow-sm" required onchange="actualizarLabels()">
+                                        <option value="DESCUENTO">DESCUENTO (%)</option>
+                                        <option value="PRECIO_FIJO">PRECIO FIJO ($)</option>
+                                        <option value="2X1">PROMOCIÓN 2X1</option>
                                     </select>
                                 </div>
                                 <div class="col-6">
-                                    <label class="small fw-bold text-muted text-uppercase mb-1">Valor Gral.</label>
+                                    <label class="small fw-bold text-muted text-uppercase mb-1" id="labelValor">Valor Oferta</label>
                                     <input type="number" step="0.01" name="valor" id="promo_valor" class="form-control bg-white border-0 shadow-sm" required>
                                 </div>
                             </div>
@@ -253,13 +258,34 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+function actualizarLabels() {
+    const tipo = document.getElementById('promo_tipo').value;
+    const label = document.getElementById('labelValor');
+    const input = document.getElementById('promo_valor');
+    
+    if (tipo === 'DESCUENTO') {
+        label.innerText = 'DESCUENTO (%)';
+        input.placeholder = 'Ej: 10';
+        input.disabled = false;
+    } else if (tipo === 'PRECIO_FIJO') {
+        label.innerText = 'PRECIO FIJO ($)';
+        input.placeholder = 'Ej: 5.99';
+        input.disabled = false;
+    } else if (tipo === '2X1') {
+        label.innerText = 'VALOR REF. ($)';
+        input.value = '0';
+        input.disabled = true;
+    }
+}
+
 function prepararNuevaPromo() {
     document.getElementById('tituloModalPromo').innerText = 'Nueva Promoción';
     document.getElementById('promo_id').value = '';
     document.getElementById('promo_nombre').value = '';
     document.getElementById('promo_valor').value = '';
-    document.getElementById('promo_tipo').value = 'PORCENTAJE';
+    document.getElementById('promo_tipo').value = 'DESCUENTO';
     document.getElementById('promo_activo').value = '1';
+    actualizarLabels();
     
     // Resetear plataformas
     document.querySelectorAll('.check-plat').forEach(cb => {
@@ -272,11 +298,13 @@ function prepararEdicionPromo(btn) {
     document.getElementById('tituloModalPromo').innerText = 'Editar Promoción';
     document.getElementById('promo_id').value = btn.dataset.id;
     document.getElementById('promo_nombre').value = btn.dataset.nombre;
-    document.getElementById('promo_valor').value = btn.dataset.valor;
     document.getElementById('promo_tipo').value = btn.dataset.tipo;
+    document.getElementById('promo_valor').value = btn.dataset.valor;
     document.getElementById('promo_inicio').value = btn.dataset.inicio;
     document.getElementById('promo_fin').value = btn.dataset.fin;
     document.getElementById('promo_activo').value = btn.dataset.activo;
+    
+    actualizarLabels();
     
     // Marcar plataformas y sus valores
     const platsDetalle = JSON.parse(btn.dataset.plataformas || '{}');

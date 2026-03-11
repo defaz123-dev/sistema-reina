@@ -190,9 +190,10 @@ DROP TABLE IF EXISTS `promociones`;
 CREATE TABLE `promociones` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `nombre` varchar(100) NOT NULL,
-  `tipo` enum('PORCENTAJE','VALOR_FIJO') NOT NULL,
+  `tipo` enum('DESCUENTO','PRECIO_FIJO','2X1') NOT NULL,
   `valor` decimal(10,2) NOT NULL,
-  `plataformas_json` text DEFAULT NULL,
+  `fecha_inicio` date DEFAULT NULL,
+  `fecha_fin` date DEFAULT NULL,
   `activo` tinyint(1) DEFAULT '1',
   `usuario_creacion_id` int(11) DEFAULT NULL,
   `fecha_creacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -208,6 +209,16 @@ CREATE TABLE `promocion_productos` (
   PRIMARY KEY (`promocion_id`,`producto_id`),
   CONSTRAINT `promocion_productos_ibfk_1` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`) ON DELETE CASCADE,
   CONSTRAINT `promocion_productos_ibfk_2` FOREIGN KEY (`producto_id`) REFERENCES `productos` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+DROP TABLE IF EXISTS `promocion_plataformas`;
+CREATE TABLE `promocion_plataformas` (
+  `promocion_id` int(11) NOT NULL,
+  `plataforma_id` int(11) NOT NULL,
+  `valor_especifico` decimal(10,2) DEFAULT NULL,
+  PRIMARY KEY (`promocion_id`,`plataforma_id`),
+  CONSTRAINT `promocion_plataformas_ibfk_1` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `promocion_plataformas_ibfk_2` FOREIGN KEY (`plataforma_id`) REFERENCES `plataformas` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `recetas`;
