@@ -186,7 +186,50 @@
 
 {% block scripts %}
 <script>
-    // Hacer funciones disponibles globalmente
+    $(document).ready(function() {
+        if ($.fn.DataTable.isDataTable('#tablaAnulaciones')) {
+            $('#tablaAnulaciones').DataTable().destroy();
+        }
+        
+        $('#tablaAnulaciones').DataTable({
+            "order": [[ 0, "desc" ]],
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
+            "dom": '<"row mb-3"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            "autoWidth": false,
+            "columnDefs": [
+                { "width": "15%", "targets": 0 },
+                { "width": "15%", "targets": 1 },
+                { "width": "20%", "targets": 2 },
+                { "width": "10%", "targets": 3 },
+                { "width": "20%", "targets": 4 },
+                { "width": "10%", "targets": 5 },
+                { "width": "10%", "targets": 6 }
+            ]
+        });
+
+        // Refresco automático silencioso para Notas de Crédito en proceso
+        setInterval(function() {
+            const pendingItems = document.querySelectorAll('.sri-nc-pending');
+            if (pendingItems.length > 0) {
+                fetch("{{ url_for('sri_nc_status') }}")
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        let needsReload = false;
+                        pendingItems.forEach(badge => {
+                            let id = badge.id.split('-')[2];
+                            if (data.estados && data.estados[id] && data.estados[id].estado !== 'PENDIENTE') {
+                                needsReload = true;
+                            }
+                        });
+                        if (needsReload) location.reload();
+                    }
+                });
+            }
+        }, 30000);
+    });
+
+    // Funciones del buscador (globales)
     window.limpiarBuscador = function() {
         document.getElementById('inputBusquedaVenta').value = '';
         document.getElementById('resultadosBusqueda').innerHTML = '';
@@ -247,35 +290,6 @@
         document.getElementById('formMotivoAnulacion').classList.add('d-none');
         document.getElementById('resultadosBusqueda').classList.remove('d-none');
     };
-
-    $(document).ready(function() {
-        $('#tablaAnulaciones').DataTable({
-            "order": [[ 0, "desc" ]],
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
-            "dom": '<"row mb-3"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
-        });
-
-        // Refresco automático silencioso para Notas de Crédito en proceso
-        setInterval(function() {
-            const pendingItems = document.querySelectorAll('.sri-nc-pending');
-            if (pendingItems.length > 0) {
-                fetch("{{ url_for('sri_nc_status') }}")
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        let needsReload = false;
-                        pendingItems.forEach(badge => {
-                            let id = badge.id.split('-')[2];
-                            if (!data.estados || !data.estados[id] || data.estados[id].estado !== 'PENDIENTE') {
-                                needsReload = true;
-                            }
-                        });
-                        if (needsReload) location.reload();
-                    }
-                });
-            }
-        }, 30000);
-    });
 </script>
 {% endblock %}
 {% endblock %}
