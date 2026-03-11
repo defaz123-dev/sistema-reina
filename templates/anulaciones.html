@@ -80,11 +80,15 @@
                             {% endif %}
                         </td>
                         <td class="text-center">
-                            <div class="d-flex justify-content-center gap-1">
+                            <div class="d-flex justify-content-center align-items-center gap-1">
                                 {% if a.estado_anulacion == 'PROCESADO' %}
-                                <a href="{{ url_for('ver_ride', id=a.venta_id) }}" target="_blank" class="btn btn-sm btn-outline-danger border-0"><i class="fas fa-file-pdf"></i></a>
+                                <a href="{{ url_for('ver_ride', id=a.venta_id) }}" target="_blank" class="btn btn-outline-danger border-0" title="Ver RIDE">
+                                    <i class="fas fa-file-pdf fa-lg action-icon"></i>
+                                </a>
                                 {% endif %}
-                                <a href="{{ url_for('reintentar_anulacion_sri', id=a.venta_id) }}" class="btn btn-sm btn-outline-primary border-0" onclick="showLoading()"><i class="fas fa-cloud-upload-alt"></i></a>
+                                <a href="{{ url_for('reintentar_anulacion_sri', id=a.venta_id) }}" class="btn btn-outline-primary border-0" title="Reintentar SRI" onclick="showLoading()">
+                                    <i class="fas fa-cloud-upload-alt fa-lg action-icon"></i>
+                                </a>
                             </div>
                         </td>
                     </tr>
