@@ -728,7 +728,7 @@ function renderizarCarrito() {
     carrito.forEach(item => {
         let precioF = item.precio; 
         if(promoId && (promoProds.length === 0 || promoProds.includes(parseInt(item.id)))) {
-            precioF = (promoTipo === 'PORCENTAJE') ? item.precio * (1 - (promoValor / 100)) : Math.max(0, item.precio - promoValor);
+            precioF = (promoTipo === 'DESCUENTO') ? item.precio * (1 - (promoValor / 100)) : Math.max(0, item.precio - promoValor);
         }
         item.precio_final = precioF;
 
