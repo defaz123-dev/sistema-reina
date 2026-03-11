@@ -270,16 +270,20 @@
             mode: 'cors',
             method: 'GET'
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) throw new Error("Error en la respuesta del bridge.");
+            return response.json();
+        })
         .then(data => {
             if (!data.success) {
-                console.error("Error del bridge:", data.error);
+                reinaAlert('Error de Caja', 'El bridge detectó un error: ' + data.error, 'danger');
             } else {
                 console.log("Caja abierta exitosamente:", data.message);
             }
         })
         .catch(err => {
-            console.warn("Agente local Reina Bridge no detectado. ¿Está ejecutándose reina_bridge.exe?");
+            console.warn("Agente local Reina Bridge no detectado.", err);
+            reinaAlert('Sin Conexión Local', 'No se detectó el <b>Reina Bridge</b> en esta computadora. <br><br> Por favor, asegúrese de que el programa de caja esté abierto.', 'danger');
         });
     }
 
