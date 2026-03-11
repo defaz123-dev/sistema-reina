@@ -1300,6 +1300,98 @@ def ejecutar_cierre_diario():
         cur.close()
     return redirect(url_for('reportes'))
 
+# --- PROMOCIONES ---
+@app.route('/promociones')
+@login_required
+@admin_required
+def promociones():
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        SELECT p.*, 
+        (SELECT COUNT(*) FROM promocion_productos WHERE promocion_id = p.id) as productos_count,
+        (SELECT GROUP_CONCAT(plat.nombre SEPARATOR ', ') 
+         FROM promocion_plataformas pp 
+         JOIN plataformas plat ON pp.plataforma_id = plat.id 
+         WHERE pp.promocion_id = p.id) as plataformas_nombres
+        FROM promociones p ORDER BY p.fecha_creacion DESC
+    """)
+    promos = cur.fetchall()
+    
+    # Obtener detalles de plataformas para cada promo
+    for p in promos:
+        cur.execute("SELECT plataforma_id, valor_especifico FROM promocion_plataformas WHERE promocion_id = %s", (p['id'],))
+        p['plataformas_detalle'] = {r['plataforma_id']: float(r['valor_especifico']) if r['valor_especifico'] else None for r in cur.fetchall()}
+
+    cur.execute("SELECT p.id, p.codigo, p.nombre, c.nombre as categoria_nombre FROM productos p JOIN categorias c ON p.categoria_id = c.id ORDER BY p.nombre")
+    prods = cur.fetchall()
+    cur.execute("SELECT * FROM plataformas ORDER BY nombre")
+    plats = cur.fetchall()
+    cur.close()
+    return render_template('promociones.html', promociones=promos, todos_productos=prods, plataformas=plats)
+
+@app.route('/promociones/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_promocion():
+    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
+    nom, tipo, val = d['nombre'].upper(), d['tipo'], d['valor']
+    f_ini, f_fin, act = d['fecha_inicio'], d['fecha_fin'], d['activo']
+    
+    # Plataformas seleccionadas
+    plats_sel = request.form.getlist('plataformas_ids')
+    
+    try:
+        if d.get('id'):
+            p_id = d['id']
+            cur.execute("""UPDATE promociones SET nombre=%s, tipo=%s, valor=%s, fecha_inicio=%s, fecha_fin=%s, activo=%s 
+                           WHERE id=%s""", (nom, tipo, val, f_ini, f_fin, act, p_id))
+            registrar_auditoria('PROMOCION', f"Actualizó promoción: {nom}")
+        else:
+            cur.execute("""INSERT INTO promociones (nombre, tipo, valor, fecha_inicio, fecha_fin, activo, usuario_creacion_id) 
+                           VALUES (%s, %s, %s, %s, %s, %s, %s)""", (nom, tipo, val, f_ini, f_fin, act, u_id))
+            p_id = cur.lastrowid
+            registrar_auditoria('PROMOCION', f"Creó promoción: {nom}")
+        
+        # Guardar relación con plataformas y valores específicos
+        cur.execute("DELETE FROM promocion_plataformas WHERE promocion_id = %s", (p_id,))
+        for plat_id in plats_sel:
+            # Buscar si tiene un valor específico ingresado
+            val_esp = d.get(f'valor_plat_{plat_id}')
+            if not val_esp or val_esp.strip() == '':
+                val_esp = None # Usará el valor general de la promo
+            cur.execute("INSERT INTO promocion_plataformas (promocion_id, plataforma_id, valor_especifico) VALUES (%s, %s, %s)", (p_id, plat_id, val_esp))
+            
+        mysql.connection.commit(); flash('Promoción guardada correctamente', 'success')
+    except Exception as e: mysql.connection.rollback(); flash(f'Error al guardar: {str(e)}', 'danger')
+    finally: cur.close()
+    return redirect(url_for('promociones'))
+
+@app.route('/promociones/productos/<int:id>')
+@login_required
+@admin_required
+def obtener_productos_promo(id):
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT producto_id FROM promocion_productos WHERE promocion_id = %s", (id,))
+    res = [r['producto_id'] for r in cur.fetchall()]
+    cur.close()
+    return jsonify({'success': True, 'productos': res})
+
+@app.route('/promociones/productos/guardar', methods=['POST'])
+@login_required
+@admin_required
+def guardar_productos_promo():
+    data = request.get_json(); p_id = data.get('promocion_id'); productos = data.get('productos', [])
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("DELETE FROM promocion_productos WHERE promocion_id = %s", (p_id,))
+        for prod_id in productos:
+            cur.execute("INSERT INTO promocion_productos (promocion_id, producto_id) VALUES (%s, %s)", (p_id, prod_id))
+        mysql.connection.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        mysql.connection.rollback(); return jsonify({'success': False, 'message': str(e)})
+    finally: cur.close()
+
 # --- POS ---
 @app.route('/pos')
 @login_required
@@ -1314,20 +1406,42 @@ def pos():
     cur.execute("SELECT iva_porcentaje FROM empresa LIMIT 1"); iva_p = cur.fetchone()['iva_porcentaje']
     cur.execute("SELECT * FROM plataformas"); plats = cur.fetchall()
     cur.execute("SELECT * FROM tipos_identificacion"); t_id = cur.fetchall()
-    query = """SELECT p.id, p.codigo, p.nombre, p.precio, p.categoria_id, IF(p.imagen IS NOT NULL, 1, 0) as tiene_foto,
+    
+    # Obtener promociones activas y vigentes con sus plataformas y valores específicos
+    cur.execute("""
+        SELECT p.*
+        FROM promociones p 
+        WHERE p.activo = 1 AND NOW() BETWEEN p.fecha_inicio AND p.fecha_fin
+    """)
+    promos = cur.fetchall()
+    for p in promos:
+        # Productos
+        cur.execute("SELECT producto_id FROM promocion_productos WHERE promocion_id = %s", (p['id'],))
+        p['productos'] = [r['producto_id'] for r in cur.fetchall()]
+        # Plataformas y sus valores específicos
+        cur.execute("SELECT plataforma_id, valor_especifico FROM promocion_plataformas WHERE promocion_id = %s", (p['id'],))
+        p['plataformas_json'] = {str(r['plataforma_id']): float(r['valor_especifico']) if r['valor_especifico'] else float(p['valor']) for r in cur.fetchall()}
+
+    query_prods = """SELECT p.id, p.codigo, p.nombre, p.precio, p.categoria_id, IF(p.imagen IS NOT NULL, 1, 0) as tiene_foto,
                (SELECT MIN(FLOOR(i.stock_actual / r.cantidad_requerida)) FROM recetas r JOIN insumos i ON r.insumo_id = i.id WHERE r.producto_id = p.id AND i.sucursal_id = %s) as stock_disponible
                FROM productos p"""
-    cur.execute(query, (session['sucursal_id'],))
+    cur.execute(query_prods, (session['sucursal_id'],))
     prods = cur.fetchall()
     for p in prods:
+        # CONVERSIÓN DE SEGURIDAD PARA EVITAR VALORES VACÍOS O DECIMALES
+        p['precio'] = float(p['precio']) if p['precio'] is not None else 0.0
+        p['stock_disponible'] = int(p['stock_disponible']) if p['stock_disponible'] is not None else 0
+        
         cur.execute("SELECT plataforma_id, precio FROM producto_precios WHERE producto_id = %s", (p['id'],))
-        precs = cur.fetchall(); p['precios_json'] = {item['plataforma_id']: float(item['precio']) for item in precs}
-        # CORRECCIÓN: Si stock_disponible es None, verificamos si es que no tiene receta
-        if p['stock_disponible'] is None:
+        precs = cur.fetchall()
+        p['precios_json'] = {str(item['plataforma_id']): float(item['precio']) for item in precs}
+        
+        # Lógica especial de stock para productos sin receta
+        if p['stock_disponible'] is None or p['stock_disponible'] == 0:
             cur.execute("SELECT COUNT(*) as c FROM recetas WHERE producto_id=%s", (p['id'],))
-            # Si no tiene receta, asumimos stock infinito (999) para que se pueda vender
-            p['stock_disponible'] = 999 if cur.fetchone()['c'] == 0 else 0
-    cur.close(); return render_template('pos.html', categorias=cats, productos=prods, tipos_id=t_id, iva_porcentaje=iva_p, plataformas=plats)
+            if cur.fetchone()['c'] == 0:
+                p['stock_disponible'] = 999
+    cur.close(); return render_template('pos.html', categorias=cats, productos=prods, tipos_id=t_id, iva_porcentaje=iva_p, plataformas=plats, promociones=promos)
 
 @app.route('/pos/venta', methods=['POST'])
 @login_required
@@ -1336,9 +1450,18 @@ def procesar_venta_v2():
     try:
         c_id, fpago, s_id, plat_id = data.get('cliente_id'), data.get('forma_pago', 'EFECTIVO').upper(), session['sucursal_id'], data.get('plataforma_id')
         id_tarjeta = data.get('id_tarjeta')
+        
+        # NUEVOS CAMPOS DE DESCUENTO
+        promo_id = data.get('descuento_promo_id')
+        desc_manual = float(data.get('descuento_manual_instante', 0))
+        motivo_manual = data.get('motivo_descuento_manual', '').upper()
+
         if not id_tarjeta or str(id_tarjeta).strip() == '':
             id_tarjeta = None # Evita error de FK si llega vacío
         
+        if not promo_id or str(promo_id).strip() == '' or promo_id == 0:
+            promo_id = None
+
         # VALIDACIÓN LEGAL SRI: Consumidor Final monto máximo $50.00
         if str(c_id) == '1' and float(data['total']) > 50.00:
             return jsonify({'success': False, 'message': 'Ventas superiores a $50.00 requieren identificación del cliente.'})
@@ -1354,9 +1477,14 @@ def procesar_venta_v2():
         
         sesion_id = obtener_sesion_caja_activa(s_id, u_id)
         
-        cur.execute("""INSERT INTO ventas (usuario_id, sucursal_id, cliente_id, plataforma_id, id_tarjeta, sesion_caja_id, subtotal_0, subtotal_15, iva_valor, total, forma_pago, clave_acceso_sri, estado_sri, establecimiento, punto_emision, secuencial, usuario_creacion_id, usuario_modificacion_id) 
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDIENTE',%s,%s,%s,%s,%s)""", 
-                    (u_id, s_id, c_id, plat_id, id_tarjeta, sesion_id, data.get('subtotal_0', 0), data.get('subtotal_15', 0), data.get('iva_valor', 0), data['total'], fpago, clave, est, pto, sec_str, u_id, u_id))
+        cur.execute("""INSERT INTO ventas (usuario_id, sucursal_id, cliente_id, plataforma_id, id_tarjeta, sesion_caja_id, 
+                                          descuento_promo_id, descuento_manual_instante, motivo_descuento_manual,
+                                          subtotal_0, subtotal_15, iva_valor, total, forma_pago, clave_acceso_sri, 
+                                          estado_sri, establecimiento, punto_emision, secuencial, usuario_creacion_id, usuario_modificacion_id) 
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDIENTE',%s,%s,%s,%s,%s)""", 
+                    (u_id, s_id, c_id, plat_id, id_tarjeta, sesion_id, 
+                     promo_id, desc_manual, motivo_manual,
+                     data.get('subtotal_0', 0), data.get('subtotal_15', 0), data.get('iva_valor', 0), data['total'], fpago, clave, est, pto, sec_str, u_id, u_id))
         v_id = cur.lastrowid
         
         # ACTUALIZAR EL ÚLTIMO SECUENCIAL EN LA SUCURSAL
@@ -1376,9 +1504,8 @@ def procesar_venta_v2():
                     cur.execute("""INSERT INTO kardex (insumo_id, sucursal_id, tipo_movimiento, motivo, referencia_id, cantidad_salida, saldo_anterior, saldo_posterior, usuario_id) 
                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
                                 (r['insumo_id'], s_id, 'VENTA', f"VENTA FACTURA {est}-{pto}-{sec_str}", v_id, cant_descontar, saldo_ant, saldo_post, u_id))
-        mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta ID: {v_id} registrada")
+        mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta ID: {v_id} registrada con descuento manual {desc_manual}%")
         
-        # REGISTRAR INGRESO EN FLUJO DE CAJA SI ES EFECTIVO
         if fpago == 'EFECTIVO':
             cur = mysql.connection.cursor()
             cur.execute("""
@@ -1389,23 +1516,8 @@ def procesar_venta_v2():
 
         import facturacion_sri
         autorizada = facturacion_sri.procesar_factura_electronica(v_id, mysql)
-        
-        # INTENTAR ENVÍO AUTOMÁTICO DE EMAIL SOLO SI FUE AUTORIZADA
         if autorizada:
-            if enviar_comprobante_email(v_id):
-                flash('Factura AUTORIZADA y enviada al cliente por correo', 'success')
-            else:
-                flash('Factura AUTORIZADA, pero el envío de correo falló (verifique configuración)', 'info')
-        else:
-            # Si no fue autorizada, verificamos por qué (Pendiente o Devuelta)
-            cur = mysql.connection.cursor()
-            cur.execute("SELECT estado_sri FROM ventas WHERE id = %s", (v_id,))
-            v_actual = cur.fetchone()
-            cur.close()
-            if v_actual and 'PENDIENTE' in v_actual['estado_sri'].upper():
-                flash('Venta registrada. La factura quedó PENDIENTE de autorización en el SRI.', 'warning')
-            else:
-                flash(f'Venta registrada, pero el SRI reportó: {v_actual["estado_sri"] if v_actual else "Error"}', 'danger')
+            enviar_comprobante_email(v_id)
         
         return jsonify({'success': True, 'venta_id': v_id})
     except Exception as e: mysql.connection.rollback(); return jsonify({'success': False, 'message': str(e)})

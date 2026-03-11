@@ -1,4 +1,4 @@
-{% extends "layout.html" %}
+﻿{% extends "layout.html" %}
 
 {% block title %}POS Profesional - Sistema Reina{% endblock %}
 
@@ -79,6 +79,10 @@
     .btn-check:checked + .btn-outline-success i {
         color: #fff !important;
     }
+    
+    /* Animacion para promocion */
+    @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
+    .pulse-danger { animation: pulse-red 2s infinite; }
 </style>
 
 <div class="pos-layout">
@@ -152,10 +156,25 @@
                     <label class="extra-small fw-bold text-muted text-uppercase d-block mb-1">Plataforma de Venta</label>
                     <select id="ventaPlataforma" class="form-select form-select-sm border-0 bg-light fw-bold text-success" onchange="cambiarPlataforma()">
                         {% for plat in plataformas %}
-                        <option value="{{ plat.id }}">{{ plat.nombre }}</option>
+                        <option value="{{ plat.id }}" {% if plat.id == 1 %}selected{% endif %}>{{ plat.nombre }}</option>
                         {% endfor %}
                     </select>
                 </div>
+                
+                <div id="promoAppliedContainer" style="display: none;" class="mt-2">
+                    <div class="alert alert-success border-0 shadow-sm p-2 mb-0 d-flex align-items-center justify-content-between" style="border-radius: 10px;">
+                        <div class="small fw-bold text-truncate" id="promoNombreAplicada">---</div>
+                        <button class="btn btn-sm btn-outline-success border-0" onclick="quitarPromo()"><i class="fas fa-undo"></i></button>
+                    </div>
+                </div>
+                
+                <select id="promoSeleccionada" style="display: none;">
+                    <option value="">NINGUNA</option>
+                    {% for p in promociones %}
+                    <option value="{{ p.id }}" data-nombre="{{ p.nombre }}" data-tipo="{{ p.tipo }}" data-valor="{{ p.valor }}" data-productos='{{ p.productos | tojson }}' data-plataformas='{{ p.plataformas_json | tojson }}'></option>
+                    {% endfor %}
+                </select>
+
             </div>
             <div class="carrito-scroll-container">
                 <div id="carritoItems">
@@ -167,8 +186,12 @@
             </div>
             <div class="card-footer bg-white border-0 p-3 mt-auto shadow-lg">
                 <div class="summary-item mb-1">
-                    <span class="text-muted extra-small">SUBTOTAL (BASE {{ iva_porcentaje|int }}%):</span>
-                    <span class="fw-bold extra-small" id="subtotal15Label">$ 0.00</span>
+                    <span class="text-muted extra-small">SUBTOTAL BRUTO:</span>
+                    <span class="fw-bold extra-small" id="subtotalBrutoLabel">$ 0.00</span>
+                </div>
+                <div class="summary-item mb-1 text-primary">
+                    <span class="extra-small fw-bold">DESC. PROMO:</span>
+                    <span class="fw-bold extra-small" id="descuentoPromoLabel">$ 0.00</span>
                 </div>
                 <div class="summary-item mb-2">
                     <span class="text-muted extra-small">IVA ({{ iva_porcentaje|int }}%):</span>
@@ -181,6 +204,25 @@
                 <button class="btn btn-reina w-100 py-3 rounded-4 fw-bold shadow-sm" id="btnPagar" onclick="abrirModalFinalizar()" disabled>
                     <i class="fas fa-check-circle me-2"></i> REGISTRAR VENTA
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DETECCIÓN PROMOCIÓN -->
+<div class="modal fade" id="modalPromocionDeteccion" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg text-center overflow-hidden">
+            <div class="p-4 bg-danger text-white"><i class="fas fa-gift fa-3x mb-2 pulse-danger"></i><h4 class="fw-bold mb-0">¡PROMOCIÓN DISPONIBLE!</h4></div>
+            <div class="p-4">
+                <p class="text-muted small fw-bold mb-2">Se detectó una promoción para:</p>
+                <div id="promoPlataformaBadge" class="mb-3"></div>
+                <h4 id="promoNombreModal" class="fw-bold mb-1">---</h4>
+                <div id="promoValorEspecifico" class="h5 text-success fw-bold mb-4"></div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success py-3 rounded-pill fw-bold shadow" onclick="aplicarPromoModal()">SÍ, APLICAR DESCUENTO</button>
+                    <button class="btn btn-outline-danger py-2 rounded-pill fw-bold" onclick="ignorarPromoModal()">NO APLICAR</button>
+                </div>
             </div>
         </div>
     </div>
@@ -227,6 +269,22 @@
                                     <div id="clienteNombre" class="fw-bold text-dark h5 mb-0">CONSUMIDOR FINAL</div>
                                     <input type="hidden" id="clienteId" value="1">
                                 </div>
+                                
+                                <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-percent me-2 text-primary"></i> DESCUENTO MANUAL AL INSTANTE</h6>
+                                <div id="info_desc_bloqueado" class="alert alert-warning py-1 extra-small mb-2" style="display:none;">
+                                    Bloqueado: Ya se aplicó una promoción del sistema.
+                                </div>
+                                <div class="row g-2 mb-4">
+                                    <div class="col-4">
+                                        <label class="extra-small fw-bold text-muted text-uppercase mb-1">Porcentaje %</label>
+                                        <input type="number" id="desc_manual_porc" class="form-control bg-light border-0 fw-bold text-primary" value="0" min="0" max="100" oninput="calcularTotalesFinales()">
+                                    </div>
+                                    <div class="col-8">
+                                        <label class="extra-small fw-bold text-muted text-uppercase mb-1">Motivo del Descuento</label>
+                                        <input type="text" id="desc_manual_motivo" class="form-control bg-light border-0 force-upper" placeholder="EJ: CORTESÍA / CLIENTE VIP">
+                                    </div>
+                                </div>
+                                
                                 <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-wallet me-2 text-success"></i> MÉTODO DE PAGO</h6>
                                 <div class="row g-2 mb-3">
                                     <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoEfectivo" value="EFECTIVO" checked onclick="toggleTarjetaSelector()"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoEfectivo"><i class="fas fa-money-bill-wave d-block mb-1"></i> EFECTIVO</label></div>
@@ -252,15 +310,15 @@
                                 <div id="resumenItems" class="mb-4 overflow-auto" style="max-height: 200px;"></div>
                                 <div class="mt-auto border-top pt-3">
                                     <div class="d-flex justify-content-between mb-1">
-                                        <span class="text-muted small">Total Productos:</span>
-                                        <span class="fw-bold small" id="modalTotalItems">0</span>
+                                        <span class="text-muted small">Subtotal:</span>
+                                        <span class="fw-bold small" id="modalSubtotalBruto">$ 0.00</span>
                                     </div>
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <span class="text-muted small">Subtotal Base 15%:</span>
-                                        <span class="fw-bold small" id="modalSubtotal15">$ 0.00</span>
+                                    <div class="d-flex justify-content-between mb-1 text-primary">
+                                        <span class="small fw-bold">Descuentos:</span>
+                                        <span class="fw-bold small" id="modalDescuentosTotales">$ 0.00</span>
                                     </div>
                                     <div class="d-flex justify-content-between mb-2">
-                                        <span class="text-muted small">IVA (15%):</span>
+                                        <span class="text-muted small">IVA ({{ iva_porcentaje|int }}%):</span>
                                         <span class="fw-bold small" id="modalIvaVal">$ 0.00</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mt-3 border-top pt-2">
@@ -305,11 +363,17 @@
     </div>
 </div>
 
+{% endblock %}
+
 {% block scripts %}
 <script>
 let carrito = [];
 let modalFinalizarInstance;
 let modalClienteInstance;
+let modalPromocionInstance;
+let promoIdDetectada = null;
+let ultimaPlataformaEvaluada = null;
+
 const productosData = {{ productos | tojson | safe }};
 const IVA_P = {{ iva_porcentaje or 15.0 }};
 
@@ -340,10 +404,12 @@ function validarIdEcuador(numero, tipo) {
 document.addEventListener('DOMContentLoaded', () => {
     modalFinalizarInstance = new bootstrap.Modal(document.getElementById('modalFinalizar'));
     modalClienteInstance = new bootstrap.Modal(document.getElementById('modalCliente'));
+    modalPromocionInstance = new bootstrap.Modal(document.getElementById('modalPromocionDeteccion'));
     
-    // Al cargar, actualizar precios visuales según plataforma LOCAL (asumiendo ID 1)
-    actualizarPreciosVisuales();
-    renderizarCarrito();
+    // Pequeño retraso para asegurar que Bootstrap esté listo antes de la primera detección
+    setTimeout(() => {
+        cambiarPlataforma();
+    }, 300);
 
     $('.filter-btn').on('click', function() {
         $('.filter-btn').removeClass('active btn-reina').addClass('btn-outline-secondary');
@@ -359,29 +425,135 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function cambiarPlataforma() {
     actualizarPreciosVisuales();
+    buscarPromocionesAutomaticas(); // Inyección de lógica de promoción
     
-    // Actualizar precios de productos ya en el carrito
+    // Actualizar precios de productos ya en el carrito (ORIGINAL ADAPTADO)
     const platId = document.getElementById('ventaPlataforma').value;
     carrito.forEach(item => {
         const prod = productosData.find(p => String(p.id) === String(item.id));
         if (prod && prod.precios_json && prod.precios_json[platId]) {
             item.precio = parseFloat(prod.precios_json[platId]);
+        } else if (prod) {
+            item.precio = parseFloat(prod.precio); // Fallback de seguridad al original
         }
     });
     renderizarCarrito();
 }
 
+// Función ORIGINAL Intacta de visualización de precios
 function actualizarPreciosVisuales() {
     const platId = document.getElementById('ventaPlataforma').value;
     document.querySelectorAll('.product-price-display').forEach(span => {
         const pId = span.getAttribute('data-product-id');
         const prod = productosData.find(p => String(p.id) === String(pId));
-        if (prod && prod.precios_json && prod.precios_json[platId]) {
-            span.textContent = `$ ${parseFloat(prod.precios_json[platId]).toFixed(2)}`;
+        if (prod) {
+            let pMostrar = prod.precio; // Mantiene el precio base si no hay platId
+            if (platId && prod.precios_json && prod.precios_json[platId]) {
+                pMostrar = prod.precios_json[platId];
+            }
+            span.textContent = `$ ${parseFloat(pMostrar).toFixed(2)}`;
         }
     });
 }
 
+// LÓGICA INYECTADA: Búsqueda de Promociones
+function buscarPromocionesAutomaticas() {
+    const platSelect = document.getElementById('ventaPlataforma');
+    const platId = platSelect.value;
+    const platNombre = platSelect.options[platSelect.selectedIndex].text;
+    
+    const select = document.getElementById('promoSeleccionada');
+    if(!select || !platId) return;
+
+    // Evitar re-evaluar si por alguna razón se llama a la función con la misma plataforma consecutivamente
+    if (ultimaPlataformaEvaluada === platId) return;
+    ultimaPlataformaEvaluada = platId;
+
+    // REINICIAR TODO: Al cambiar de plataforma, quitamos cualquier promoción aplicada previamente
+    quitarPromo();
+
+    const options = select.querySelectorAll('option');
+    let encontrada = null;
+
+    options.forEach(opt => {
+        if (opt.value === "") return;
+        let platsJson = {};
+        try { platsJson = JSON.parse(opt.dataset.plataformas || '{}'); } catch(e) { platsJson = {}; }
+        
+        if (platsJson.hasOwnProperty(platId)) {
+            const numPlatsPromo = Object.keys(platsJson).length;
+            const esGeneral = numPlatsPromo >= platSelect.options.length;
+            
+            let valorReal = platsJson[platId] !== undefined ? platsJson[platId] : opt.dataset.valor;
+            let tipoPromo = opt.dataset.tipo;
+            let valorTxt = (tipoPromo === 'PORCENTAJE') ? `${parseFloat(valorReal)}%` : `$${parseFloat(valorReal).toFixed(2)}`;
+
+            encontrada = { 
+                id: opt.value, 
+                nombre: opt.dataset.nombre,
+                esGeneral: esGeneral,
+                platNombre: platNombre,
+                valorTxt: valorTxt
+            };
+        }
+    });
+
+    // Si la nueva plataforma tiene una promoción asignada, mostramos la modal SIEMPRE
+    if (encontrada) {
+        promoIdDetectada = encontrada.id;
+
+        const badgeCont = document.getElementById('promoPlataformaBadge');
+        const valorCont = document.getElementById('promoValorEspecifico');
+        const nombreModal = document.getElementById('promoNombreModal');
+
+        if (encontrada.esGeneral) {
+            badgeCont.innerHTML = `<span class="badge rounded-pill bg-success px-4 py-2 fs-6 shadow-sm"><i class="fas fa-globe me-2"></i>PROMOCIÓN GENERAL</span>`;
+        } else {
+            badgeCont.innerHTML = `<span class="badge rounded-pill bg-warning text-dark px-4 py-2 fs-6 shadow-sm"><i class="fas fa-store me-2"></i>${encontrada.platNombre.toUpperCase()}</span>`;
+        }
+
+        // El título principal ahora es el Descuento Real
+        nombreModal.innerHTML = `<span class="text-success">${encontrada.valorTxt} DE DESCUENTO</span>`;
+        valorCont.innerHTML = `<i class="fas fa-info-circle me-1 small"></i> Beneficio exclusivo para esta plataforma`;
+
+        if(modalPromocionInstance) {
+            modalPromocionInstance.hide(); 
+            setTimeout(() => { modalPromocionInstance.show(); }, 100);
+        }
+    }
+}
+
+function aplicarPromoModal() {
+    if (!promoIdDetectada) return;
+    const select = document.getElementById('promoSeleccionada');
+    if(!select) return;
+
+    select.value = promoIdDetectada;
+    
+    const opt = select.querySelector(`option[value="${promoIdDetectada}"]`);
+    if(opt) {
+        const container = document.getElementById('promoAppliedContainer');
+        const label = document.getElementById('promoNombreAplicada');
+        if(label) label.textContent = opt.dataset.nombre;
+        if(container) container.style.display = 'block';
+    }
+    
+    if(modalPromocionInstance) modalPromocionInstance.hide();
+    renderizarCarrito();
+}
+
+function ignorarPromoModal() {
+    modalPromocionInstance.hide();
+}
+
+function quitarPromo() {
+    const select = document.getElementById('promoSeleccionada');
+    if(select) select.value = "";
+    document.getElementById('promoAppliedContainer').style.display = 'none';
+    renderizarCarrito();
+}
+
+// Funciones Originales de Búsqueda
 function buscarPorCodigo(codigo) {
     const term = codigo.trim().toLowerCase();
     if (!term) return;
@@ -394,7 +566,6 @@ function buscarCliente() {
     const term = document.getElementById('clienteCedula').value.trim();
     if (!term) return;
     
-    // Si es numérico y tiene 10 o 13 dígitos, buscamos por cédula directamente primero
     if (/^\d+$/.test(term) && (term.length === 10 || term.length === 13)) {
         fetch(`/clientes/buscar/${encodeURIComponent(term)}`).then(res => res.json()).then(data => {
             if (data.success) {
@@ -406,7 +577,6 @@ function buscarCliente() {
             }
         });
     } else {
-        // De lo contrario, buscamos por nombre o coincidencia parcial
         fetch(`/clientes/buscar_nombre/${encodeURIComponent(term)}`).then(res => res.json()).then(data => {
             if (data.success && data.clientes.length > 0) {
                 if (data.clientes.length === 1) {
@@ -443,7 +613,6 @@ function mostrarListaClientes(clientes) {
     });
     lista.style.display = 'block';
 
-    // Cerrar lista al hacer click fuera
     const closeList = (e) => {
         if (!lista.contains(e.target) && e.target.id !== 'clienteCedula') {
             lista.style.display = 'none';
@@ -494,17 +663,22 @@ function setConsumidorFinal() {
 }
 
 function agregarAlCarrito(p) {
+    // ORIGINAL LOGIC
     if (p.stock_disponible == 999) return reinaAlert('Falta Receta', 'Este producto no tiene ingredientes asociados.', 'warning');
     if (p.stock_disponible <= 0) return reinaAlert('Sin Stock', 'No hay ingredientes.', 'danger');
     
     const platId = document.getElementById('ventaPlataforma').value;
-    const precioPlat = (p.precios_json && p.precios_json[platId]) ? parseFloat(p.precios_json[platId]) : parseFloat(p.precio);
+    let precioPlat = p.precio;
+    if (platId && p.precios_json && p.precios_json[platId]) {
+        precioPlat = p.precios_json[platId];
+    }
+    precioPlat = parseFloat(precioPlat);
     
     const exist = carrito.find(i => String(i.id) === String(p.id));
     if(exist) {
         if (exist.cantidad + 1 > p.stock_disponible) return reinaAlert('Límite', 'No hay más stock.', 'warning');
         exist.cantidad++;
-        exist.precio = precioPlat; // Actualizar precio por si cambió la plataforma
+        exist.precio = precioPlat; 
     } else {
         carrito.push({ id: String(p.id), nombre: p.nombre, precio: precioPlat, cantidad: 1, stock_max: p.stock_disponible });
     }
@@ -517,33 +691,73 @@ function renderizarCarrito() {
     if (carrito.length === 0) {
         cont.innerHTML = `<div class="text-center text-muted py-5"><i class="fas fa-shopping-basket fa-3x mb-3 opacity-25"></i><p class="small fw-bold">No hay productos seleccionados</p></div>`;
         document.getElementById('totalLabel').textContent = '$ 0.00';
-        document.getElementById('subtotal15Label').textContent = '$ 0.00';
+        document.getElementById('subtotalBrutoLabel').textContent = '$ 0.00';
+        document.getElementById('descuentoPromoLabel').textContent = '$ 0.00';
         document.getElementById('ivaLabel').textContent = '$ 0.00';
         btnPagar.disabled = true;
         return;
     }
     btnPagar.disabled = false;
-    let html = ''; let total = 0;
+
+    // Lógica Promociones Inyectada Suavemente
+    const platId = document.getElementById('ventaPlataforma').value;
+    const promoSelect = document.getElementById('promoSeleccionada');
+    const promoId = promoSelect ? promoSelect.value : "";
+    
+    let promoTipo = '', promoValor = 0, promoProds = [];
+    if(promoId) {
+        const opt = promoSelect.querySelector(`option[value="${promoId}"]`);
+        if(opt) {
+            promoTipo = opt.dataset.tipo;
+            const platsJson = JSON.parse(opt.dataset.plataformas || '{}');
+            promoValor = parseFloat(platsJson[platId] !== undefined ? platsJson[platId] : opt.dataset.valor);
+            promoProds = JSON.parse(opt.dataset.productos || '[]');
+        }
+    }
+
+    let html = ''; 
+    let subtotalBruto = 0; 
+    let descuentoPromoTotal = 0;
+
     carrito.forEach(item => {
-        const sub = item.precio * item.cantidad; total += sub;
+        let precioF = item.precio; 
+        if(promoId && (promoProds.length === 0 || promoProds.includes(parseInt(item.id)))) {
+            precioF = (promoTipo === 'PORCENTAJE') ? item.precio * (1 - (promoValor / 100)) : Math.max(0, item.precio - promoValor);
+        }
+        item.precio_final = precioF;
+
+        const subB = item.precio * item.cantidad;
+        const subF = precioF * item.cantidad;
+        const descI = subB - subF;
+
+        subtotalBruto += subB;
+        descuentoPromoTotal += descI;
+
         html += `<div class="item-carrito d-flex justify-content-between align-items-center">
-            <div style="max-width: 60%;"><div class="fw-bold small text-dark">${item.nombre}</div><div class="text-muted extra-small">$${item.precio.toFixed(2)} c/u</div></div>
+            <div style="max-width: 60%;">
+                <div class="fw-bold small text-dark">${item.nombre}</div>
+                <div class="text-muted extra-small">
+                    ${descI > 0 ? `<del class="text-danger">$${item.precio.toFixed(2)}</del> <span class="text-success fw-bold">$${precioF.toFixed(2)}</span>` : `$${item.precio.toFixed(2)}`} c/u
+                </div>
+            </div>
             <div class="d-flex align-items-center">
                 <button class="btn btn-outline-secondary btn-cantidad" onclick="actualizarCantidad('${item.id}', -1)">-</button>        
                 <span class="mx-2 small fw-bold">${item.cantidad}</span>
                 <button class="btn btn-reina btn-cantidad" onclick="actualizarCantidad('${item.id}', 1)">+</button>
-                <div class="ms-2 small fw-bold text-end text-success" style="min-width:65px">$${sub.toFixed(2)}</div>
+                <div class="ms-2 small fw-bold text-end text-success" style="min-width:65px">$${subF.toFixed(2)}</div>
             </div></div>`;
     });
     
+    const totalParcial = subtotalBruto - descuentoPromoTotal;
     const divisorIVA = 1 + (IVA_P / 100);
-    const baseIVA = total / divisorIVA;
-    const ivaVal = total - baseIVA;
+    const baseIVA = totalParcial / divisorIVA;
+    const ivaVal = totalParcial - baseIVA;
 
     cont.innerHTML = html;
-    document.getElementById('totalLabel').textContent = `$ ${total.toFixed(2)}`;
-    document.getElementById('subtotal15Label').textContent = `$ ${baseIVA.toFixed(2)}`;
+    document.getElementById('subtotalBrutoLabel').textContent = `$ ${subtotalBruto.toFixed(2)}`;
+    document.getElementById('descuentoPromoLabel').textContent = `$ -${descuentoPromoTotal.toFixed(2)}`;
     document.getElementById('ivaLabel').textContent = `$ ${ivaVal.toFixed(2)}`;
+    document.getElementById('totalLabel').textContent = `$ ${totalParcial.toFixed(2)}`;
 }
 
 function actualizarCantidad(id, c) {
@@ -557,28 +771,71 @@ function actualizarCantidad(id, c) {
 }
 
 function abrirModalFinalizar() {
+    const platId = document.getElementById('ventaPlataforma').value;
+    if (!platId) return reinaAlert('Aviso', 'Debe seleccionar una Plataforma de Venta primero.', 'warning');
+
     if (carrito.length === 0) return;
     document.getElementById('clienteCedula').value = '';
     document.getElementById('clienteNombre').textContent = 'CONSUMIDOR FINAL';
     document.getElementById('clienteId').value = '1';
     
+    // Lógica Promociones Modal
+    const promoId = document.getElementById('promoSeleccionada') ? document.getElementById('promoSeleccionada').value : "";
+    const inpDesc = document.getElementById('desc_manual_porc');
+    const inpMot = document.getElementById('desc_manual_motivo');
+    const infoB = document.getElementById('info_desc_bloqueado');
+    
+    if (promoId) {
+        if(inpDesc) { inpDesc.value = 0; inpDesc.disabled = true; }
+        if(inpMot) { inpMot.value = "DESCUENTO PROMOCIÓN DEL SISTEMA"; inpMot.disabled = true; }
+        if(infoB) infoB.style.display = 'block';
+    } else {
+        if(inpDesc) { inpDesc.value = 0; inpDesc.disabled = false; }
+        if(inpMot) { inpMot.value = ''; inpMot.disabled = false; }
+        if(infoB) infoB.style.display = 'none';
+    }
+
+    renderizarResumenFinal();
+    modalFinalizarInstance.show();
+}
+
+function renderizarResumenFinal() {
     const resumenCont = document.getElementById('resumenItems');
-    let total = 0; let totalCant = 0; let html = '';
+    let html = '';
     carrito.forEach(item => {
-        const sub = item.precio * item.cantidad; total += sub; totalCant += item.cantidad;
-        html += `<div class="summary-item"><span class="small">${item.cantidad}x ${item.nombre}</span><span class="small fw-bold">$${sub.toFixed(2)}</span></div>`;
+        const subF = item.precio_final * item.cantidad;
+        html += `<div class="summary-item"><span class="small">${item.cantidad}x ${item.nombre}</span><span class="small fw-bold">$${subF.toFixed(2)}</span></div>`;
     });
+    resumenCont.innerHTML = html;
+    calcularTotalesFinales();
+}
+
+function calcularTotalesFinales() {
+    let subtotalBruto = 0;
+    let descuentoPromoTotal = 0;
+    
+    carrito.forEach(item => {
+        subtotalBruto += (item.precio * item.cantidad);
+        descuentoPromoTotal += (item.precio - item.precio_final) * item.cantidad;
+    });
+
+    const subtotalPostPromo = subtotalBruto - descuentoPromoTotal;
+    
+    // Descuento Manual
+    const inpDesc = document.getElementById('desc_manual_porc');
+    const percManual = inpDesc ? (parseFloat(inpDesc.value) || 0) : 0;
+    const descManualVal = subtotalPostPromo * (percManual / 100);
+    
+    const totalFinal = subtotalPostPromo - descManualVal;
     
     const divisorIVA = 1 + (IVA_P / 100);
-    const baseIVA = total / divisorIVA;
-    const ivaVal = total - baseIVA;
+    const baseIVA = totalFinal / divisorIVA;
+    const ivaVal = totalFinal - baseIVA;
 
-    resumenCont.innerHTML = html;
-    document.getElementById('modalTotalItems').textContent = totalCant;
-    document.getElementById('modalSubtotal15').textContent = `$ ${baseIVA.toFixed(2)}`;
+    document.getElementById('modalSubtotalBruto').textContent = `$ ${subtotalBruto.toFixed(2)}`;
+    document.getElementById('modalDescuentosTotales').textContent = `$ -${(descuentoPromoTotal + descManualVal).toFixed(2)}`;
     document.getElementById('modalIvaVal').textContent = `$ ${ivaVal.toFixed(2)}`;
-    document.getElementById('modalTotalPagar').textContent = `$ ${total.toFixed(2)}`;
-    modalFinalizarInstance.show();
+    document.getElementById('modalTotalPagar').textContent = `$ ${totalFinal.toFixed(2)}`;
 }
 
 function toggleTarjetaSelector() {
@@ -593,18 +850,31 @@ async function confirmarOrden() {
     const f_pago = document.querySelector('input[name="formaPago"]:checked').value;
     const id_tarjeta = document.getElementById('id_tarjeta').value;
     const plat_id = document.getElementById('ventaPlataforma').value;
-    const total = carrito.reduce((s, i) => s + (i.precio * i.cantidad), 0);
-    const base15 = total / 1.15;
-    const ivaVal = total - base15;
+    
+    const promoId = document.getElementById('promoSeleccionada') ? document.getElementById('promoSeleccionada').value : "";
+    const descManual = parseFloat(document.getElementById('desc_manual_porc').value) || 0;
+    const motivoManual = document.getElementById('desc_manual_motivo').value.trim();
 
     if (!c_id) return reinaAlert('Aviso', 'Seleccione un cliente', 'warning');
-    
-    // Validación de tarjeta si corresponde
-    if (f_pago === 'TARJETA' && !id_tarjeta) {
-        return reinaAlert('Faltan Datos', 'Debe seleccionar el tipo de tarjeta para este pago.', 'warning');
-    }
+    if (f_pago === 'TARJETA' && !id_tarjeta) return reinaAlert('Faltan Datos', 'Debe seleccionar el tipo de tarjeta para este pago.', 'warning');
+    if (descManual > 0 && !motivoManual) return reinaAlert('Faltan Datos', 'Debe ingresar un motivo para el descuento manual.', 'warning');
 
-    if (c_id == '1' && total > 50) return reinaAlert('Límite Excedido', 'Ventas superiores a $50.00 requieren datos del cliente.', 'warning');
+    let totalBruto = 0;
+    let descPromo = 0;
+    carrito.forEach(item => {
+        totalBruto += (item.precio * item.cantidad);
+        descPromo += (item.precio - item.precio_final) * item.cantidad;
+    });
+    
+    const subPostPromo = totalBruto - descPromo;
+    const descMVal = subPostPromo * (descManual / 100);
+    const totalFinal = subPostPromo - descMVal;
+    
+    const divisorIVA = 1 + (IVA_P / 100);
+    const baseIVA = totalFinal / divisorIVA;
+    const ivaVal = totalFinal - baseIVA;
+
+    if (c_id == '1' && totalFinal > 50) return reinaAlert('Límite Excedido', 'Ventas superiores a $50.00 requieren datos del cliente.', 'warning');
     
     if (c_id == '1') {
         const ok = await reinaConfirm('¿Facturar como Consumidor Final?', 'No podrá cambiar los datos después.');
@@ -616,8 +886,22 @@ async function confirmarOrden() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            items: carrito, subtotal_0: 0, subtotal_15: base15, iva_valor: ivaVal, total: total, 
-            cliente_id: c_id, forma_pago: f_pago, id_tarjeta: id_tarjeta, plataforma_id: plat_id
+            items: carrito.map(i => ({
+                id: i.id, 
+                cantidad: i.cantidad, 
+                precio: i.precio_final * (1 - (descManual / 100))
+            })), 
+            subtotal_0: 0, 
+            subtotal_15: baseIVA, 
+            iva_valor: ivaVal, 
+            total: totalFinal, 
+            cliente_id: c_id, 
+            forma_pago: f_pago, 
+            id_tarjeta: id_tarjeta, 
+            plataforma_id: plat_id,
+            descuento_promo_id: promoId,
+            descuento_manual_instante: descManual,
+            motivo_descuento_manual: motivoManual
         })
     });
     const data = await res.json();
@@ -633,5 +917,4 @@ async function confirmarOrden() {
 
 function vaciarCarrito() { carrito=[]; renderizarCarrito(); }
 </script>
-{% endblock %}
 {% endblock %}

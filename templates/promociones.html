@@ -1,0 +1,379 @@
+
+{% extends "layout.html" %}
+{% block title %}Promociones y Descuentos - {{ config_empresa.nombre_comercial }}{% endblock %}
+
+{% block container_class %}container-fluid px-4{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}" style="color: {{ config_empresa.color_tema }} !important;">
+            {{ config_empresa.nombre_comercial|upper }}
+        </a>
+        <div class="ms-auto">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm rounded-pill px-3 text-white fw-bold shadow-sm" style="background-color: {{ config_empresa.color_tema }};">
+                <i class="fas fa-home me-1"></i> INICIO
+            </a>
+        </div>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="brand-logo"><i class="fas fa-tags me-2"></i>Catálogo de Promociones</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-reina rounded-pill px-4 shadow-sm" 
+                data-bs-toggle="modal" 
+                data-bs-target="#modalPromo"
+                onclick="prepararNuevaPromo()">
+            <i class="fas fa-plus me-2"></i>Nueva Promoción
+        </button>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="tablaPromociones">
+                <thead class="table-light">
+                    <tr class="small text-muted text-uppercase">
+                        <th>Nombre</th>
+                        <th>Tipo</th>
+                        <th>Valor Gral.</th>
+                        <th>Plataformas</th>
+                        <th>Vigencia</th>
+                        <th>Aplicación</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in promociones %}
+                    <tr>
+                        <td class="fw-bold">{{ p.nombre }}</td>
+                        <td>
+                            <span class="badge {{ 'bg-info' if p.tipo == 'PORCENTAJE' else 'bg-primary' }}">
+                                {{ p.tipo }}
+                            </span>
+                        </td>
+                        <td class="fw-bold">
+                            {{ p.valor }}{{ '%' if p.tipo == 'PORCENTAJE' else '$' }}
+                        </td>
+                        <td>
+                            {% if p.plataformas_nombres %}
+                                <div class="d-flex flex-wrap gap-1" style="max-width: 300px;">
+                                    {% for p_nom in p.plataformas_nombres.split(', ') %}
+                                        <span class="badge bg-white text-dark border shadow-sm" style="font-size: 0.85rem;">{{ p_nom }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <span class="badge bg-danger">NINGUNA</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">
+                            <div class="text-success"><i class="fas fa-clock me-1"></i>{{ p.fecha_inicio.strftime('%Y-%m-%d %H:%M') }}</div>
+                            <div class="text-danger"><i class="fas fa-clock me-1"></i>{{ p.fecha_fin.strftime('%Y-%m-%d %H:%M') }}</div>
+                        </td>
+                        <td>
+                            {% if p.productos_count == 0 %}
+                            <span class="badge bg-dark">TODO EL CATÁLOGO</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ p.productos_count }} PRODUCTOS</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge {{ 'bg-success' if p.activo else 'bg-danger' }}">
+                                {{ 'ACTIVO' if p.activo else 'INACTIVO' }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <button class="btn btn-outline-warning border-0 me-1" title="Asignar Productos"
+                                    onclick="abrirModalAsignar({{ p.id }}, '{{ p.nombre }}')">
+                                <i class="fas fa-boxes fa-lg"></i>
+                            </button>
+                            <button class="btn btn-outline-primary border-0" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalPromo"
+                                    data-id="{{ p.id }}"
+                                    data-nombre="{{ p.nombre }}"
+                                    data-tipo="{{ p.tipo }}"
+                                    data-valor="{{ p.valor }}"
+                                    data-inicio="{{ p.fecha_inicio.strftime('%Y-%m-%dT%H:%M') }}"
+                                    data-fin="{{ p.fecha_fin.strftime('%Y-%m-%dT%H:%M') }}"
+                                    data-activo="{{ 1 if p.activo else 0 }}"
+                                    data-plataformas='{{ p.plataformas_detalle | tojson | safe }}'
+                                    onclick="prepararEdicionPromo(this)">
+                                <i class="fas fa-edit fa-lg"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Promoción -->
+<div class="modal fade" id="modalPromo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header text-white border-0 py-3" style="background-color: {{ config_empresa.color_tema }};">
+                <h5 class="modal-title fw-bold" id="tituloModalPromo">Nueva Promoción</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('guardar_promocion') }}" method="POST">
+                <input type="hidden" name="id" id="promo_id">
+                <div class="modal-body p-4 bg-light">
+                    <div class="row">
+                        <!-- Columna Izquierda: Datos Generales -->
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-3"><i class="fas fa-cog me-2 text-primary"></i>Datos Generales</h6>
+                            <div class="mb-3">
+                                <label class="small fw-bold text-muted text-uppercase mb-1">Nombre de la Promoción</label>
+                                <input type="text" name="nombre" id="promo_nombre" class="form-control bg-white border-0 shadow-sm force-upper" required>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="small fw-bold text-muted text-uppercase mb-1">Tipo</label>
+                                    <select name="tipo" id="promo_tipo" class="form-select bg-white border-0 shadow-sm" required>
+                                        <option value="PORCENTAJE">PORCENTAJE (%)</option>
+                                        <option value="VALOR">VALOR ($)</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="small fw-bold text-muted text-uppercase mb-1">Valor Gral.</label>
+                                    <input type="number" step="0.01" name="valor" id="promo_valor" class="form-control bg-white border-0 shadow-sm" required>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="small fw-bold text-muted text-uppercase mb-1">Inicio</label>
+                                    <input type="datetime-local" name="fecha_inicio" id="promo_inicio" class="form-control bg-white border-0 shadow-sm" required>
+                                </div>
+                                <div class="col-6">
+                                    <label class="small fw-bold text-muted text-uppercase mb-1">Fin</label>
+                                    <input type="datetime-local" name="fecha_fin" id="promo_fin" class="form-control bg-white border-0 shadow-sm" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="small fw-bold text-muted text-uppercase mb-1">Estado</label>
+                                <select name="activo" id="promo_activo" class="form-select bg-white border-0 shadow-sm">
+                                    <option value="1">ACTIVA</option>
+                                    <option value="0">INACTIVA</option>
+                                </select>
+                            </div>
+                        </div>
+                        <!-- Columna Derecha: Plataformas -->
+                        <div class="col-md-6 border-start">
+                            <h6 class="fw-bold mb-3"><i class="fas fa-store me-2 text-success"></i>Plataformas Aplicables</h6>
+                            <div class="alert alert-info py-1 small border-0 mb-3" style="font-size: 0.7rem;">
+                                <i class="fas fa-info-circle me-1"></i> Marque las plataformas. Si ingresa un valor, este reemplaza al <b>Valor Gral.</b> para esa plataforma.
+                            </div>
+                            <div style="max-height: 280px; overflow-y: auto;" class="pe-2">
+                                {% for plat in plataformas %}
+                                <div class="d-flex align-items-center mb-2 p-2 bg-white rounded-3 shadow-sm">
+                                    <div class="form-check flex-grow-1">
+                                        <input class="form-check-input check-plat" type="checkbox" name="plataformas_ids" value="{{ plat.id }}" id="plat_{{ plat.id }}" onchange="toggleValPlat({{ plat.id }})">
+                                        <label class="form-check-label small fw-bold" for="plat_{{ plat.id }}">
+                                            {{ plat.nombre }}
+                                        </label>
+                                    </div>
+                                    <div style="width: 90px;">
+                                        <input type="number" step="0.01" name="valor_plat_{{ plat.id }}" id="val_plat_{{ plat.id }}" class="form-control form-control-sm border-0 bg-light" placeholder="Valor" disabled>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-4 bg-light">
+                    <button type="button" class="btn btn-white rounded-pill px-4 fw-bold" data-bs-dismiss="modal">CANCELAR</button>
+                    <button type="submit" class="btn btn-reina rounded-pill px-4 fw-bold shadow">GUARDAR PROMOCIÓN</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Asignar Productos (ESTILO REINA) -->
+<div class="modal fade" id="modalAsignar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header text-white border-0 py-3" style="background-color: {{ config_empresa.color_tema }};">
+                <h5 class="modal-title fw-bold" id="tituloAsignar">Asignar Productos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <div class="alert alert-info py-2 small mb-3 border-0 shadow-sm" style="border-radius: 12px; background-color: rgba(0, 137, 56, 0.1); color: #006400;">
+                    <i class="fas fa-info-circle me-2"></i> Si no selecciona ningún producto, la promoción aplicará a <strong>TODO EL CATÁLOGO</strong>.
+                </div>
+                <input type="hidden" id="asignar_promo_id">
+                <div class="input-group mb-3 shadow-sm rounded-pill overflow-hidden">
+                    <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" id="buscarProductoPromo" class="form-control border-0 bg-white" placeholder="Buscar producto por nombre o código...">
+                </div>
+                <div style="max-height: 400px; overflow-y: auto; border-radius: 15px;" class="p-2 bg-white shadow-sm">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr class="small text-muted text-uppercase">
+                                <th width="60" class="text-center">Sel.</th>
+                                <th>Código</th>
+                                <th>Nombre</th>
+                                <th>Categoría</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaProductosAsignar">
+                            <!-- JS populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 bg-light">
+                <button type="button" class="btn btn-white rounded-pill px-4 fw-bold" data-bs-dismiss="modal">CANCELAR</button>
+                <button type="button" class="btn btn-reina rounded-pill px-4 fw-bold shadow" onclick="guardarAsignacion()">GUARDAR CAMBIOS</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+let productos = {{ todos_productos | tojson | safe }};
+let modalAsignar;
+
+document.addEventListener('DOMContentLoaded', () => {
+    modalAsignar = new bootstrap.Modal(document.getElementById('modalAsignar'));
+    
+    document.getElementById('buscarProductoPromo').addEventListener('input', function(e) {
+        const term = e.target.value.toLowerCase();
+        renderizarListaProductos(term);
+    });
+});
+
+function prepararNuevaPromo() {
+    document.getElementById('tituloModalPromo').innerText = 'Nueva Promoción';
+    document.getElementById('promo_id').value = '';
+    document.getElementById('promo_nombre').value = '';
+    document.getElementById('promo_valor').value = '';
+    document.getElementById('promo_tipo').value = 'PORCENTAJE';
+    document.getElementById('promo_activo').value = '1';
+    
+    // Resetear plataformas
+    document.querySelectorAll('.check-plat').forEach(cb => {
+        cb.checked = false;
+        toggleValPlat(cb.value);
+    });
+}
+
+function prepararEdicionPromo(btn) {
+    document.getElementById('tituloModalPromo').innerText = 'Editar Promoción';
+    document.getElementById('promo_id').value = btn.dataset.id;
+    document.getElementById('promo_nombre').value = btn.dataset.nombre;
+    document.getElementById('promo_valor').value = btn.dataset.valor;
+    document.getElementById('promo_tipo').value = btn.dataset.tipo;
+    document.getElementById('promo_inicio').value = btn.dataset.inicio;
+    document.getElementById('promo_fin').value = btn.dataset.fin;
+    document.getElementById('promo_activo').value = btn.dataset.activo;
+    
+    // Marcar plataformas y sus valores
+    const platsDetalle = JSON.parse(btn.dataset.plataformas || '{}');
+    document.querySelectorAll('.check-plat').forEach(cb => {
+        const platId = cb.value;
+        if (platsDetalle.hasOwnProperty(platId)) {
+            cb.checked = true;
+            const inputVal = document.getElementById(`val_plat_${platId}`);
+            inputVal.disabled = false;
+            inputVal.value = platsDetalle[platId] !== null ? platsDetalle[platId] : '';
+        } else {
+            cb.checked = false;
+            toggleValPlat(platId);
+        }
+    });
+}
+
+function toggleValPlat(id) {
+    const cb = document.getElementById(`plat_${id}`);
+    const input = document.getElementById(`val_plat_${id}`);
+    input.disabled = !cb.checked;
+    if (!cb.checked) {
+        input.value = '';
+        input.classList.add('bg-light');
+        input.classList.remove('bg-white');
+    } else {
+        input.classList.remove('bg-light');
+        input.classList.add('bg-white');
+    }
+}
+
+async function abrirModalAsignar(id, nombre) {
+    document.getElementById('asignar_promo_id').value = id;
+    document.getElementById('tituloAsignar').innerText = `Asignar Productos a: ${nombre}`;
+    
+    // Obtener productos ya asignados
+    const res = await fetch(`/promociones/productos/${id}`);
+    const data = await res.json();
+    const asignadosIds = data.productos;
+    
+    productos.forEach(p => {
+        p.seleccionado = asignadosIds.includes(p.id);
+    });
+    
+    renderizarListaProductos();
+    modalAsignar.show();
+}
+
+function renderizarListaProductos(term = '') {
+    const tbody = document.getElementById('listaProductosAsignar');
+    tbody.innerHTML = '';
+    
+    productos.filter(p => 
+        p.nombre.toLowerCase().includes(term) || 
+        (p.codigo && p.codigo.toLowerCase().includes(term))
+    ).forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="text-center">
+                <input type="checkbox" class="form-check-input check-prod" data-id="${p.id}" ${p.seleccionado ? 'checked' : ''} onchange="toggleSeleccion(${p.id}, this.checked)">
+            </td>
+            <td>${p.codigo || '-'}</td>
+            <td class="fw-bold">${p.nombre}</td>
+            <td><span class="badge bg-light text-dark border">${p.categoria_nombre}</span></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function toggleSeleccion(id, val) {
+    const p = productos.find(prod => prod.id === id);
+    if(p) p.seleccionado = val;
+}
+
+async function guardarAsignacion() {
+    const id = document.getElementById('asignar_promo_id').value;
+    const ids = productos.filter(p => p.seleccionado).map(p => p.id);
+    
+    showLoading();
+    const res = await fetch('/promociones/productos/guardar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            promocion_id: id,
+            productos: ids
+        })
+    });
+    const data = await res.json();
+    hideLoading();
+    
+    if(data.success) {
+        modalAsignar.hide();
+        window.location.reload();
+    } else {
+        reinaAlert('Error', data.message, 'danger');
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

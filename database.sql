@@ -172,6 +172,7 @@ CREATE TABLE `productos` (
   `codigo` varchar(50) DEFAULT NULL,
   `nombre` varchar(150) NOT NULL,
   `precio` decimal(10,2) NOT NULL,
+  `precios_json` text DEFAULT NULL,
   `categoria_id` int(11) DEFAULT NULL,
   `imagen` longblob,
   `mimetype` varchar(50) DEFAULT NULL,
@@ -183,7 +184,31 @@ CREATE TABLE `productos` (
   UNIQUE KEY `codigo` (`codigo`),
   KEY `categoria_id` (`categoria_id`),
   CONSTRAINT `productos_ibfk_1` FOREIGN KEY (`categoria_id`) REFERENCES `categorias` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+DROP TABLE IF EXISTS `promociones`;
+CREATE TABLE `promociones` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(100) NOT NULL,
+  `tipo` enum('PORCENTAJE','VALOR_FIJO') NOT NULL,
+  `valor` decimal(10,2) NOT NULL,
+  `plataformas_json` text DEFAULT NULL,
+  `activo` tinyint(1) DEFAULT '1',
+  `usuario_creacion_id` int(11) DEFAULT NULL,
+  `fecha_creacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `usuario_modificacion_id` int(11) DEFAULT NULL,
+  `fecha_modificacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+DROP TABLE IF EXISTS `promocion_productos`;
+CREATE TABLE `promocion_productos` (
+  `promocion_id` int(11) NOT NULL,
+  `producto_id` int(11) NOT NULL,
+  PRIMARY KEY (`promocion_id`,`producto_id`),
+  CONSTRAINT `promocion_productos_ibfk_1` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `promocion_productos_ibfk_2` FOREIGN KEY (`producto_id`) REFERENCES `productos` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `recetas`;
 CREATE TABLE `recetas` (
@@ -581,6 +606,7 @@ INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUE
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (16, 'Reportes', 'reportes', 'fas fa-chart-pie', 'ADMINISTRATIVO', 16);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (17, 'Anulaciones', 'listar_anulaciones', 'fas fa-ban', 'OPERATIVO', 17);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (18, 'Kardex', 'kardex_movimientos', 'fas fa-exchange-alt', 'ADMINISTRATIVO', 18);
+INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (19, 'Promociones', 'listar_promociones', 'fas fa-gift', 'ADMINISTRATIVO', 19);
 
 -- Datos para rol_menus
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (1, 1, 1);
@@ -601,6 +627,7 @@ INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (15, 1, 15);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (16, 1, 16);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (22, 1, 17);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (23, 1, 18);
+INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (24, 1, 19);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (17, 2, 1);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (18, 2, 2);
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (19, 2, 3);

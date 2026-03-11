@@ -13,6 +13,8 @@ Propuesta integral para la implementación del **Sistema Reina (Versión Enterpr
 ### Innovaciones "Enterprise Pro" v2.5:
 *   **Atajos Globales de Productividad:** Navegación ultrarrápida mediante teclado (`Ctrl+I` para Inicio, `Ctrl+O` para Ventas), optimizando el tiempo de atención al cliente.
 *   **Gestión de Pagos y Canales 360°:** Módulo centralizado para administrar tarjetas bancarias y plataformas de delivery (Uber Eats, Pedidos Ya) con reportes consolidados.
+*   **Control de Precios por Plataforma:** Ajuste automático y visual de precios según el canal de venta seleccionado en el POS.
+*   **Motor de Promociones Inteligentes:** Sistema de detección automática de ofertas generales o por plataforma, con validación visual inmediata para el cajero.
 *   **Motor SRI de Alta Disponibilidad:** Agente de segundo plano que gestiona reintentos automáticos y previene bloqueos por errores de datos.
 *   **Whitelabel Dinámico Total:** El sistema adopta automáticamente la identidad visual de la empresa (Colores, Logos, Iconografía) en cada componente.
 *   **Seguridad y Auditoría:** Control granular de permisos con diseño visual mejorado y trazabilidad absoluta de cada transacción.

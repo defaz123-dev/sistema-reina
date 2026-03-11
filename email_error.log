@@ -65,3 +65,5 @@ ModuleNotFoundError: No module named 'barcode'
 
 2026-03-09 17:50:47.171733: EXITO: Factura enviada a DG_IO28@HOTMAIL.COM
 2026-03-10 08:59:52.034631: EXITO: Nota de Credito enviada a DG_IO28@HOTMAIL.COM
+2026-03-11 07:55:54.115308: Error Brevo (400): {"code":"missing_parameter","message":"email is missing in to"}
+

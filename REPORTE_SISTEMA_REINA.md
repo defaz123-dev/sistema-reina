@@ -25,10 +25,16 @@ Para garantizar la máxima disponibilidad y rendimiento, el sistema opera bajo u
 - **Seguridad Referencial**: Bloqueo inteligente de eliminación si existen ventas o precios asociados.
 - **Multisucursal**: Secuenciales, puntos de emisión e inventario independientes por local con sincronización basada en recetas.
 
-## 5. Experiencia de Usuario (UX) y Productividad
+## 5. Experiencia de Usuario (POS) y Promociones
 - **Atajos Globales de Teclado**: 
   - `Ctrl + I`: Retorno instantáneo al Dashboard desde cualquier pantalla.
   - `Ctrl + O`: Apertura directa del módulo de Nueva Orden (POS).
+- **Control de Precios por Plataforma**: Sincronización automática de precios en el POS al seleccionar el canal de venta (Local, Uber, PedidosYa).
+- **Arquitectura de Datos Flexible**: Implementación de campos `JSON` en las tablas de `productos` y `promociones`, permitiendo escalabilidad infinita de canales de venta sin alterar la estructura del motor principal.
+- **Motor de Promociones Inteligentes**: 
+  - Detección automática de promociones vigentes al cambiar de plataforma.
+  - Modal informativa con badge visual y resaltado del "Descuento Real" por canal.
+  - Reinicio automático de estados para garantizar la aplicación correcta de beneficios según la plataforma.
 - **Interfaz Fluida**: Estandarización de cabeceras pegadas a los bordes (`container-fluid`) para máximo aprovechamiento de pantalla.
 - **Roles con Identidad Visual**: Modal de permisos codificado por colores según categoría (Operativo, Abastecimiento, Administrativo).
 
