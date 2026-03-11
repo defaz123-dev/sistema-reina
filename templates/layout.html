@@ -265,21 +265,18 @@
     // --- FUNCIÓN ABRIR CAJA (BRIDGE LOCAL) ---
     function abrirCajaLocal() {
         console.log("Intentando abrir caja registradora...");
-        showLoading(); // Mostrar modal de espera
+        showLoading(); 
         
-        // Intentamos llamar al bridge local en el puerto 5001
         fetch('http://localhost:5001/abrir-caja', {
             mode: 'cors',
             method: 'GET'
         })
-        .then(response => {
-            if (!response.ok) return response.json().then(err => { throw new Error(err.error || "Error en el bridge"); });
-            return response.json();
-        })
-        .then(data => {
+        .then(async response => {
+            const data = await response.json();
             hideLoading();
-            if (!data.success) {
-                reinaAlert('Error de Caja', data.error, 'danger');
+            if (!response.ok || !data.success) {
+                // El bridge respondió, pero con un error (ej. no hay impresora)
+                reinaAlert('Aviso de Caja', data.error || 'Error desconocido en el bridge local.', 'danger');
             } else {
                 console.log("Caja abierta exitosamente:", data.message);
             }
@@ -287,7 +284,8 @@
         .catch(err => {
             hideLoading();
             console.warn("Agente local Reina Bridge no detectado.", err);
-            reinaAlert('Sin Conexión Local', 'No se detectó el <b>Reina Bridge</b> en esta computadora. <br><br> Por favor, asegúrese de que el programa de caja esté abierto.', 'danger');
+            // El fetch falló completamente (el bridge no está abierto)
+            reinaAlert('Sin Conexión Local', 'No se detectó el <b>Reina Bridge</b> en esta computadora. <br><br> Por favor, asegúrese de que el programa de caja esté abierto y ejecutándose.', 'danger');
         });
     }
 
