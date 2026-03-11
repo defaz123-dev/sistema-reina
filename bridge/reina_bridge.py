@@ -20,18 +20,21 @@ CORS(app) # Permitir que el Sistema Reina en la nube se conecte
 
 def get_pos_printer():
     """Busca automáticamente una impresora POS en el sistema."""
-    printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)
-    
-    # Palabras clave para identificar impresoras térmicas
-    keywords = ["POS", "80mm", "58mm", "TICKET", "EPSON", "ZJIANG", "TERMIC"]
-    
-    # 1. Buscar por palabras clave
-    for (_, _, name, _) in printers:
-        if any(kw in name.upper() for kw in keywords):
-            return name
-            
-    # 2. Si no hay coincidencias, usar la predeterminada
-    return win32print.GetDefaultPrinter()
+    try:
+        printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)
+        
+        # Palabras clave para identificar impresoras térmicas
+        keywords = ["POS", "80mm", "58mm", "TICKET", "EPSON", "ZJIANG", "TERMIC"]
+        
+        # 1. Buscar por palabras clave
+        for (_, _, name, _) in printers:
+            if any(kw in name.upper() for kw in keywords):
+                return name, True
+                
+        # 2. Si no hay coincidencias, informar que no se halló impresora específica
+        return None, False
+    except Exception:
+        return None, False
 
 def open_cash_drawer(printer_name):
     """Envía el pulso ESC/POS para abrir el cajón."""
@@ -56,19 +59,22 @@ def open_cash_drawer(printer_name):
 
 @app.route('/status', methods=['GET'])
 def status():
-    printer = get_pos_printer()
+    printer, found = get_pos_printer()
     return jsonify({
         "status": "online",
         "app": APP_NAME,
         "version": VERSION,
-        "detected_printer": printer
+        "detected_printer": printer if found else "NINGUNA DETECTADA"
     })
 
 @app.route('/abrir-caja', methods=['GET'])
 def trigger_open():
-    printer = get_pos_printer()
-    if not printer:
-        return jsonify({"success": False, "error": "No se detectó impresora"}), 404
+    printer, found = get_pos_printer()
+    if not found:
+        return jsonify({
+            "success": False, 
+            "error": "No se detectó ninguna impresora térmica (POS) instalada. Por favor, asegúrese de que el nombre de su impresora contenga 'POS', 'TICKET' o '80mm' en el Panel de Control."
+        }), 404
     
     success, msg = open_cash_drawer(printer)
     return jsonify({"success": success, "message": msg})
