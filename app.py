@@ -1364,7 +1364,7 @@ def guardar_promocion():
         mysql.connection.commit(); flash('Promoción guardada correctamente', 'success')
     except Exception as e: mysql.connection.rollback(); flash(f'Error al guardar: {str(e)}', 'danger')
     finally: cur.close()
-    return redirect(url_for('promociones'))
+    return redirect(url_for('listar_promociones'))
 
 @app.route('/promociones/productos/<int:id>')
 @login_required

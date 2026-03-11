@@ -45,7 +45,7 @@
     <!-- ACCESO A GESTIÓN DE ROLES (Fijo para Administrador si no se incluye en la tabla menus) -->
     {% if session['rol'] == 'ADMINISTRADOR' %}
     <div class="col-6 col-md-3 col-lg-2">
-        <a href="{{ url_for('promociones') }}" class="text-decoration-none">
+        <a href="{{ url_for('listar_promociones') }}" class="text-decoration-none">
             <div class="card h-100 border-0 shadow main-card">
                 <div class="card-body p-3 text-center">
                     <div class="icon-box border-danger text-danger mb-3">
