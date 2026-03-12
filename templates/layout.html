@@ -203,8 +203,10 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         // Inicialización segura de modales una vez cargado Bootstrap
-        mTicket = new bootstrap.Modal(document.getElementById('modalTicketPreview'));
-        mRide = new bootstrap.Modal(document.getElementById('modalRidePreview'));
+        const tPrev = document.getElementById('modalTicketPreview');
+        const rPrev = document.getElementById('modalRidePreview');
+        if (tPrev) mTicket = new bootstrap.Modal(tPrev);
+        if (rPrev) mRide = new bootstrap.Modal(rPrev);
 
         // Botón Imprimir Ticket desde el Modal
         document.getElementById('btnConfirmPrintTicket').onclick = function() {
@@ -282,6 +284,23 @@
     }
 </script>
 
+<!-- Modal Elegante Reina (Alerts y Confirms) -->
+<div class="modal fade" id="reinaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg">
+            <div class="modal-body p-5 text-center">
+                <div id="modalIcon" class="mb-3"></div>
+                <h4 id="modalTitle" class="fw-bold mb-3"></h4>
+                <div id="modalMessage" class="text-muted mb-4"></div>
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-light px-4 fw-bold rounded-pill d-none" id="btnModalCancel">CANCELAR</button>
+                    <button type="button" class="btn btn-reina px-5 fw-bold rounded-pill" id="btnModalOk">ENTENDIDO</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Overlay de Carga Temático (CSS Puro para velocidad instantánea) -->
 <div id="reina-loader" class="d-none" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); backdrop-filter: blur(5px); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column;">
     <div class="crown-loader" style="font-size: 5rem; color: var(--reina-yellow); animation: crown-pulse 1.2s infinite ease-in-out;">
@@ -304,13 +323,17 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    const rModal = new bootstrap.Modal(document.getElementById('reinaModal'));
+    let rModal;
     
     function showLoading() { document.getElementById('reina-loader').classList.remove('d-none'); }
     function hideLoading() { document.getElementById('reina-loader').classList.add('d-none'); }
 
     // Auto-cerrar alertas flash después de 3 segundos
     document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar rModal de forma segura
+        const rElem = document.getElementById('reinaModal');
+        if (rElem) rModal = new bootstrap.Modal(rElem);
+
         // Capturar mensajes flash de error para mostrarlos en reinaAlert si son críticos
         let alerts = document.querySelectorAll('.alert');
         alerts.forEach(function(alert) {
@@ -455,8 +478,9 @@
     document.addEventListener('keydown', function(event) {
         const isCtrlOrCmd = event.ctrlKey || event.metaKey;
         const key = event.key.toLowerCase();
+        const code = event.code;
 
-        if (isCtrlOrCmd && (key === 'i' || key === 'o')) {
+        if (isCtrlOrCmd && (key === 'i' || key === 'o' || code === 'KeyI' || code === 'KeyO')) {
             
             // Evitamos la redirección si el usuario está escribiendo en un input o textarea
             const target = event.target.tagName.toLowerCase();
@@ -466,9 +490,9 @@
 
             event.preventDefault(); // Prevenir comportamiento por defecto del navegador
 
-            if (key === 'i') {
+            if (key === 'i' || code === 'KeyI') {
                 window.location.href = "{{ url_for('dashboard') }}";
-            } else if (key === 'o') {
+            } else if (key === 'o' || code === 'KeyO') {
                 window.location.href = "{{ url_for('pos') }}";
             }
         }
