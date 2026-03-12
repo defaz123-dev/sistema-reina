@@ -73,7 +73,14 @@
                             {% endif %}
                             <br><small class="text-muted" style="font-size: 0.65rem;">{{ m.tipo_movimiento }}</small>
                         </td>
-                        <td>{{ m.motivo or 'N/A' }} <br><small class="text-muted">Ref: {{ m.referencia_id or '---' }}</small></td>
+                        <td>
+                            {{ m.motivo or 'N/A' }} 
+                            {% if m.proveedor_nombre %}
+                                <br><small class="text-primary fw-bold"><i class="fas fa-truck me-1"></i>PROV: {{ m.proveedor_nombre }}</small>
+                            {% else %}
+                                <br><small class="text-muted">Ref: {{ m.referencia_id or '---' }}</small>
+                            {% endif %}
+                        </td>
                         <td class="text-end text-success fw-bold">{% if m.cantidad_entrada > 0 %}+{{ "%.2f"|format(m.cantidad_entrada) }}{% else %}-{% endif %}</td>
                         <td class="text-end text-danger fw-bold">{% if m.cantidad_salida > 0 %}-{{ "%.2f"|format(m.cantidad_salida) }}{% else %}-{% endif %}</td>
                         <td class="text-end text-muted">{{ "%.2f"|format(m.saldo_anterior) }}</td>

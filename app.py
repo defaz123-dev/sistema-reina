@@ -548,11 +548,14 @@ def ajustar_inventario():
 def kardex_movimientos():
     cur = mysql.connection.cursor()
     cur.execute("""
-        SELECT k.*, i.nombre as insumo_nombre, u.usuario as usuario_nombre, s.nombre as sucursal_nombre
+        SELECT k.*, i.nombre as insumo_nombre, u.usuario as usuario_nombre, 
+               s.nombre as sucursal_nombre, p.razon_social as proveedor_nombre
         FROM kardex k
         JOIN insumos i ON k.insumo_id = i.id
         JOIN usuarios u ON k.usuario_id = u.id
         JOIN sucursales s ON k.sucursal_id = s.id
+        LEFT JOIN compras c ON k.referencia_id = c.id AND k.tipo_movimiento = 'COMPRA'
+        LEFT JOIN proveedores p ON c.proveedor_id = p.id
         ORDER BY k.fecha DESC
         LIMIT 500
     """)
