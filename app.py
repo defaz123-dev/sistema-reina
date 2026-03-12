@@ -1015,7 +1015,9 @@ def enviar_comprobante_email(venta_id, forzar=False):
                 'total': float(g_txt(inf, 'importeTotal', '0')),
                 'obligado_contabilidad': g_txt(inf, 'obligadoContabilidad', 'NO'),
                 'subtotal_0': 0.0, 'subtotal_15': 0.0, 'iva_valor': 0.0,
-                'forma_pago': v['forma_pago']
+                'forma_pago': v['forma_pago'],
+                'tarjeta_nombre': v.get('tarjeta_nombre', ''),
+                'plataforma_nombre': v.get('plataforma_nombre', '')
             })
 
         # Totales

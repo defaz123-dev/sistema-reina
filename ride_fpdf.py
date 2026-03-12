@@ -142,13 +142,21 @@ def generar_pdf_fpdf(d, empresa):
     
     # --- Bloque Cliente ---
     pdf.set_y(100)
-    pdf.rounded_rect(10, 100, 190, 25, 4)
+    
+    # Altura dinámica para el cuadro del cliente
+    h_bloque_cliente = 25
+    if d.get('es_nota_credito'):
+        h_bloque_cliente = 42 # Aumentamos espacio para los datos de la NC
+        
+    pdf.rounded_rect(10, 100, 190, h_bloque_cliente, 4)
     
     pdf.set_font('Arial', 'B', 9)
     pdf.set_xy(15, 105)
     pdf.cell(65, 5, "RAZON SOCIAL / NOMBRES:", 0, 0)
     pdf.set_font('Arial', '', 9)
-    pdf.cell(70, 5, d['cliente_nombre'].encode('latin-1', 'replace').decode('latin-1')[:40], 0, 0)
+    # Limpiar nombres largos para que no rompan la estructura
+    nombre_c = d['cliente_nombre'].encode('latin-1', 'replace').decode('latin-1')
+    pdf.cell(70, 5, nombre_c[:45], 0, 0)
     
     pdf.set_font('Arial', 'B', 9)
     pdf.cell(30, 5, "IDENTIFICACION:", 0, 0)
@@ -168,16 +176,21 @@ def generar_pdf_fpdf(d, empresa):
     
     if d.get('es_nota_credito'):
         pdf.set_y(pdf.get_y() + 2)
-        pdf.set_font('Arial', 'B', 8)
+        pdf.set_font('Arial', 'B', 8.5)
         pdf.set_x(15)
-        pdf.cell(180, 4, "COMPROBANTE QUE SE MODIFICA: FACTURA " + d.get('doc_modificado', ''), 0, 1)
+        pdf.cell(180, 5, "COMPROBANTE QUE SE MODIFICA: FACTURA " + d.get('doc_modificado', ''), 0, 1)
         pdf.set_x(15)
-        pdf.cell(180, 4, "FECHA EMISION (COMPROBANTE A MODIFICAR): " + d.get('fecha_emision', ''), 0, 1)
+        pdf.cell(180, 5, "FECHA EMISION (COMPROBANTE A MODIFICAR): " + d.get('fecha_emision', ''), 0, 1)
         pdf.set_x(15)
-        pdf.cell(180, 4, "RAZON DE MODIFICACION: " + d.get('motivo_anulacion', '').upper(), 0, 1)
+        pdf.cell(40, 5, "RAZON DE MODIFICACION: ", 0, 0)
+        pdf.set_font('Arial', '', 8.5)
+        # multi_cell para que el motivo no se salga del cuadro
+        motivo = d.get('motivo_anulacion', '').upper().encode('latin-1', 'replace').decode('latin-1')
+        pdf.multi_cell(140, 5, motivo, 0, 'L')
     
     # --- Tabla Productos ---
-    pdf.set_y(130)
+    y_tabla = 130 if not d.get('es_nota_credito') else 145
+    pdf.set_y(y_tabla)
     pdf.set_font('Arial', 'B', 9)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(25, 8, "Cod. Princ.", 1, 0, 'C', 1)
@@ -230,15 +243,22 @@ def generar_pdf_fpdf(d, empresa):
     pdf.set_font('Arial', '', 8)
     pdf.set_x(10)
     
+    # Lógica mejorada de Forma de Pago según estándar SRI y detalle interno
+    fp_raw = d.get('forma_pago', 'EFECTIVO')
     fp_text = "OTROS CON UTILIZACION DEL SISTEMA FINANCIERO"
-    if d.get('forma_pago') == 'EFECTIVO':
+    
+    if fp_raw == 'EFECTIVO':
         fp_text = "SIN UTILIZACION DEL SISTEMA FINANCIERO"
-    elif d.get('forma_pago') == 'TARJETA':
-        fp_text = "TARJETA DE CREDITO / DEBITO"
-    elif d.get('forma_pago') == 'TRANSFERENCIA':
-        fp_text = "OTROS CON UTILIZACION DEL SISTEMA FINANCIERO"
+    elif fp_raw == 'TARJETA':
+        nombre_tarjeta = d.get('tarjeta_nombre', '')
+        fp_text = f"TARJETA DE CREDITO / DEBITO ({nombre_tarjeta})" if nombre_tarjeta else "TARJETA DE CREDITO / DEBITO"
+    elif fp_raw == 'TRANSFERENCIA':
+        fp_text = "OTROS CON UTILIZACION DEL SISTEMA FINANCIERO (TRANSFERENCIA)"
+    elif fp_raw == 'PLATAFORMA':
+        nombre_plat = d.get('plataforma_nombre', '')
+        fp_text = f"OTROS CON UTILIZACION DEL SISTEMA FINANCIERO ({nombre_plat})" if nombre_plat else "PLATAFORMA DIGITAL"
         
-    pdf.cell(80, 6, fp_text, 1, 0, 'L')
+    pdf.cell(80, 6, fp_text[:55], 1, 0, 'L') # Limitamos a 55 caracteres para que no se desborde
     pdf.set_font('Arial', '', 9)
     pdf.cell(30, 6, "$ %.2f" % d['total'], 1, 1, 'R')
     
