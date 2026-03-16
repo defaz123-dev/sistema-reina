@@ -150,6 +150,33 @@
                     </div>
                     {% else %}
                     <form id="formCierreDiario" action="{{ url_for('ejecutar_cierre_diario') }}" method="POST">
+                        <div class="card border-0 bg-light rounded-4 mb-3">
+                            <div class="card-body p-3">
+                                <h6 class="fw-bold text-dark mb-3"><i class="fas fa-calculator me-2 text-primary"></i> Conteo Físico Final del Día</h6>
+                                <div class="row align-items-center">
+                                    <div class="col-md-8 border-end">
+                                        <div class="row g-2">
+                                            {% for den in [100.00, 50.00, 20.00, 10.00, 5.00, 1.00, 0.50, 0.25, 0.10, 0.05, 0.01] %}
+                                            <div class="col-md-6">
+                                                <div class="input-group mb-2 shadow-xs rounded-2 border">
+                                                    <span class="input-group-text border-0 bg-light fw-bold text-dark" style="width: 60px;">{{ "%.2f"|format(den)|replace('0.', '.')|replace('.00', '') }}</span>
+                                                    <input type="number" name="den_{{ "%.2f"|format(den) }}" class="form-control border-0 text-center den-input-global fw-bold" 
+                                                           style="font-size: 1.1rem;"
+                                                           data-valor="{{ den }}" min="0" placeholder="0" oninput="calcularTotalGlobal()">
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-4 rounded-4 text-center h-100 d-flex flex-column justify-content-center" style="background-color: #1a1a1a;">
+                                            <span class="small fw-bold text-white-50 text-uppercase d-block mb-2">SALDO TOTAL EN CAJA:</span>
+                                            <div id="txt_total_global_fisico" class="h1 fw-bold text-success mb-0" style="text-shadow: 0 0 10px rgba(40, 167, 69, 0.3); font-size: 2.5rem;">$ 0.00</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <textarea name="observaciones" class="form-control bg-light border-0 mb-3" rows="2" placeholder="Observaciones finales del día..."></textarea>
                         <button type="button" class="btn btn-reina w-100 rounded-pill py-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalConfirmCierre">
                             <i class="fas fa-check-double me-2"></i> EJECUTAR CIERRE FINAL DEL DÍA
@@ -276,5 +303,18 @@
 
 <style>
     .x-small { font-size: 0.75rem; }
+    .extra-small { font-size: 0.7rem; }
 </style>
+
+<script>
+function calcularTotalGlobal() {
+    let total = 0;
+    document.querySelectorAll('.den-input-global').forEach(input => {
+        const valor = parseFloat(input.dataset.valor);
+        const cantidad = parseInt(input.value) || 0;
+        total += valor * cantidad;
+    });
+    document.getElementById('txt_total_global_fisico').textContent = `$ ${total.toFixed(2)}`;
+}
+</script>
 {% endblock %}

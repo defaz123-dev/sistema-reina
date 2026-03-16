@@ -17,29 +17,115 @@
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center align-items-center" style="min-height: 70vh;">
-    <div class="col-md-5">
-        <div class="card border-0 shadow-lg rounded-4 text-center p-4">
-            <div class="card-body">
-                <i class="fas fa-box-open fa-4x text-success mb-3"></i>
-                <h3 class="fw-bold mb-1">Apertura de Turno</h3>
-                <p class="text-muted small mb-4">Debes iniciar tu sesión de caja para poder registrar ventas y movimientos.</p>
-                
-                <form action="{{ url_for('abrir_caja') }}" method="POST">
-                    <div class="mb-4 text-start">
-                        <label class="form-label fw-bold small text-muted">¿Con cuánto efectivo inicias la caja?</label>
-                        <div class="input-group input-group-lg">
-                            <span class="input-group-text bg-light border-0 fw-bold">$</span>
-                            <input type="number" step="0.01" min="0" name="monto_inicial" class="form-control bg-light border-0 fw-bold" placeholder="0.00" required autofocus>
+<div class="row justify-content-center py-4">
+    <div class="col-12 col-lg-10 col-xl-9">
+        <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="card-header bg-white border-0 py-4 text-center">
+                <div class="bg-success-light rounded-circle d-inline-flex p-3 mb-3">
+                    <i class="fas fa-cash-register fa-3x text-success"></i>
+                </div>
+                <h3 class="fw-bold mb-1">Apertura de Caja</h3>
+                <p class="text-muted small">Realice el conteo físico inicial para habilitar las ventas.</p>
+            </div>
+            <div class="card-body p-4 bg-white">
+                <form action="{{ url_for('abrir_caja') }}" method="POST" id="formApertura">
+                    <div class="row g-4">
+                        <!-- COLUMNA IZQUIERDA: DENOMINACIONES -->
+                        <div class="col-md-8 border-end pr-md-4">
+                            <div class="row">
+                                <!-- BILLETES -->
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="fw-bold text-muted text-uppercase x-small mb-2"><i class="fas fa-money-bill-wave me-2 text-success"></i> Billetes</h6>
+                                    {% for b in [100.00, 50.00, 20.00, 10.00, 5.00, 1.00] %}
+                                    <div class="input-group mb-2 shadow-xs rounded-2 border">
+                                        <span class="input-group-text border-0 bg-light fw-bold text-dark" style="width: 60px;">{{ "%.0f"|format(b) }}</span>
+                                        <input type="number" name="den_{{ "%.2f"|format(b) }}" class="form-control border-0 text-center den-input fw-bold" 
+                                               style="font-size: 1.1rem;" data-valor="{{ b }}" min="0" placeholder="0" oninput="calcularTotalApertura()">
+                                        <span class="input-group-text border-0 bg-white text-success extra-small fw-bold subtotal-den" style="width: 85px;">$ 0.00</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <!-- MONEDAS -->
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="fw-bold text-muted text-uppercase x-small mb-2"><i class="fas fa-coins me-2 text-warning"></i> Monedas</h6>
+                                    {% for m in [0.50, 0.25, 0.10, 0.05, 0.01] %}
+                                    <div class="input-group mb-2 shadow-xs rounded-2 border">
+                                        <span class="input-group-text border-0 bg-light fw-bold text-dark" style="width: 60px;">{{ "%.2f"|format(m)|replace('0.', '.') }}</span>
+                                        <input type="number" name="den_{{ "%.2f"|format(m) }}" class="form-control border-0 text-center den-input fw-bold" 
+                                               style="font-size: 1.1rem;" data-valor="{{ m }}" min="0" placeholder="0" oninput="calcularTotalApertura()">
+                                        <span class="input-group-text border-0 bg-white text-warning extra-small fw-bold subtotal-den" style="width: 85px;">$ 0.00</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- COLUMNA DERECHA: RESUMEN (STICKY) -->
+                        <div class="col-md-4">
+                            <div class="sticky-top" style="top: 20px;">
+                                <div class="card border-0 bg-dark text-white rounded-4 shadow-sm mb-4">
+                                    <div class="card-body p-4 text-center">
+                                        <p class="small fw-bold text-uppercase opacity-50 mb-2">Total en Efectivo</p>
+                                        <h2 class="fw-bold mb-0 text-success" id="labelTotalApertura" style="font-size: 2.2rem;">$ 0.00</h2>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-reina rounded-pill fw-bold shadow-sm py-2">
+                                        <i class="fas fa-check-circle me-2"></i> CONFIRMAR APERTURA
+                                    </button>
+                                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary rounded-pill fw-bold py-2 small">
+                                        <i class="fas fa-times me-2"></i> CANCELAR OPERACIÓN
+                                    </a>
+                                </div>
+
+                            </div>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-reina w-100 rounded-pill py-3 fw-bold shadow-sm">
-                        <i class="fas fa-check-circle me-2"></i> ABRIR CAJA
-                    </button>
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-link text-muted mt-3 text-decoration-none">Volver al Inicio</a>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .bg-success-light { background-color: rgba(40, 167, 69, 0.1); }
+    .extra-small { font-size: 0.75rem; }
+    .den-input:focus { box-shadow: none; background-color: #fff9e6; }
+</style>
+
+<script>
+function calcularTotalApertura() {
+    let total = 0;
+    document.querySelectorAll('.den-input').forEach(input => {
+        const valor = parseFloat(input.dataset.valor);
+        const cantidad = parseInt(input.value) || 0;
+        const subtotal = valor * cantidad;
+        total += subtotal;
+
+        // Actualizar el subtotal visual de cada denominación
+        const subLabel = input.parentElement.querySelector('.subtotal-den');
+        subLabel.textContent = `$ ${subtotal.toFixed(2)}`;
+        if(cantidad > 0) {
+            subLabel.classList.remove('text-muted');
+            subLabel.classList.add('text-success', 'fw-bold');
+        } else {
+            subLabel.classList.add('text-muted');
+            subLabel.classList.remove('text-success', 'fw-bold');
+        }
+    });
+
+    document.getElementById('labelTotalApertura').textContent = `$ ${total.toFixed(2)}`;
+}
+
+// Prevenir el envío si el total es 0 (opcional, dependiendo de si permites abrir con 0)
+document.getElementById('formApertura').onsubmit = function(e) {
+    const total = parseFloat(document.getElementById('labelTotalApertura').textContent.replace('$ ', ''));
+    if(total === 0) {
+        // Podrías pedir confirmación si abren con $0
+        return confirm('¿Está seguro de que desea abrir la caja con $0.00?');
+    }
+    return true;
+};
+</script>
 {% endblock %}

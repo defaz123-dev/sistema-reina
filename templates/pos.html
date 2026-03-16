@@ -290,20 +290,85 @@
                                     </div>
                                 </div>
                                 
-                                <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-wallet me-2 text-success"></i> MÉTODO DE PAGO</h6>
-                                <div class="row g-2 mb-3">
-                                    <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoEfectivo" value="EFECTIVO" checked onclick="toggleTarjetaSelector()"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoEfectivo"><i class="fas fa-money-bill-wave d-block mb-1"></i> EFECTIVO</label></div>
-                                    <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoTrans" value="TRANSFERENCIA" onclick="toggleTarjetaSelector()"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoTrans"><i class="fas fa-university d-block mb-1"></i> TRANSF.</label></div>
-                                    <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoTarjeta" value="TARJETA" onclick="toggleTarjetaSelector()"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoTarjeta"><i class="fas fa-credit-card d-block mb-1"></i> TARJETA</label></div>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-wallet me-2 text-success"></i> MÉTODO DE PAGO</h6>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="checkPagoMixto" onchange="toggleVistaPago()">
+                                        <label class="form-check-label small fw-bold text-primary" for="checkPagoMixto">¿Pago Mixto?</label>
+                                    </div>
                                 </div>
-                                <div id="tarjetaSelector" class="mb-4" style="display: none;">
-                                    <label class="extra-small fw-bold text-muted text-uppercase d-block mb-2">Seleccione Tipo de Tarjeta</label>
-                                    <select id="id_tarjeta" class="form-select bg-light border-0 fw-bold">
-                                        <option value="" selected disabled>-- SELECCIONE TARJETA --</option>
-                                        {% for t in cat_tarjetas %}
-                                        <option value="{{ t.id }}">{{ t.nombre }}</option>
-                                        {% endfor %}
-                                    </select>
+                                
+                                <!-- PAGO SIMPLE (ORIGINAL INTACTO) -->
+                                <div id="vista_pago_simple">
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoEfectivo" value="EFECTIVO" checked onclick="toggleTarjetaSelector()"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoEfectivo"><i class="fas fa-money-bill-wave d-block mb-1"></i> EFECTIVO</label></div>
+                                        <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoTrans" value="TRANSFERENCIA" onclick="toggleTarjetaSelector()"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoTrans"><i class="fas fa-university d-block mb-1"></i> TRANSF.</label></div>
+                                        <div class="col-4"><input type="radio" class="btn-check" name="formaPago" id="pagoTarjeta" value="TARJETA" onclick="toggleTarjetaSelector()"><label class="btn btn-outline-success w-100 py-3 rounded-3" for="pagoTarjeta"><i class="fas fa-credit-card d-block mb-1"></i> TARJETA</label></div>
+                                    </div>
+                                    <div id="tarjetaSelector" class="mb-4" style="display: none;">
+                                        <label class="extra-small fw-bold text-muted text-uppercase d-block mb-2">Seleccione Tipo de Tarjeta</label>
+                                        <select id="id_tarjeta" class="form-select bg-light border-0 fw-bold">
+                                            <option value="" selected disabled>-- SELECCIONE TARJETA --</option>
+                                            {% for t in cat_tarjetas %}
+                                            <option value="{{ t.id }}">{{ t.nombre }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- PAGO MIXTO (NUEVO OCULTO) -->
+                                <div id="vista_pago_mixto" style="display: none;">
+                                    <div class="card border-0 bg-white shadow-sm rounded-3 mb-3">
+                                        <div class="card-body p-3">
+                                            <div class="row g-2 align-items-end mb-2">
+                                                <div class="col-6">
+                                                    <label class="extra-small fw-bold text-muted text-uppercase mb-1">Método</label>
+                                                    <select id="metodo_pago_selector" class="form-select form-select-sm bg-light border-0 fw-bold" onchange="toggleInputsPago()">
+                                                        <option value="EFECTIVO">EFECTIVO</option>
+                                                        <option value="TARJETA">TARJETA</option>
+                                                        <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-4">
+                                                    <label class="extra-small fw-bold text-muted text-uppercase mb-1">Monto $</label>
+                                                    <input type="number" id="monto_pago_input" class="form-control form-control-sm bg-light border-0 fw-bold text-success" step="0.01" placeholder="0.00">
+                                                </div>
+                                                <div class="col-2">
+                                                    <button type="button" class="btn btn-success btn-sm w-100" onclick="agregarPago()" title="Agregar Pago">
+                                                        <i class="fas fa-plus"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div id="extra_pago_inputs" style="display: none;">
+                                                <div class="row g-2">
+                                                    <div class="col-6" id="div_tarjeta_mixed" style="display: none;">
+                                                        <label class="extra-small fw-bold text-muted text-uppercase mb-1">Tarjeta</label>
+                                                        <select id="id_tarjeta_mixed" class="form-select form-select-sm bg-light border-0">
+                                                            <option value="">-- TIPO --</option>
+                                                            {% for t in cat_tarjetas %}
+                                                            <option value="{{ t.id }}">{{ t.nombre }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-6" id="div_referencia_mixed" style="display: none;">
+                                                        <label class="extra-small fw-bold text-muted text-uppercase mb-1">Ref / Lote</label>
+                                                        <input type="text" id="referencia_mixed" class="form-control form-control-sm bg-light border-0" placeholder="Opcional">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mt-3" style="max-height: 120px; overflow-y: auto;">
+                                                <table class="table table-sm table-borderless mb-0">
+                                                    <tbody id="lista_pagos_agregados" class="small"></tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6"><div class="p-2 rounded-3 bg-white border border-info"><div class="extra-small fw-bold text-info text-uppercase">Pendiente:</div><div id="monto_pendiente_txt" class="fw-bold h6 mb-0 text-info">$ 0.00</div></div></div>
+                                        <div class="col-6"><div class="p-2 rounded-3 bg-white border border-warning"><div class="extra-small fw-bold text-warning text-uppercase">Cambio:</div><div id="monto_cambio_txt" class="fw-bold h6 mb-0 text-warning">$ 0.00</div></div></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -378,6 +443,100 @@ let modalClienteInstance;
 let modalPromocionInstance;
 let promoIdDetectada = null;
 let ultimaPlataformaEvaluada = null;
+let listaPagos = [];
+
+function toggleVistaPago() {
+    const isMixto = document.getElementById('checkPagoMixto').checked;
+    document.getElementById('vista_pago_simple').style.display = isMixto ? 'none' : 'block';
+    document.getElementById('vista_pago_mixto').style.display = isMixto ? 'block' : 'none';
+    if(isMixto) {
+        listaPagos = [];
+        actualizarResumenPagos();
+    }
+}
+
+function toggleInputsPago() {
+    const metodo = document.getElementById('metodo_pago_selector').value;
+    const extraDiv = document.getElementById('extra_pago_inputs');
+    const tarjetaDiv = document.getElementById('div_tarjeta_mixed');
+    const refDiv = document.getElementById('div_referencia_mixed');
+
+    extraDiv.style.display = (metodo === 'TARJETA' || metodo === 'TRANSFERENCIA') ? 'block' : 'none';
+    tarjetaDiv.style.display = (metodo === 'TARJETA') ? 'block' : 'none';
+    refDiv.style.display = (metodo === 'TARJETA' || metodo === 'TRANSFERENCIA') ? 'block' : 'none';
+}
+
+function agregarPago() {
+    const metodo = document.getElementById('metodo_pago_selector').value;
+    const montoInput = document.getElementById('monto_pago_input');
+    const monto = parseFloat(montoInput.value);
+    const id_tarjeta = document.getElementById('id_tarjeta_mixed').value;
+    const ref = document.getElementById('referencia_mixed').value;
+    
+    if (isNaN(monto) || monto <= 0) return;
+    if (metodo === 'TARJETA' && !id_tarjeta) {
+        reinaAlert('Atención', 'Seleccione el tipo de tarjeta', 'warning');
+        return;
+    }
+
+    const t_nombre = id_tarjeta ? document.getElementById('id_tarjeta_mixed').options[document.getElementById('id_tarjeta_mixed').selectedIndex].text : '';
+
+    listaPagos.push({
+        metodo: metodo,
+        monto: monto,
+        id_tarjeta: id_tarjeta || null,
+        tarjeta_nombre: t_nombre,
+        referencia: ref
+    });
+
+    montoInput.value = '';
+    document.getElementById('id_tarjeta_mixed').value = '';
+    document.getElementById('referencia_mixed').value = '';
+    actualizarResumenPagos();
+}
+
+function eliminarPago(index) {
+    listaPagos.splice(index, 1);
+    actualizarResumenPagos();
+}
+
+function actualizarResumenPagos() {
+    const tbody = document.getElementById('lista_pagos_agregados');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    let totalPagado = 0;
+    listaPagos.forEach((p, idx) => {
+        totalPagado += p.monto;
+        tbody.innerHTML += `<tr>
+            <td><i class="fas fa-check-circle text-success me-1"></i> ${p.metodo} ${p.tarjeta_nombre ? '('+p.tarjeta_nombre+')' : ''}</td>
+            <td class="text-end fw-bold">$${p.monto.toFixed(2)}</td>
+            <td class="text-end"><button class="btn btn-link btn-sm text-danger p-0" onclick="eliminarPago(${idx})"><i class="fas fa-trash-alt"></i></button></td>
+        </tr>`;
+    });
+
+    let subtotalBruto = 0, descuentoPromoTotal = 0;
+    carrito.forEach(item => {
+        subtotalBruto += (item.precio * item.cantidad);
+        descuentoPromoTotal += (item.precio - item.precio_final) * item.cantidad;
+    });
+    const subtotalPostPromo = subtotalBruto - descuentoPromoTotal;
+    const percManual = parseFloat(document.getElementById('desc_manual_porc').value) || 0;
+    const descManualVal = subtotalPostPromo * (percManual / 100);
+    const totalFinal = subtotalPostPromo - descManualVal;
+
+    const pendiente = Math.max(0, totalFinal - totalPagado);
+    const cambio = Math.max(0, totalPagado - totalFinal);
+
+    document.getElementById('monto_pendiente_txt').textContent = `$ ${pendiente.toFixed(2)}`;
+    document.getElementById('monto_cambio_txt').textContent = `$ ${cambio.toFixed(2)}`;
+    
+    if (pendiente > 0) {
+        document.getElementById('monto_pago_input').value = pendiente.toFixed(2);
+    } else {
+        document.getElementById('monto_pago_input').value = '';
+    }
+}
 
 const productosData = {{ productos | tojson | safe }};
 const IVA_P = {{ iva_porcentaje or 15.0 }};
@@ -853,16 +1012,25 @@ function toggleTarjetaSelector() {
 
 async function confirmarOrden() {
     const c_id = document.getElementById('clienteId').value;
-    const f_pago = document.querySelector('input[name="formaPago"]:checked').value;
-    const id_tarjeta = document.getElementById('id_tarjeta').value;
     const plat_id = document.getElementById('ventaPlataforma').value;
-    
     const promoId = document.getElementById('promoSeleccionada') ? document.getElementById('promoSeleccionada').value : "";
     const descManual = parseFloat(document.getElementById('desc_manual_porc').value) || 0;
     const motivoManual = document.getElementById('desc_manual_motivo').value.trim();
+    
+    // VERIFICAR MODO DE PAGO
+    const isMixto = document.getElementById('checkPagoMixto') && document.getElementById('checkPagoMixto').checked;
+    
+    let f_pago = 'EFECTIVO';
+    let id_tarjeta = '';
+    
+    if (!isMixto) {
+        const radioChecked = document.querySelector('input[name="formaPago"]:checked');
+        f_pago = radioChecked ? radioChecked.value : 'EFECTIVO';
+        id_tarjeta = document.getElementById('id_tarjeta').value;
+        if (f_pago === 'TARJETA' && !id_tarjeta) return reinaAlert('Faltan Datos', 'Debe seleccionar el tipo de tarjeta para este pago.', 'warning');
+    }
 
     if (!c_id) return reinaAlert('Aviso', 'Seleccione un cliente', 'warning');
-    if (f_pago === 'TARJETA' && !id_tarjeta) return reinaAlert('Faltan Datos', 'Debe seleccionar el tipo de tarjeta para este pago.', 'warning');
     if (descManual > 0 && !motivoManual) return reinaAlert('Faltan Datos', 'Debe ingresar un motivo para el descuento manual.', 'warning');
 
     let totalBruto = 0;
@@ -875,6 +1043,12 @@ async function confirmarOrden() {
     const subPostPromo = totalBruto - descPromo;
     const descMVal = subPostPromo * (descManual / 100);
     const totalFinal = subPostPromo - descMVal;
+
+    if (isMixto) {
+        if (listaPagos.length === 0) return reinaAlert('Atención', 'Debe registrar al menos un pago mixto.', 'warning');
+        const totalPagado = listaPagos.reduce((a, b) => a + b.monto, 0);
+        if (totalPagado < (totalFinal - 0.01)) return reinaAlert('Monto Insuficiente', `El total pagado ($${totalPagado.toFixed(2)}) es menor a la venta ($${totalFinal.toFixed(2)})`, 'warning');
+    }
     
     const divisorIVA = 1 + (IVA_P / 100);
     const baseIVA = totalFinal / divisorIVA;
@@ -889,27 +1063,34 @@ async function confirmarOrden() {
 
     showLoading();
     try {
+        const payload = {
+            items: carrito.map(i => ({
+                id: i.id, 
+                cantidad: i.cantidad, 
+                precio: i.precio_final * (1 - (descManual / 100))
+            })), 
+            subtotal_0: 0, 
+            subtotal_15: baseIVA, 
+            iva_valor: ivaVal, 
+            total: totalFinal, 
+            cliente_id: c_id, 
+            plataforma_id: plat_id,
+            descuento_promo_id: promoId,
+            descuento_manual_instante: descManual,
+            motivo_descuento_manual: motivoManual
+        };
+
+        if (isMixto) {
+            payload.pagos = listaPagos;
+        } else {
+            payload.forma_pago = f_pago;
+            payload.id_tarjeta = id_tarjeta;
+        }
+
         const res = await fetch('/pos/venta', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                items: carrito.map(i => ({
-                    id: i.id, 
-                    cantidad: i.cantidad, 
-                    precio: i.precio_final * (1 - (descManual / 100))
-                })), 
-                subtotal_0: 0, 
-                subtotal_15: baseIVA, 
-                iva_valor: ivaVal, 
-                total: totalFinal, 
-                cliente_id: c_id, 
-                forma_pago: f_pago, 
-                id_tarjeta: id_tarjeta, 
-                plataforma_id: plat_id,
-                descuento_promo_id: promoId,
-                descuento_manual_instante: descManual,
-                motivo_descuento_manual: motivoManual
-            })
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
         
@@ -917,8 +1098,10 @@ async function confirmarOrden() {
             hideLoading();
             cleanupModals();
             
-            // --- APERTURA DE CAJA AUTOMÁTICA (SOLO EFECTIVO) ---
-            if (f_pago === 'EFECTIVO') {
+            // --- APERTURA DE CAJA AUTOMÁTICA ---
+            if (!isMixto && f_pago === 'EFECTIVO') {
+                abrirCajaLocal();
+            } else if (isMixto && listaPagos.some(p => p.metodo === 'EFECTIVO')) {
                 abrirCajaLocal();
             }
 

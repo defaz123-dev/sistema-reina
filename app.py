@@ -1099,28 +1099,43 @@ def sesion_caja():
     sesion_abierta = cur.fetchone()
     
     if sesion_abierta:
-        # Calcular ventas y egresos de la sesión actual
+        # Calcular ventas y egresos de la sesión actual DESDE ventas_pagos para precisión en mixtos
         ses_id = sesion_abierta['id']
-        f_apertura = sesion_abierta['fecha_apertura']
         
-        # Total Ventas Efectivo
-        cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'EFECTIVO' AND anulada = 0", (ses_id,))
+        # Total Ventas Efectivo (Monto entregado - Cambio)
+        cur.execute("""
+            SELECT SUM(vp.monto - vp.cambio) as t 
+            FROM ventas_pagos vp 
+            JOIN ventas v ON vp.venta_id = v.id 
+            WHERE v.sesion_caja_id = %s AND vp.metodo_pago = 'EFECTIVO' AND v.anulada = 0
+        """, (ses_id,))
         v_efectivo = float(cur.fetchone()['t'] or 0)
         
         # Total Ventas Tarjeta
-        cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TARJETA' AND anulada = 0", (ses_id,))
+        cur.execute("""
+            SELECT SUM(vp.monto) as t 
+            FROM ventas_pagos vp 
+            JOIN ventas v ON vp.venta_id = v.id 
+            WHERE v.sesion_caja_id = %s AND vp.metodo_pago = 'TARJETA' AND v.anulada = 0
+        """, (ses_id,))
         v_tarjeta = float(cur.fetchone()['t'] or 0)
         
         # Total Ventas Transferencia
-        cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TRANSFERENCIA' AND anulada = 0", (ses_id,))
+        cur.execute("""
+            SELECT SUM(vp.monto) as t 
+            FROM ventas_pagos vp 
+            JOIN ventas v ON vp.venta_id = v.id 
+            WHERE v.sesion_caja_id = %s AND vp.metodo_pago = 'TRANSFERENCIA' AND v.anulada = 0
+        """, (ses_id,))
         v_trans = float(cur.fetchone()['t'] or 0)
 
         # DESGLOSE DETALLADO POR TIPO DE TARJETA
         cur.execute("""
-            SELECT ct.nombre as tarjeta, SUM(v.total) as total 
-            FROM ventas v 
-            JOIN cat_tarjetas ct ON v.id_tarjeta = ct.id 
-            WHERE v.sesion_caja_id = %s AND v.forma_pago = 'TARJETA' AND v.anulada = 0
+            SELECT ct.nombre as tarjeta, SUM(vp.monto) as total 
+            FROM ventas_pagos vp
+            JOIN ventas v ON vp.venta_id = v.id
+            JOIN cat_tarjetas ct ON vp.id_tarjeta = ct.id 
+            WHERE v.sesion_caja_id = %s AND vp.metodo_pago = 'TARJETA' AND v.anulada = 0
             GROUP BY ct.id
         """, (ses_id,))
         desglose_tarjetas = cur.fetchall()
@@ -1144,39 +1159,77 @@ def sesion_caja():
     cur.close()
     return render_template('apertura_caja.html')
 
+DENOMINACIONES_FISICAS = [100.00, 50.00, 20.00, 10.00, 5.00, 1.00, 0.50, 0.25, 0.10, 0.05, 0.01]
+
 @app.route('/caja/abrir', methods=['POST'])
 @login_required
 def abrir_caja():
-    monto_inicial = float(request.form.get('monto_inicial', 0))
-    s_id = session['sucursal_id']
-    u_id = session['user_id']
-    
+    s_id, u_id = session['sucursal_id'], session['user_id']
     cur = mysql.connection.cursor()
-    # Verificar que no tenga ya una abierta
+
+    # 1. Verificar si ya tiene una sesión abierta
     cur.execute("SELECT id FROM sesiones_caja WHERE sucursal_id = %s AND usuario_id = %s AND estado = 'ABIERTA'", (s_id, u_id))
     if cur.fetchone():
         flash('Ya tienes un turno de caja abierto.', 'warning')
         return redirect(url_for('pos'))
-        
-    cur.execute("INSERT INTO sesiones_caja (sucursal_id, usuario_id, monto_inicial) VALUES (%s, %s, %s)", (s_id, u_id, monto_inicial))
-    sesion_id = cur.lastrowid
-    
-    # REGISTRAR EL MONTO INICIAL EN EL FLUJO DE CAJA PARA QUE EL SALDO DISPONIBLE SEA CORRECTO
-    cur.execute("""
-        INSERT INTO flujo_caja (sucursal_id, usuario_id, tipo, monto, descripcion, referencia_id, tipo_referencia)
-        VALUES (%s, %s, 'INGRESO', %s, %s, %s, 'APERTURA')
-    """, (s_id, u_id, monto_inicial, f"Apertura de Caja - Turno #{sesion_id}", sesion_id))
-    
-    mysql.connection.commit()
-    registrar_auditoria('CAJA', f"Abrió turno de caja con ${monto_inicial:.2f}")
-    cur.close()
-    flash('Turno de caja abierto exitosamente.', 'success')
-    return redirect(url_for('pos'))
 
+    # 2. Procesar el conteo físico enviado desde el formulario
+    conteo = {}
+    total_calculado = 0.0
+    for den in DENOMINACIONES_FISICAS:
+        val_form = request.form.get(f'den_{den:.2f}', '0')
+        cant = int(val_form) if val_form.strip() != '' else 0 # Manejo de campos vacíos
+        if cant > 0:
+            subt = float(den) * cant
+            conteo[den] = {'cantidad': cant, 'subtotal': subt}
+            total_calculado += subt
+
+    # 3. Crear la sesión de caja con el total calculado
+    cur.execute("INSERT INTO sesiones_caja (sucursal_id, usuario_id, monto_inicial) VALUES (%s, %s, %s)", (s_id, u_id, total_calculado))
+    sesion_id = cur.lastrowid
+
+    # 4. Guardar el detalle físico del conteo
+    for den, d_val in conteo.items():
+        cur.execute("""INSERT INTO caja_detalle_fisico (sesion_caja_id, tipo, denominacion, cantidad, subtotal) 
+                       VALUES (%s, 'APERTURA', %s, %s, %s)""", 
+                    (sesion_id, den, d_val['cantidad'], d_val['subtotal']))
+
+    # 5. Registrar en flujo de caja
+    cur.execute("""INSERT INTO flujo_caja (sucursal_id, usuario_id, tipo, monto, descripcion, referencia_id, tipo_referencia)
+                   VALUES (%s, %s, 'INGRESO', %s, %s, %s, 'APERTURA')""", 
+                (s_id, u_id, total_calculado, f"Apertura Turno #{sesion_id} (Conteo Físico)", sesion_id))
+
+    mysql.connection.commit(); registrar_auditoria('CAJA', f"Apertura Turno #{sesion_id} con ${total_calculado:.2f} (Detalle guardado)")
+    cur.close(); flash('Turno de caja abierto exitosamente.', 'success')
+    return redirect(url_for('pos'))
 @app.route('/caja/cerrar', methods=['POST'])
 @login_required
 def cerrar_caja():
-    r_efe = float(request.form.get('real_efectivo', 0))
+    s_id, u_id = session['sucursal_id'], session['user_id']
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM sesiones_caja WHERE sucursal_id = %s AND usuario_id = %s AND estado = 'ABIERTA' ORDER BY id DESC LIMIT 1", (s_id, u_id))
+    sesion = cur.fetchone()
+    
+    if not sesion:
+        flash('No tienes una sesión de caja abierta.', 'danger')
+        return redirect(url_for('dashboard'))
+        
+    ses_id = sesion['id']
+    
+    # 1. Procesar conteo físico de CIERRE
+    conteo = {}
+    r_efe = 0.0
+    for den in DENOMINACIONES_FISICAS:
+        cant = int(request.form.get(f'den_{den:.2f}', 0))
+        if cant > 0:
+            subt = float(den) * cant
+            conteo[den] = {'cantidad': cant, 'subtotal': subt}
+            r_efe += subt
+            # Guardar detalle físico del cierre
+            cur.execute("""INSERT INTO caja_detalle_fisico (sesion_caja_id, tipo, denominacion, cantidad, subtotal) 
+                           VALUES (%s, 'CIERRE', %s, %s, %s)""", 
+                        (ses_id, den, cant, subt))
+
     r_tar = float(request.form.get('real_tarjeta', 0))
     r_tra = float(request.form.get('real_transferencia', 0))
     
@@ -1198,13 +1251,31 @@ def cerrar_caja():
         
     ses_id = sesion['id']
     
-    # Recalcular totales exactos del sistema
-    cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'EFECTIVO' AND anulada = 0", (ses_id,))
+    # Recalcular totales exactos del sistema usando ventas_pagos para precisión en mixtos
+    cur.execute("""
+        SELECT SUM(vp.monto - vp.cambio) as t 
+        FROM ventas_pagos vp 
+        JOIN ventas v ON vp.venta_id = v.id 
+        WHERE v.sesion_caja_id = %s AND vp.metodo_pago = 'EFECTIVO' AND v.anulada = 0
+    """, (ses_id,))
     v_efectivo = float(cur.fetchone()['t'] or 0)
-    cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TARJETA' AND anulada = 0", (ses_id,))
+
+    cur.execute("""
+        SELECT SUM(vp.monto) as t 
+        FROM ventas_pagos vp 
+        JOIN ventas v ON vp.venta_id = v.id 
+        WHERE v.sesion_caja_id = %s AND vp.metodo_pago = 'TARJETA' AND v.anulada = 0
+    """, (ses_id,))
     v_tarjeta = float(cur.fetchone()['t'] or 0)
-    cur.execute("SELECT SUM(total) as t FROM ventas WHERE sesion_caja_id = %s AND forma_pago = 'TRANSFERENCIA' AND anulada = 0", (ses_id,))
+
+    cur.execute("""
+        SELECT SUM(vp.monto) as t 
+        FROM ventas_pagos vp 
+        JOIN ventas v ON vp.venta_id = v.id 
+        WHERE v.sesion_caja_id = %s AND vp.metodo_pago = 'TRANSFERENCIA' AND v.anulada = 0
+    """, (ses_id,))
     v_trans = float(cur.fetchone()['t'] or 0)
+
     cur.execute("SELECT SUM(monto) as t FROM egresos WHERE sesion_caja_id = %s", (ses_id,))
     t_egresos = float(cur.fetchone()['t'] or 0)
     cur.execute("SELECT SUM(total) as t FROM compras WHERE sesion_caja_id = %s", (ses_id,))
@@ -1271,11 +1342,20 @@ def cierre_diario():
 def ejecutar_cierre_diario():
     cur = mysql.connection.cursor()
     try:
-        s_id = session['sucursal_id']
-        u_id = session['user_id']
+        s_id, u_id = session['sucursal_id'], session['user_id']
         fecha_hoy = datetime.now().strftime('%Y-%m-%d')
         
-        # Recalcular totales para seguridad
+        # 1. Procesar conteo físico GLOBAL
+        conteo = {}
+        saldo_fisico_total = 0.0
+        for den in DENOMINACIONES_FISICAS:
+            cant = int(request.form.get(f'den_{den:.2f}', 0))
+            if cant > 0:
+                subt = float(den) * cant
+                conteo[den] = {'cantidad': cant, 'subtotal': subt}
+                saldo_fisico_total += subt
+
+        # 2. Recalcular totales de turnos para auditoría
         cur.execute("""
             SELECT COUNT(*) as turnos, SUM(monto_ventas_efectivo) as efe, SUM(monto_ventas_tarjeta) as tar, 
                    SUM(monto_ventas_transferencia) as tra, SUM(monto_egresos) as egr
@@ -1285,24 +1365,27 @@ def ejecutar_cierre_diario():
         r = cur.fetchone()
         
         if not r or r['turnos'] == 0:
-            return redirect(url_for('dashboard'))
+            flash('No hay turnos cerrados para consolidar hoy.', 'warning')
+            return redirect(url_for('cierre_diario'))
 
-        total_ventas = float(r['efe'] or 0) + float(r['tar'] or 0) + float(r['tra'] or 0)
-        saldo_final = total_ventas - float(r['egr'] or 0)
-
+        # 3. Guardar el cierre diario consolidado
         cur.execute("""
             INSERT INTO cierres_diarios (sucursal_id, usuario_id, fecha_dia, total_efectivo, total_tarjetas, total_transferencias, total_egresos, saldo_final_caja, cantidad_turnos)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (s_id, u_id, fecha_hoy, r['efe'], r['tar'], r['tra'], r['egr'], saldo_final, r['turnos']))
+        """, (s_id, u_id, fecha_hoy, r['efe'], r['tar'], r['tra'], r['egr'], saldo_fisico_total, r['turnos']))
+        cierre_id = cur.lastrowid
+
+        # 4. Guardar detalle físico del cierre diario
+        for den, d_val in conteo.items():
+            cur.execute("""INSERT INTO cierre_diario_detalle_fisico (cierre_diario_id, denominacion, cantidad, subtotal) 
+                           VALUES (%s, %s, %s, %s)""", 
+                        (cierre_id, den, d_val['cantidad'], d_val['subtotal']))
         
-        mysql.connection.commit()
-        registrar_auditoria('CIERRE', f"Cierre diario consolidado sucursal ID {s_id}")
-        flash('Cierre diario realizado con éxito y consolidado en reportes.', 'success')
+        mysql.connection.commit(); registrar_auditoria('CIERRE', f"Cierre diario consolidado ID {cierre_id} con saldo físico ${saldo_fisico_total:.2f}")
+        flash('Cierre diario consolidado con éxito.', 'success')
     except Exception as e:
-        mysql.connection.rollback()
-        flash(f'Error al cerrar: {str(e)}', 'danger')
-    finally:
-        cur.close()
+        mysql.connection.rollback(); flash(f'Error al cerrar: {str(e)}', 'danger')
+    finally: cur.close()
     return redirect(url_for('reportes'))
 
 # --- PROMOCIONES ---
@@ -1466,22 +1549,34 @@ def pos():
 def procesar_venta_v2():
     data = request.get_json(); cur = mysql.connection.cursor(); u_id = session['user_id']
     try:
-        c_id, fpago, s_id, plat_id = data.get('cliente_id'), data.get('forma_pago', 'EFECTIVO').upper(), session['sucursal_id'], data.get('plataforma_id')
-        id_tarjeta = data.get('id_tarjeta')
+        c_id, s_id, plat_id = data.get('cliente_id'), session['sucursal_id'], data.get('plataforma_id')
+        total_venta = float(data.get('total', 0))
+        pagos = data.get('pagos', []) # lista de dicts: [{'metodo': 'EFECTIVO', 'monto': 10.00, 'id_tarjeta': None, 'referencia': ''}, ...]
+
+        # Compatibilidad: Si no envían lista de pagos, crear uno con el método tradicional
+        if not pagos:
+            fpago_legacy = data.get('forma_pago', 'EFECTIVO').upper()
+            id_tarjeta_legacy = data.get('id_tarjeta')
+            pagos = [{'metodo': fpago_legacy, 'monto': total_venta, 'id_tarjeta': id_tarjeta_legacy, 'referencia': ''}]
+
+        # VALIDACIÓN: Suma de pagos >= Total
+        suma_pagos = sum(float(p.get('monto', 0)) for p in pagos)
+        if suma_pagos < total_venta:
+            return jsonify({'success': False, 'message': f'El total pagado (${suma_pagos:.2f}) es menor al total de la venta (${total_venta:.2f}).'})
+
+        # Cálculo de cambio: Prioridad efectivo
+        cambio_total = suma_pagos - total_venta
         
         # NUEVOS CAMPOS DE DESCUENTO
         promo_id = data.get('descuento_promo_id')
         desc_manual = float(data.get('descuento_manual_instante', 0))
         motivo_manual = data.get('motivo_descuento_manual', '').upper()
 
-        if not id_tarjeta or str(id_tarjeta).strip() == '':
-            id_tarjeta = None # Evita error de FK si llega vacío
-        
         if not promo_id or str(promo_id).strip() == '' or promo_id == 0:
             promo_id = None
 
         # VALIDACIÓN LEGAL SRI: Consumidor Final monto máximo $50.00
-        if str(c_id) == '1' and float(data['total']) > 50.00:
+        if str(c_id) == '1' and total_venta > 50.00:
             return jsonify({'success': False, 'message': 'Ventas superiores a $50.00 requieren identificación del cliente.'})
 
         est, pto = session.get('establecimiento', '001'), session.get('punto_emision', '001')
@@ -1495,16 +1590,52 @@ def procesar_venta_v2():
         
         sesion_id = obtener_sesion_caja_activa(s_id, u_id)
         
+        # Insertamos la venta (mantenemos forma_pago principal para compatibilidad de reportes actuales)
+        # Tomamos el método con mayor monto como el principal
+        pagos_sorted = sorted(pagos, key=lambda x: float(x['monto']), reverse=True)
+        fpago_principal = pagos_sorted[0]['metodo'].upper()
+        id_tarjeta_principal = pagos_sorted[0].get('id_tarjeta')
+        if not id_tarjeta_principal or str(id_tarjeta_principal).strip() == '':
+            id_tarjeta_principal = None
+
         cur.execute("""INSERT INTO ventas (usuario_id, sucursal_id, cliente_id, plataforma_id, id_tarjeta, sesion_caja_id, 
                                           descuento_promo_id, descuento_manual_instante, motivo_descuento_manual,
                                           subtotal_0, subtotal_15, iva_valor, total, forma_pago, clave_acceso_sri, 
                                           estado_sri, establecimiento, punto_emision, secuencial, usuario_creacion_id, usuario_modificacion_id) 
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDIENTE',%s,%s,%s,%s,%s)""", 
-                    (u_id, s_id, c_id, plat_id, id_tarjeta, sesion_id, 
+                    (u_id, s_id, c_id, plat_id, id_tarjeta_principal, sesion_id, 
                      promo_id, desc_manual, motivo_manual,
-                     data.get('subtotal_0', 0), data.get('subtotal_15', 0), data.get('iva_valor', 0), data['total'], fpago, clave, est, pto, sec_str, u_id, u_id))
+                     data.get('subtotal_0', 0), data.get('subtotal_15', 0), data.get('iva_valor', 0), total_venta, 'MIXTO' if len(pagos) > 1 else fpago_principal, clave, est, pto, sec_str, u_id, u_id))
         v_id = cur.lastrowid
         
+        # PROCESAR CADA PAGO E INSERTAR EN ventas_pagos
+        restante_cambio = cambio_total
+        for p in pagos:
+            metodo = p['metodo'].upper()
+            monto_entregado = float(p['monto'])
+            id_t = p.get('id_tarjeta')
+            ref = p.get('referencia', '')
+            
+            if not id_t or str(id_t).strip() == '' or id_t == 0: id_t = None
+            
+            cambio_pago = 0.00
+            # Regla: Restar cambio prioritariamente de EFECTIVO
+            if metodo == 'EFECTIVO' and restante_cambio > 0:
+                cambio_pago = min(monto_entregado, restante_cambio)
+                restante_cambio -= cambio_pago
+            
+            cur.execute("""INSERT INTO ventas_pagos (venta_id, metodo_pago, monto, id_tarjeta, referencia, cambio) 
+                           VALUES (%s, %s, %s, %s, %s, %s)""", 
+                        (v_id, metodo, monto_entregado, id_t, ref, cambio_pago))
+            
+            # FLUJO DE CAJA (Solo si es EFECTIVO y afecta caja real)
+            if metodo == 'EFECTIVO':
+                monto_neto_caja = monto_entregado - cambio_pago
+                if monto_neto_caja > 0:
+                    cur.execute("""INSERT INTO flujo_caja (sucursal_id, usuario_id, tipo, monto, descripcion, referencia_id, tipo_referencia)
+                                   VALUES (%s, %s, 'INGRESO', %s, %s, %s, 'VENTA')""", 
+                                (s_id, u_id, monto_neto_caja, f"Pago Mixto - Venta #{v_id} (Efectivo)", v_id))
+
         # ACTUALIZAR EL ÚLTIMO SECUENCIAL EN LA SUCURSAL
         cur.execute("UPDATE sucursales SET ultimo_secuencial=%s WHERE id=%s", (siguiente_sec, s_id))
         for i in data['items']:
@@ -1522,22 +1653,15 @@ def procesar_venta_v2():
                     cur.execute("""INSERT INTO kardex (insumo_id, sucursal_id, tipo_movimiento, motivo, referencia_id, cantidad_salida, saldo_anterior, saldo_posterior, usuario_id) 
                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
                                 (r['insumo_id'], s_id, 'VENTA', f"VENTA FACTURA {est}-{pto}-{sec_str}", v_id, cant_descontar, saldo_ant, saldo_post, u_id))
-        mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta ID: {v_id} registrada con descuento manual {desc_manual}%")
         
-        if fpago == 'EFECTIVO':
-            cur = mysql.connection.cursor()
-            cur.execute("""
-                INSERT INTO flujo_caja (sucursal_id, usuario_id, tipo, monto, descripcion, referencia_id, tipo_referencia)
-                VALUES (%s, %s, 'INGRESO', %s, %s, %s, 'VENTA')
-            """, (s_id, u_id, data['total'], f"Venta #{v_id}", v_id))
-            mysql.connection.commit()
+        mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta ID: {v_id} registrada con pagos mixtos. Total: {total_venta}")
 
         import facturacion_sri
         autorizada = facturacion_sri.procesar_factura_electronica(v_id, mysql)
         if autorizada:
             enviar_comprobante_email(v_id)
         
-        return jsonify({'success': True, 'venta_id': v_id})
+        return jsonify({'success': True, 'venta_id': v_id, 'cambio': cambio_total})
     except Exception as e: mysql.connection.rollback(); return jsonify({'success': False, 'message': str(e)})
     finally: cur.close()
 
@@ -1956,7 +2080,17 @@ def reportes():
     cur.execute("SELECT p.nombre, SUM(dv.cantidad) as total_vendido FROM detalles_ventas dv JOIN productos p ON dv.producto_id=p.id JOIN ventas v ON dv.venta_id = v.id WHERE v.anulada = 0 GROUP BY p.id ORDER BY total_vendido DESC LIMIT 5"); t = cur.fetchall()
     cur.execute("SELECT p.nombre, p.precio, (SELECT SUM(r.cantidad_requerida * IFNULL((SELECT dc.costo_unitario FROM detalles_compras dc WHERE dc.insumo_id = r.insumo_id ORDER BY dc.id DESC LIMIT 1), 0)) FROM recetas r WHERE r.producto_id = p.id) as costo_receta FROM productos p ORDER BY (p.precio - IFNULL(costo_receta, 0)) DESC"); rent = cur.fetchall()
     cur.execute("SELECT HOUR(fecha) as hora, COUNT(*) as cantidad, SUM(total) as total FROM ventas WHERE anulada = 0 GROUP BY hora ORDER BY hora"); hor = cur.fetchall()
-    cur.execute("SELECT forma_pago, COUNT(*) as cantidad, SUM(total) as total FROM ventas WHERE anulada = 0 GROUP BY forma_pago"); pags = cur.fetchall()
+    
+    # Desglose de Formas de Pago desde ventas_pagos para precisión en pagos mixtos
+    cur.execute("""
+        SELECT vp.metodo_pago as forma_pago, COUNT(DISTINCT vp.venta_id) as cantidad, SUM(vp.monto - vp.cambio) as total 
+        FROM ventas_pagos vp
+        JOIN ventas v ON vp.venta_id = v.id
+        WHERE v.anulada = 0
+        GROUP BY vp.metodo_pago
+    """)
+    pags = cur.fetchall()
+    
     cur.execute("SELECT i.nombre, i.stock_actual, i.stock_minimo, u.nombre as unidad_medida, s.nombre as sucursal FROM insumos i JOIN unidades_medida u ON i.unidad_medida_id = u.id JOIN sucursales s ON i.sucursal_id = s.id WHERE i.stock_actual <= i.stock_minimo"); crit = cur.fetchall()
     cur.execute("SELECT COUNT(*) as total_ventas, SUM(total) as monto_total, AVG(total) as ticket_promedio FROM ventas WHERE anulada = 0"); st = cur.fetchone()
     

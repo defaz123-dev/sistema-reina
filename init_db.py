@@ -1,54 +1,63 @@
-# init_db.py
+
 import MySQLdb
+import os
 import sys
 
 # Configuración (Igual que en app.py)
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'passwd': '', # Pon tu contraseña si la cambiaste
+    'host': os.environ.get('MYSQL_HOST', 'localhost'),
+    'user': os.environ.get('MYSQL_USER', 'root'),
+    'passwd': os.environ.get('MYSQL_PASSWORD', ''),
+    'port': int(os.environ.get('MYSQL_PORT', 3306)),
 }
 
-def run_sql_file(filename):
+def execute_sql_file(cursor, filename):
+    print(f"--- Ejecutando: {filename} ---")
     try:
-        # Conexión inicial al servidor (sin especificar DB)
+        with open(filename, 'r', encoding='utf-8') as f:
+            sql_content = f.read()
+            
+        # Limpiar comentarios simples y manejar bloques SQL
+        statements = sql_content.split(';')
+        for statement in statements:
+            clean_stmt = statement.strip()
+            if clean_stmt:
+                try:
+                    cursor.execute(clean_stmt)
+                except Exception as e:
+                    # Ignorar errores menores en DROP TABLE si no existe
+                    if "Drop table" not in clean_stmt:
+                        print(f"Error en statement: {clean_stmt[:50]}... \nDetalle: {e}")
+    except Exception as e:
+        print(f"Error al leer/procesar {filename}: {e}")
+
+def init_all():
+    try:
         db = MySQLdb.connect(**DB_CONFIG)
         cursor = db.cursor()
 
-        # Crear y seleccionar la base de datos
-        print("--- Creando base de datos 'sistema_reina' ---")
+        print("--- Preparando Base de Datos 'sistema_reina' ---")
+        cursor.execute("SET FOREIGN_KEY_CHECKS=0;")
         cursor.execute("CREATE DATABASE IF NOT EXISTS sistema_reina;")
         cursor.execute("USE sistema_reina;")
 
-        print(f"--- Ejecutando script: {filename} ---")
+        # 1. Esquema (Borrar y crear tablas)
+        execute_sql_file(cursor, 'database.sql')
         
-        with open(filename, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
+        # 2. Datos Maestros (Usuarios, Productos, etc.)
+        if os.path.exists('seed_data.sql'):
+            execute_sql_file(cursor, 'seed_data.sql')
+        else:
+            print("⚠️ Advertencia: seed_data.sql no encontrado.")
 
-        # Limpiar y unir comandos SQL
-        full_sql = ""
-        for line in lines:
-            if not line.strip().startswith('--'):
-                full_sql += line
-
-        commands = full_sql.split(';')
-        
-        for cmd in commands:
-            sql = cmd.strip()
-            if sql:
-                try:
-                    cursor.execute(sql)
-                    # print(f"✅ OK: {sql[:40]}...") # Comentado para no saturar la salida
-                except Exception as e:
-                    print(f"⚠️ Error en: {sql[:40]}... -> {str(e)}")
-        
+        cursor.execute("SET FOREIGN_KEY_CHECKS=1;")
         db.commit()
         cursor.close()
         db.close()
-        print("\n¡Base de datos 'sistema_reina' lista! ✅")
+        print("\n¡Base de datos REINICIADA y DATOS RESTAURADOS con éxito! ✅")
 
     except Exception as e:
-        print(f"\n❌ Error de conexión: {str(e)}")
+        print(f"\n❌ Error Crítico: {e}")
 
 if __name__ == "__main__":
-    run_sql_file('database.sql')
+    init_all()

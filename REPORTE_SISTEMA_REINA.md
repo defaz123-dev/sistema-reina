@@ -38,12 +38,20 @@ Para garantizar la máxima disponibilidad y rendimiento, el sistema opera bajo u
 - **Interfaz Fluida**: Estandarización de cabeceras pegadas a los bordes (`container-fluid`) para máximo aprovechamiento de pantalla.
 - **Roles con Identidad Visual**: Modal de permisos codificado por colores según categoría (Operativo, Abastecimiento, Administrativo).
 
-## 6. Seguridad y Whitelabel
+## 6. Flexibilidad Financiera: Pagos Mixtos (NUEVO)
+- **Gestión Multi-Método**: El POS ahora permite fraccionar una sola venta entre múltiples formas de pago (Efectivo, Tarjeta, Transferencia).
+- **Cálculo de Cambio Inteligente**: Priorización automática del efectivo para la devolución de cambio, manteniendo la integridad de los montos electrónicos.
+- **Trazabilidad de Auditoría**: Registro detallado de cada componente del pago en la nueva tabla `ventas_pagos`, permitiendo auditorías granulares por transacción.
+- **Precisión en Cierres de Caja**: 
+  - Los arqueos de caja y turnos ahora calculan el efectivo real recibido (monto entregado - cambio), eliminando descuadres por pagos combinados.
+  - Desglose exacto de montos por tipo de tarjeta y referencias de transferencia en el reporte de cierre.
+
+## 7. Seguridad y Whitelabel
 - **Whitelabel Dinámico**: Personalización total de nombre, colores e iconografía que se propaga a todo el sistema.
 - **Cifrado**: Protección AES para firmas y PBKDF2 para usuarios.
 - **Auditoría**: Trazabilidad completa de acciones críticas (Configuraciones, Cierres, Anulaciones).
 
 ---
-**Fecha de última actualización:** 10 de marzo de 2026  
-**Estado:** Versión v2.5 Liberada con atajos de productividad y robustez SRI.
+**Fecha de última actualización:** 15 de marzo de 2026  
+**Estado:** Versión v2.6 Liberada con Pagos Mixtos y Precisión Financiera.
 ---
