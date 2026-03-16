@@ -1,25 +1,5 @@
 SET FOREIGN_KEY_CHECKS=0;
 
-DROP TABLE IF EXISTS `ajustes_inventario`;
-CREATE TABLE `ajustes_inventario` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `insumo_id` int(11) DEFAULT NULL,
-  `cantidad` decimal(10,2) DEFAULT NULL,
-  `tipo` enum('INGRESO','EGRESO') DEFAULT NULL,
-  `motivo` varchar(255) DEFAULT NULL,
-  `usuario_id` int(11) DEFAULT NULL,
-  `fecha` timestamp NOT NULL DEFAULT current_timestamp(),
-  `usuario_creacion_id` int(11) DEFAULT NULL,
-  `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp(),
-  `usuario_modificacion_id` int(11) DEFAULT NULL,
-  `fecha_modificacion` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `insumo_id` (`insumo_id`),
-  KEY `usuario_id` (`usuario_id`),
-  CONSTRAINT `ajustes_inventario_ibfk_1` FOREIGN KEY (`insumo_id`) REFERENCES `insumos` (`id`),
-  CONSTRAINT `ajustes_inventario_ibfk_2` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
 DROP TABLE IF EXISTS `anulaciones_factura`;
 CREATE TABLE `anulaciones_factura` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
