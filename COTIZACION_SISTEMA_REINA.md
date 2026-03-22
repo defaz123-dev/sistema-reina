@@ -2,7 +2,7 @@
 
 **Para:** Negocio con Gestión de Sucursales y Facturación SRI  
 **De:** Christian Defaz - Consultoría de Software  
-**Fecha:** 15 de marzo de 2026 (Actualizada con versión "Enterprise Pro" v2.6)  
+**Fecha:** 21 de marzo de 2026 (Actualizada con versión "Enterprise Pro" v2.8)  
 **Vigencia:** 30 días  
 
 ---
@@ -10,7 +10,12 @@
 ## 1. DESCRIPCIÓN DE LA SOLUCIÓN
 Propuesta integral para la implementación del **Sistema Reina (Versión Enterprise Pro)**, un ecosistema diseñado bajo arquitectura distribuida de alto rendimiento.
 
-### Innovaciones "Enterprise Pro" v2.6:
+### Innovaciones "Enterprise Pro" v2.8:
+*   **Módulo de Auditoría de Cierre (Cero Errores):** Nuevo motor de consolidación diaria que permite al administrador validar el conteo físico (Billetes/Monedas) contra el reporte de los cajeros, con cálculo automático de diferencias (sobrantes/faltantes).
+*   **Control Total de Vouchers y Bancos:** Verificación obligatoria de montos reales en Tarjetas y Transferencias en el cierre diario, asegurando que el dinero en bancos coincida con lo vendido.
+*   **Historial de Auditoría con Observaciones:** Registro permanente de notas y justificaciones de cada cajero por método de pago, permitiendo una trazabilidad total en caso de descuadres.
+*   **Sincronización Espejo Local-Nube:** Arquitectura de base de datos optimizada para que el funcionamiento en local y en la nube (Render/Aiven) sea 100% idéntico y sin pérdida de campos de auditoría.
+*   **Refinamiento UX/UI Avanzado:** Interfaces ergonómicas con prevención de cierres accidentales (pérdida de datos) y ventanas de gestión redimensionadas para máxima comodidad visual.
 *   **Flexibilidad Financiera (Pagos Mixtos):** Capacidad de fraccionar una sola venta entre múltiples métodos de pago (Efectivo + Tarjeta + Transferencia), con cálculo automático de cambio priorizando efectivo.
 *   **Arqueo de Caja de Alta Precisión:** Algoritmo financiero que desglosa ingresos reales por canal de pago, eliminando errores humanos en cobros combinados.
 *   **Atajos Globales de Productividad:** Navegación ultrarrápida mediante teclado (`Ctrl+I` para Inicio, `Ctrl+O` para Ventas), optimizando el tiempo de atención al cliente.
@@ -27,14 +32,14 @@ Propuesta integral para la implementación del **Sistema Reina (Versión Enterpr
 
 ---
 
-## 2. INVERSIÓN (ACTUALIZADA V2.6)
+## 2. INVERSIÓN (ACTUALIZADA V2.7)
 
 ### OPCIÓN A: PROPIEDAD TOTAL (LICENCIA PERPETUA)
 *Ideal para el control absoluto del ecosistema tecnológico.*
 
 | Concepto | Detalle | Total |
 | :--- | :--- | :---: |
-| **Licencia ENTERPRISE v2.6** | Motor SRI + Pagos Mixtos + Atajos + Canales | $ 2,800.00 |
+| **Licencia ENTERPRISE v2.7** | Motor SRI + Pagos Mixtos + Atajos + Canales | $ 2,800.00 |
 | **Configuración Cloud** | Setup de Infraestructura Render, Aiven y Bravo API | $ 500.00 |
 | **Capacitación y Auditoría** | Formación en gestión de costos y control de roles | $ 200.00 |
 | **TOTAL INVERSIÓN INICIAL** | | **$ 3,500.00** |
@@ -45,7 +50,7 @@ Propuesta integral para la implementación del **Sistema Reina (Versión Enterpr
 
 | Concepto | Detalle | Mensualidad |
 | :--- | :--- | :---: |
-| **Plan RENTAL PRO v2.6** | Uso de Sistema Reina + Hosting + Soporte | $ 95.00 |
+| **Plan RENTAL PRO v2.7** | Uso de Sistema Reina + Hosting + Soporte | $ 95.00 |
 | **Configuración Inicial** | Setup único de empresa y firma electrónica | $ 150.00 (único) |
 | **TOTAL INVERSIÓN INICIAL** | **Incluye Setup + 1er Mes de Arriendo** | **$ 245.00** |
 | **ACTUALIZACIONES** | Incluye todas las mejoras del SRI sin costo extra | INCLUIDO |

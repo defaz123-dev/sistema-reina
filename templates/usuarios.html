@@ -89,7 +89,7 @@
 
 <!-- Modal Usuario -->
 <div class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" id="modalUsuario" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
         <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
             <form action="{{ url_for('crear_usuario') }}" id="formUsuario" method="POST">
                 <div class="modal-header text-white border-0" style="background-color: {{ config_empresa.color_tema }};">
@@ -112,8 +112,8 @@
                     <div class="row g-2">
                         <div class="col-6 mb-3">
                             <label class="extra-small fw-bold text-muted text-uppercase">Identificación</label>
-                            <input type="text" name="cedula" id="user_ced" class="form-control form-control-sm bg-light border-0" required maxlength="13">
-                            <div id="cedulaError" class="text-danger extra-small mt-1" style="display:none;">Inválida.</div>
+                            <input type="text" name="cedula" id="user_ced" class="form-control form-control-sm bg-light border-0" required maxlength="13" oninput="validarCedulaUsuarioRealTime()">
+                            <div id="cedulaError" class="text-danger extra-small mt-1" style="display:none;">Identificación no válida para el tipo seleccionado.</div>
                         </div>
                         <div class="col-6 mb-3">
                             <label class="extra-small fw-bold text-muted text-uppercase">Usuario</label>
@@ -204,6 +204,33 @@
         document.getElementById('divActivo').style.display = 'block';
         document.getElementById('modalUsuarioTitle').innerText = 'Editar Usuario';
         document.getElementById('cedulaError').style.display = 'none';
+    }
+
+    function validarCedulaUsuarioRealTime() {
+        const tipo = document.getElementById('user_tipo_id').value;
+        const cedula = document.getElementById('user_ced').value.trim();
+        const errorDiv = document.getElementById('cedulaError');
+        const input = document.getElementById('user_ced');
+
+        if (cedula.length >= 10) {
+            // Usar la función global si existe, sino la local
+            const esValido = (typeof validarIdentificacionSRI === 'function') 
+                ? validarIdentificacionSRI(cedula, tipo) 
+                : validarCedula(cedula);
+
+            if (!esValido) {
+                errorDiv.style.display = 'block';
+                input.classList.add('border', 'border-danger');
+                input.classList.remove('border-success');
+            } else {
+                errorDiv.style.display = 'none';
+                input.classList.remove('border-danger');
+                input.classList.add('border', 'border-success');
+            }
+        } else {
+            errorDiv.style.display = 'none';
+            input.classList.remove('border-danger', 'border-success');
+        }
     }
 
     function validarCedula(cedula) {

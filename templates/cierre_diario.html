@@ -64,10 +64,16 @@
                                     <th class="text-end">Transf.</th>
                                     <th class="text-end text-danger">Egresos</th>
                                     <th class="text-end fw-bold">Entregado</th>
+                                    <th class="text-center">Dif. Desglosada</th>
+                                    <th class="text-center">Observaciones</th>
                                 </tr>
                             </thead>
                             <tbody class="small">
                                 {% for d in detalle_cajeros %}
+                                {% set efe_esperado = d.monto_inicial + d.monto_ventas_efectivo - d.monto_egresos %}
+                                {% set dif_efe = d.real_efectivo - efe_esperado %}
+                                {% set dif_tar = d.real_tarjeta - d.monto_ventas_tarjeta %}
+                                {% set dif_tra = d.real_transferencia - d.monto_ventas_transferencia %}
                                 <tr>
                                     <td class="fw-bold text-dark">{{ d.usuario }}</td>
                                     <td class="text-muted small">
@@ -93,6 +99,26 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-end fw-bold text-success">$ {{ "%.2f"|format(d.monto_final_real) }}</td>
+                                    <td class="text-center">
+                                        <div class="d-flex flex-column x-small">
+                                            <span class="{% if dif_efe < 0 %}text-danger{% elif dif_efe > 0 %}text-primary{% else %}text-muted{% endif %}">
+                                                Efe: {{ "%+.2f"|format(dif_efe) }}
+                                            </span>
+                                            <span class="{% if dif_tar < 0 %}text-danger{% elif dif_tar > 0 %}text-primary{% else %}text-muted{% endif %}">
+                                                Tar: {{ "%+.2f"|format(dif_tar) }}
+                                            </span>
+                                            <span class="{% if dif_tra < 0 %}text-danger{% elif dif_tra > 0 %}text-primary{% else %}text-muted{% endif %}">
+                                                Tra: {{ "%+.2f"|format(dif_tra) }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <button class="btn btn-warning btn-sm rounded-circle shadow-sm p-2 border-0 btn-obs-detail" 
+                                                data-bs-toggle="modal" data-bs-target="#modalObs{{ d.id }}"
+                                                title="Ver Observaciones">
+                                            <i class="fas fa-comment-alt fa-lg text-dark"></i>
+                                        </button>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -152,32 +178,123 @@
                     <form id="formCierreDiario" action="{{ url_for('ejecutar_cierre_diario') }}" method="POST">
                         <div class="card border-0 bg-light rounded-4 mb-3">
                             <div class="card-body p-3">
-                                <h6 class="fw-bold text-dark mb-3"><i class="fas fa-calculator me-2 text-primary"></i> Conteo Físico Final del Día</h6>
+                                <h6 class="fw-bold text-dark mb-3"><i class="fas fa-calculator me-2 text-primary"></i> 1. Conteo Físico Final de Efectivo</h6>
                                 <div class="row align-items-center">
                                     <div class="col-md-8 border-end">
-                                        <div class="row g-2">
-                                            {% for den in [100.00, 50.00, 20.00, 10.00, 5.00, 1.00, 0.50, 0.25, 0.10, 0.05, 0.01] %}
-                                            <div class="col-md-6">
-                                                <div class="input-group mb-2 shadow-xs rounded-2 border">
-                                                    <span class="input-group-text border-0 bg-light fw-bold text-dark" style="width: 60px;">{{ "%.2f"|format(den)|replace('0.', '.')|replace('.00', '') }}</span>
-                                                    <input type="number" name="den_{{ "%.2f"|format(den) }}" class="form-control border-0 text-center den-input-global fw-bold" 
-                                                           style="font-size: 1.1rem;"
-                                                           data-valor="{{ den }}" min="0" placeholder="0" oninput="calcularTotalGlobal()">
+                                        <div class="row">
+                                            <!-- BILLETES -->
+                                            <div class="col-md-6 mb-3">
+                                                <h6 class="fw-bold text-muted text-uppercase x-small mb-2"><i class="fas fa-money-bill-wave me-2 text-success"></i> Billetes</h6>
+                                                {% for b in [100.00, 50.00, 20.00, 10.00, 5.00, 1.00] %}
+                                                <div class="input-group mb-2 shadow-xs rounded-2 border overflow-hidden">
+                                                    <span class="input-group-text border-0 bg-light fw-bold text-dark" style="width: 60px;">{{ "%.0f"|format(b) }}</span>
+                                                    <input type="number" name="den_{{ "%.2f"|format(b) }}" class="form-control border-0 text-center den-input-global fw-bold" 
+                                                           style="font-size: 1.1rem;" data-valor="{{ b }}" min="0" placeholder="0" oninput="calcularTotalGlobal()">
+                                                    <span class="input-group-text border-0 bg-white text-success extra-small fw-bold subtotal-den" style="width: 85px;">$ 0.00</span>
                                                 </div>
+                                                {% endfor %}
                                             </div>
-                                            {% endfor %}
+                                            <!-- MONEDAS -->
+                                            <div class="col-md-6 mb-3">
+                                                <h6 class="fw-bold text-muted text-uppercase x-small mb-2"><i class="fas fa-coins me-2 text-warning"></i> Monedas</h6>
+                                                {% for m in [0.50, 0.25, 0.10, 0.05, 0.01] %}
+                                                <div class="input-group mb-2 shadow-xs rounded-2 border overflow-hidden">
+                                                    <span class="input-group-text border-0 bg-light fw-bold text-dark" style="width: 60px;">{{ "%.2f"|format(m)|replace('0.', '.') }}</span>
+                                                    <input type="number" name="den_{{ "%.2f"|format(m) }}" class="form-control border-0 text-center den-input-global fw-bold" 
+                                                           style="font-size: 1.1rem;" data-valor="{{ m }}" min="0" placeholder="0" oninput="calcularTotalGlobal()">
+                                                    <span class="input-group-text border-0 bg-white text-warning extra-small fw-bold subtotal-den" style="width: 85px;">$ 0.00</span>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
                                         <div class="p-4 rounded-4 text-center h-100 d-flex flex-column justify-content-center" style="background-color: #1a1a1a;">
-                                            <span class="small fw-bold text-white-50 text-uppercase d-block mb-2">SALDO TOTAL EN CAJA:</span>
-                                            <div id="txt_total_global_fisico" class="h1 fw-bold text-success mb-0" style="text-shadow: 0 0 10px rgba(40, 167, 69, 0.3); font-size: 2.5rem;">$ 0.00</div>
+                                            <span class="small fw-bold text-white-50 text-uppercase d-block mb-2">EFECTIVO FÍSICO CONTADO:</span>
+                                            <div id="txt_total_global_fisico" class="h2 fw-bold text-success mb-3" style="text-shadow: 0 0 10px rgba(40, 167, 69, 0.3); font-size: 2.2rem;">$ 0.00</div>
+                                            
+                                            <div class="border-top border-secondary pt-3 mt-2">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <small class="text-white-50 extra-small text-uppercase">Esperado (Cajeros):</small>
+                                                    <span class="fw-bold text-white small" id="val_efe_esperado">$ {{ "%.2f"|format(resumen.t_esperado_efectivo or 0) }}</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <small class="text-white-50 extra-small text-uppercase">Diferencia:</small>
+                                                    <span id="txt_diferencia_global" class="fw-bold small text-warning">$ 0.00</span>
+                                                </div>
+                                            </div>
                                         </div>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <input type="text" name="obs_efe" class="form-control form-control-sm border-0 bg-white shadow-sm rounded-3" placeholder="Observaciones de efectivo (opcional)...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. TARJETAS Y TRANSFERENCIAS -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light rounded-4 h-100">
+                                    <div class="card-body p-3">
+                                        <h6 class="fw-bold text-dark mb-3"><i class="fas fa-credit-card me-2 text-primary"></i> 2. Verificación de Tarjetas</h6>
+                                        <div class="mb-3">
+                                            <label class="x-small fw-bold text-muted text-uppercase mb-1">Total Vouchers Físicos ($):</label>
+                                            <input type="number" step="0.01" name="real_tar" id="real_tar" class="form-control form-control-lg border-0 shadow-sm fw-bold text-primary" 
+                                                   placeholder="0.00" oninput="calcularDiferenciasNoEfe()">
+                                        </div>
+                                        <div class="p-2 rounded-3 bg-white border shadow-xs">
+                                            <div class="d-flex justify-content-between x-small mb-1">
+                                                <span class="text-muted">Reportado por Cajeros:</span>
+                                                <span class="fw-bold" id="val_tar_esperado">$ {{ "%.2f"|format(resumen.t_tarjeta or 0) }}</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between x-small">
+                                                <span class="text-muted">Diferencia Tarjetas:</span>
+                                                <span class="fw-bold" id="dif_tar_val">$ 0.00</span>
+                                            </div>
+                                        </div>
+                                        <input type="text" name="obs_tar" class="form-control form-control-sm border-0 bg-white shadow-sm rounded-3 mt-3" placeholder="Observaciones de tarjetas...">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light rounded-4 h-100">
+                                    <div class="card-body p-3">
+                                        <h6 class="fw-bold text-dark mb-3"><i class="fas fa-university me-2 text-info"></i> 3. Verificación de Transf.</h6>
+                                        <div class="mb-3">
+                                            <label class="x-small fw-bold text-muted text-uppercase mb-1">Total Confirmado Bancos ($):</label>
+                                            <input type="number" step="0.01" name="real_tra" id="real_tra" class="form-control form-control-lg border-0 shadow-sm fw-bold text-info" 
+                                                   placeholder="0.00" oninput="calcularDiferenciasNoEfe()">
+                                        </div>
+                                        <div class="p-2 rounded-3 bg-white border shadow-xs">
+                                            <div class="d-flex justify-content-between x-small mb-1">
+                                                <span class="text-muted">Reportado por Cajeros:</span>
+                                                <span class="fw-bold" id="val_tra_esperado">$ {{ "%.2f"|format(resumen.t_trans or 0) }}</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between x-small">
+                                                <span class="text-muted">Diferencia Transf:</span>
+                                                <span class="fw-bold" id="dif_tra_val">$ 0.00</span>
+                                            </div>
+                                        </div>
+                                        <input type="text" name="obs_tra" class="form-control form-control-sm border-0 bg-white shadow-sm rounded-3 mt-3" placeholder="Observaciones de transferencias...">
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <textarea name="observaciones" class="form-control bg-light border-0 mb-3" rows="2" placeholder="Observaciones finales del día..."></textarea>
+
+                        <div class="alert alert-dark border-0 rounded-4 p-3 mb-3">
+                            <div class="row align-items-center">
+                                <div class="col-8">
+                                    <h6 class="fw-bold text-white mb-0">TOTAL GENERAL FINAL (CAJA COMPLETA)</h6>
+                                    <small class="text-white-50">Suma de Efectivo + Tarjetas + Transferencias contados por usted.</small>
+                                </div>
+                                <div class="col-4 text-end">
+                                    <h3 class="fw-bold text-success mb-0" id="total_final_consolidado">$ 0.00</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <textarea name="observaciones" class="form-control bg-light border-0 mb-3" rows="2" placeholder="Observaciones finales del día (Auditoría General)..."></textarea>
                         <button type="button" class="btn btn-reina w-100 rounded-pill py-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalConfirmCierre">
                             <i class="fas fa-check-double me-2"></i> EJECUTAR CIERRE FINAL DEL DÍA
                         </button>
@@ -185,9 +302,8 @@
                     {% endif %}
 
                     <!-- Modal Confirmación Cierre Final -->
-                    <div class="modal fade" id="modalConfirmCierre" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal fade" id="modalConfirmCierre" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">                            <div class="modal-content border-0 shadow-lg rounded-4">
                                 <div class="modal-body text-center p-4">
                                     <div class="mb-3">
                                         <i class="fas fa-exclamation-triangle fa-4x text-warning"></i>
@@ -253,7 +369,7 @@
     {% for d in detalle_cajeros %}
         <!-- Modal Tarjetas -->
         {% if d.desglose_tarjetas %}
-        <div class="modal fade" id="modalTarjetas{{ d.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal fade" id="modalTarjetas{{ d.id }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-sm">
                 <div class="modal-content border-0 shadow-lg rounded-4">
                     <div class="modal-header bg-primary text-white border-0 py-2">
@@ -277,7 +393,7 @@
 
         <!-- Modal Egresos -->
         {% if d.lista_egresos %}
-        <div class="modal fade" id="modalEgresos{{ d.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal fade" id="modalEgresos{{ d.id }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg rounded-4">
                     <div class="modal-header bg-danger text-white border-0 py-2">
@@ -298,6 +414,32 @@
             </div>
         </div>
         {% endif %}
+
+        <!-- Modal Observaciones -->
+        <div class="modal fade" id="modalObs{{ d.id }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+                    <div class="modal-header bg-dark text-white border-0 py-2">
+                        <h6 class="modal-title fw-bold small">Observaciones - {{ d.usuario }}</h6>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="fw-bold x-small text-muted text-uppercase d-block mb-1">Efectivo:</label>
+                            <div class="p-2 bg-light rounded small">{{ d.obs_efectivo or 'Sin observaciones' }}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="fw-bold x-small text-muted text-uppercase d-block mb-1">Tarjetas:</label>
+                            <div class="p-2 bg-light rounded small">{{ d.obs_tarjeta or 'Sin observaciones' }}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="fw-bold x-small text-muted text-uppercase d-block mb-1">Transferencias:</label>
+                            <div class="p-2 bg-light rounded small">{{ d.obs_transferencia or 'Sin observaciones' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     {% endfor %}
 {% endif %}
 
@@ -308,13 +450,64 @@
 
 <script>
 function calcularTotalGlobal() {
-    let total = 0;
+    let totalEfe = 0;
+    const esperadoEfe = parseFloat("{{ resumen.t_esperado_efectivo or 0 }}");
+    
     document.querySelectorAll('.den-input-global').forEach(input => {
         const valor = parseFloat(input.dataset.valor);
         const cantidad = parseInt(input.value) || 0;
-        total += valor * cantidad;
+        const subtotal = valor * cantidad;
+        totalEfe += subtotal;
+
+        const subLabel = input.parentElement.querySelector('.subtotal-den');
+        if (subLabel) {
+            subLabel.textContent = `$ ${subtotal.toFixed(2)}`;
+            subLabel.className = cantidad > 0 ? 'input-group-text border-0 bg-white text-success extra-small fw-bold subtotal-den' : 'input-group-text border-0 bg-white text-muted extra-small subtotal-den';
+        }
     });
-    document.getElementById('txt_total_global_fisico').textContent = `$ ${total.toFixed(2)}`;
+
+    document.getElementById('txt_total_global_fisico').textContent = `$ ${totalEfe.toFixed(2)}`;
+    
+    // Diferencia Efectivo
+    const difEfe = totalEfe - esperadoEfe;
+    const txtDifEfe = document.getElementById('txt_diferencia_global');
+    txtDifEfe.textContent = `$ ${difEfe.toFixed(2)}`;
+    txtDifEfe.className = Math.abs(difEfe) < 0.01 ? 'fw-bold small text-success' : (difEfe > 0 ? 'fw-bold small text-primary' : 'fw-bold small text-danger');
+
+    actualizarTotalGeneralFinal();
+}
+
+function calcularDiferenciasNoEfe() {
+    // Tarjetas
+    const realTar = parseFloat(document.getElementById('real_tar').value) || 0;
+    const espTar = parseFloat("{{ resumen.t_tarjeta or 0 }}");
+    const difTar = realTar - espTar;
+    const lblDifTar = document.getElementById('dif_tar_val');
+    lblDifTar.textContent = `$ ${difTar.toFixed(2)}`;
+    lblDifTar.className = Math.abs(difTar) < 0.01 ? 'fw-bold text-success' : (difTar > 0 ? 'fw-bold text-primary' : 'fw-bold text-danger');
+
+    // Transferencias
+    const realTra = parseFloat(document.getElementById('real_tra').value) || 0;
+    const espTra = parseFloat("{{ resumen.t_trans or 0 }}");
+    const difTra = realTra - espTra;
+    const lblDifTra = document.getElementById('dif_tra_val');
+    lblDifTra.textContent = `$ ${difTra.toFixed(2)}`;
+    lblDifTra.className = Math.abs(difTra) < 0.01 ? 'fw-bold text-success' : (difTra > 0 ? 'fw-bold text-primary' : 'fw-bold text-danger');
+
+    actualizarTotalGeneralFinal();
+}
+
+function actualizarTotalGeneralFinal() {
+    let totalEfe = 0;
+    document.querySelectorAll('.den-input-global').forEach(input => {
+        totalEfe += (parseFloat(input.dataset.valor) * (parseInt(input.value) || 0));
+    });
+
+    const realTar = parseFloat(document.getElementById('real_tar').value) || 0;
+    const realTra = parseFloat(document.getElementById('real_tra').value) || 0;
+    
+    const totalFinal = totalEfe + realTar + realTra;
+    document.getElementById('total_final_consolidado').textContent = `$ ${totalFinal.toFixed(2)}`;
 }
 </script>
 {% endblock %}

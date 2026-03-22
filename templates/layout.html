@@ -155,7 +155,7 @@
 </div>
 
 <!-- Modal Previsualización Ticket -->
-<div class="modal fade" id="modalTicketPreview" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalTicketPreview" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-md modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg">
             <div class="modal-header bg-light border-0 py-2">
@@ -177,7 +177,7 @@
 </div>
 
 <!-- Modal Previsualización RIDE -->
-<div class="modal fade" id="modalRidePreview" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalRidePreview" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg" style="height: 90vh;">
             <div class="modal-header bg-dark text-white border-0 py-2">
@@ -285,7 +285,7 @@
 </script>
 
 <!-- Modal Elegante Reina (Alerts y Confirms) -->
-<div class="modal fade" id="reinaModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="reinaModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg">
             <div class="modal-body p-5 text-center">
@@ -410,6 +410,8 @@
                 reinaAlert('Aviso de Caja', data.error || 'Error desconocido en el bridge local.', 'danger');
             } else {
                 console.log("Caja abierta exitosamente:", data.message);
+                // Registrar auditoría en el servidor
+                fetch('/caja/log-abrir-bridge', { method: 'POST' }).catch(e => console.error("Error auditando apertura:", e));
             }
         })
         .catch(err => {

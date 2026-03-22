@@ -346,7 +346,7 @@
                     </thead>
                     <tbody style="font-size: 0.95rem;">
                         {% for c in cierres_caja %}
-                        {% set sist_efe = (c.monto_inicial + c.monto_ventas_efectivo - c.monto_egresos) %}
+                        {% set sist_efe = c.monto_inicial + c.monto_ventas_efectivo - c.monto_egresos %}
                         {% set dif_efe = c.real_efectivo - sist_efe %}
                         {% set dif_tar = c.real_tarjeta - c.monto_ventas_tarjeta %}
                         {% set dif_tra = c.real_transferencia - c.monto_ventas_transferencia %}
@@ -461,7 +461,7 @@
 
                         <!-- Modal Tarjetas Consolidado -->
                         {% if c.desglose_tarjetas %}
-                        <div class="modal fade" id="modalTarjetasCons{{ c.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal fade" id="modalTarjetasCons{{ c.id }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered modal-sm">
                                 <div class="modal-content border-0 shadow-lg rounded-4">
                                     <div class="modal-header bg-primary text-white border-0 py-2">
@@ -485,7 +485,7 @@
 
                         <!-- Modal Egresos Consolidado -->
                         {% if c.lista_egresos %}
-                        <div class="modal fade" id="modalEgresosCons{{ c.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal fade" id="modalEgresosCons{{ c.id }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content border-0 shadow-lg rounded-4">
                                     <div class="modal-header bg-danger text-white border-0 py-2">

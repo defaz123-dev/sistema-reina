@@ -59,19 +59,33 @@
                             </div>
                             {% endif %}
                         </div>
-                        <div class="col-md-8 border-end">
+                        <div class="col-md-8 border-end pr-md-4">
                             <h6 class="fw-bold text-muted small text-uppercase mb-3"><i class="fas fa-calculator me-2 text-primary"></i> Conteo Físico de Efectivo</h6>
-                            <div class="row g-2">
-                                {% for den in [100.00, 50.00, 20.00, 10.00, 5.00, 1.00, 0.50, 0.25, 0.10, 0.05, 0.01] %}
-                                <div class="col-md-6">
-                                    <div class="input-group rounded-2 border shadow-xs overflow-hidden">
-                                        <span class="input-group-text border-0 bg-light fw-bold text-dark small" style="width: 55px;">{{ "%.2f"|format(den)|replace('0.', '.')|replace('.00', '') }}</span>
-                                        <input type="number" name="den_{{ "%.2f"|format(den) }}" class="form-control border-0 text-center den-input-cierre fw-bold" 
-                                               style="font-size: 0.95rem;" data-valor="{{ den }}" min="0" placeholder="0" oninput="calcularTotalCierre()">
-                                        <span class="input-group-text border-0 bg-white text-muted extra-small" style="width: 70px;">$ 0</span>
+                            <div class="row">
+                                <!-- BILLETES -->
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="fw-bold text-muted text-uppercase x-small mb-2"><i class="fas fa-money-bill-wave me-2 text-success"></i> Billetes</h6>
+                                    {% for b in [100.00, 50.00, 20.00, 10.00, 5.00, 1.00] %}
+                                    <div class="input-group mb-2 shadow-xs rounded-2 border overflow-hidden">
+                                        <span class="input-group-text border-0 bg-light fw-bold text-dark" style="width: 60px;">{{ "%.0f"|format(b) }}</span>
+                                        <input type="number" name="den_{{ "%.2f"|format(b) }}" class="form-control border-0 text-center den-input-cierre fw-bold" 
+                                               style="font-size: 1.1rem;" data-valor="{{ b }}" min="0" placeholder="0" oninput="calcularTotalCierre()">
+                                        <span class="input-group-text border-0 bg-white text-success extra-small fw-bold subtotal-den" style="width: 85px;">$ 0.00</span>
                                     </div>
+                                    {% endfor %}
                                 </div>
-                                {% endfor %}
+                                <!-- MONEDAS -->
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="fw-bold text-muted text-uppercase x-small mb-2"><i class="fas fa-coins me-2 text-warning"></i> Monedas</h6>
+                                    {% for m in [0.50, 0.25, 0.10, 0.05, 0.01] %}
+                                    <div class="input-group mb-2 shadow-xs rounded-2 border overflow-hidden">
+                                        <span class="input-group-text border-0 bg-light fw-bold text-dark" style="width: 60px;">{{ "%.2f"|format(m)|replace('0.', '.') }}</span>
+                                        <input type="number" name="den_{{ "%.2f"|format(m) }}" class="form-control border-0 text-center den-input-cierre fw-bold" 
+                                               style="font-size: 1.1rem;" data-valor="{{ m }}" min="0" placeholder="0" oninput="calcularTotalCierre()">
+                                        <span class="input-group-text border-0 bg-white text-warning extra-small fw-bold subtotal-den" style="width: 85px;">$ 0.00</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -123,16 +137,8 @@
                     </div>
 
                     <div class="mb-4 p-3 rounded-4 border text-center bg-white shadow-sm">
-                        <div class="row">
-                            <div class="col-6 border-end">
-                                <small class="extra-small fw-bold text-muted text-uppercase">Total Sistema</small>
-                                <div class="h4 fw-bold text-dark mb-0">$ {{ "%.2f"|format(esperado + v_tarjeta + v_trans) }}</div>
-                            </div>
-                            <div class="col-6">
-                                <small class="extra-small fw-bold text-muted text-uppercase">Total Real Ingresado</small>
-                                <div class="h4 fw-bold text-primary mb-0" id="labelTotalReal">$ 0.00</div>
-                            </div>
-                        </div>
+                        <small class="extra-small fw-bold text-muted text-uppercase">Total General Real (Efectivo + Tarjetas + Trans.)</small>
+                        <div class="h4 fw-bold text-primary mb-0" id="labelTotalReal">$ 0.00</div>
                     </div>
 
                     <button type="button" class="btn btn-reina w-100 rounded-pill py-3 fw-bold shadow-lg mt-2" onclick="confirmarCierreDetallado()">
@@ -172,6 +178,12 @@
             </div>
         </div>
 
+        <!-- BLOQUE DE TOTAL SISTEMA (DESTACADO) -->
+        <div class="card border-0 shadow-sm rounded-4 bg-dark text-white p-4 text-center mb-4 border-start border-5 border-success">
+            <small class="extra-small fw-bold text-uppercase text-warning opacity-75">Total Esperado en Sistema</small>
+            <div class="h2 fw-bold mb-0 text-white">$ {{ "%.2f"|format(esperado + v_tarjeta + v_trans) }}</div>
+            <p class="extra-small mb-0 opacity-50">(Efectivo + Tarjetas + Trans.)</p>
+        </div>
         <div class="alert border-0 rounded-4 small p-3 bg-light text-muted">
             <i class="fas fa-info-circle me-2"></i> Al confirmar el cierre, no podrá modificar las transacciones de esta sesión.
         </div>
@@ -179,7 +191,7 @@
 </div>
 
 <!-- MODAL DE JUSTIFICACIÓN DE DESCUADRE -->
-<div class="modal fade" id="modalJustificacion" data-bs-backdrop="static" tabindex="-1">
+<div class="modal fade" id="modalJustificacion" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg">
             <div class="modal-header bg-warning text-dark border-0">
@@ -210,13 +222,30 @@
 
 {% block scripts %}
 <script>
+window.onload = function() {
+    calcularTotalCierre();
+    actualizarTotalReal();
+};
+
 // FUNCIÓN DE CONTEO FÍSICO
 function calcularTotalCierre() {
     let total = 0;
     document.querySelectorAll('.den-input-cierre').forEach(input => {
         const valor = parseFloat(input.dataset.valor);
         const cantidad = parseInt(input.value) || 0;
-        total += valor * cantidad;
+        const subtotal = valor * cantidad;
+        total += subtotal;
+
+        // Actualizar el subtotal visual de cada denominación (LA PARTE QUE FALTABA)
+        const subLabel = input.parentElement.querySelector('.subtotal-den');
+        if (subLabel) {
+            subLabel.textContent = `$ ${subtotal.toFixed(2)}`;
+            if(cantidad > 0) {
+                subLabel.classList.add('text-success', 'fw-bold');
+            } else {
+                subLabel.classList.remove('text-success', 'fw-bold');
+            }
+        }
     });
     
     document.getElementById('txt_total_fisico_cierre').textContent = `$ ${total.toFixed(2)}`;

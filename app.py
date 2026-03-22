@@ -41,7 +41,7 @@ def obtener_sesion_caja_activa(sucursal_id, usuario_id):
 
 from PIL import Image
 
-def procesar_imagen(file_storage, max_size=(800, 800), quality=85):
+def procesar_imagen(file_storage, max_size=(500, 500), quality=70):
     try:
         img = Image.open(file_storage)
         if img.mode in ("RGBA", "P"): img = img.convert("RGB")
@@ -674,7 +674,7 @@ def consultar_datos_sri(clave):
 @admin_required
 def proveedores():
     cur = mysql.connection.cursor(); cur.execute("SELECT p.*, t.nombre as tipo_comprobante_nombre FROM proveedores p JOIN tipos_comprobantes t ON p.tipo_comprobante_id = t.id")
-    p = cur.fetchall(); cur.execute("SELECT * FROM tipos_identificacion"); t = cur.fetchall(); cur.close()
+    p = cur.fetchall(); cur.execute("SELECT * FROM tipos_comprobantes"); t = cur.fetchall(); cur.close()
     return render_template('proveedores.html', proveedores=p, tipos=t)
 
 @app.route('/proveedores/guardar', methods=['POST'])
@@ -1202,6 +1202,13 @@ def abrir_caja():
     mysql.connection.commit(); registrar_auditoria('CAJA', f"Apertura Turno #{sesion_id} con ${total_calculado:.2f} (Detalle guardado)")
     cur.close(); flash('Turno de caja abierto exitosamente.', 'success')
     return redirect(url_for('pos'))
+
+@app.route('/caja/log-abrir-bridge', methods=['POST'])
+@login_required
+def log_abrir_bridge():
+    registrar_auditoria('CAJA', 'Abrió el cajón de dinero (Manual/Bridge)')
+    return jsonify({'success': True})
+
 @app.route('/caja/cerrar', methods=['POST'])
 @login_required
 def cerrar_caja():
@@ -1220,7 +1227,8 @@ def cerrar_caja():
     conteo = {}
     r_efe = 0.0
     for den in DENOMINACIONES_FISICAS:
-        cant = int(request.form.get(f'den_{den:.2f}', 0))
+        val_f = request.form.get(f'den_{den:.2f}', '0')
+        cant = int(val_f) if val_f.strip() != '' else 0
         if cant > 0:
             subt = float(den) * cant
             conteo[den] = {'cantidad': cant, 'subtotal': subt}
@@ -1230,26 +1238,17 @@ def cerrar_caja():
                            VALUES (%s, 'CIERRE', %s, %s, %s)""", 
                         (ses_id, den, cant, subt))
 
-    r_tar = float(request.form.get('real_tarjeta', 0))
-    r_tra = float(request.form.get('real_transferencia', 0))
+    # Asegurar que los valores reales de tarjeta y transferencia sean float válidos
+    val_tar = request.form.get('real_tarjeta', '0').strip()
+    r_tar = float(val_tar) if val_tar != '' else 0.0
+    
+    val_tra = request.form.get('real_transferencia', '0').strip()
+    r_tra = float(val_tra) if val_tra != '' else 0.0
     
     # Nuevas observaciones específicas
     o_efe = request.form.get('obs_efectivo', '')
     o_tar = request.form.get('obs_tarjeta', '')
     o_tra = request.form.get('obs_transferencia', '')
-    
-    s_id = session['sucursal_id']
-    u_id = session['user_id']
-    
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT * FROM sesiones_caja WHERE sucursal_id = %s AND usuario_id = %s AND estado = 'ABIERTA' ORDER BY id DESC LIMIT 1", (s_id, u_id))
-    sesion = cur.fetchone()
-    
-    if not sesion:
-        flash('No tienes una sesión de caja abierta.', 'danger')
-        return redirect(url_for('dashboard'))
-        
-    ses_id = sesion['id']
     
     # Recalcular totales exactos del sistema usando ventas_pagos para precisión en mixtos
     cur.execute("""
@@ -1278,10 +1277,8 @@ def cerrar_caja():
 
     cur.execute("SELECT SUM(monto) as t FROM egresos WHERE sesion_caja_id = %s", (ses_id,))
     t_egresos = float(cur.fetchone()['t'] or 0)
-    cur.execute("SELECT SUM(total) as t FROM compras WHERE sesion_caja_id = %s", (ses_id,))
-    t_compras = float(cur.fetchone()['t'] or 0)
     
-    total_salidas = t_egresos + t_compras
+    total_salidas = t_egresos
     e_efe = float(sesion['monto_inicial']) + v_efectivo - total_salidas
     
     total_real = r_efe + r_tar + r_tra
@@ -1320,21 +1317,66 @@ def cierre_diario():
         flash('Ya se ha realizado el cierre consolidado de este día.', 'warning')
         return redirect(url_for('reportes'))
 
-    # 2. Resumen de Turnos del Día
+    # 2. Resumen de Turnos Cerrados HOY (independiente de cuándo abrieron)
     cur.execute("""
-        SELECT COUNT(*) as turnos, SUM(monto_ventas_efectivo) as efe, SUM(monto_ventas_tarjeta) as tar, 
-               SUM(monto_ventas_transferencia) as tra, SUM(monto_egresos) as egr
+        SELECT COUNT(*) as turnos, 
+               SUM(monto_ventas_efectivo) as t_efectivo, 
+               SUM(monto_ventas_tarjeta) as t_tarjeta, 
+               SUM(monto_ventas_transferencia) as t_trans, 
+               SUM(monto_egresos) as t_egresos,
+               SUM(real_efectivo) as t_esperado_efectivo,
+               SUM(monto_final_real) as saldo_real_entregado
         FROM sesiones_caja 
-        WHERE sucursal_id = %s AND DATE(fecha_apertura) = %s AND estado = 'CERRADA'
+        WHERE sucursal_id = %s AND DATE(fecha_cierre) = %s AND estado = 'CERRADA'
     """, (s_id, fecha_hoy))
-    res = cur.fetchone()
+    resumen = cur.fetchone()
+
+    # 3. Detalle por cajero para la tabla
+    cur.execute("""
+        SELECT s.*, u.usuario 
+        FROM sesiones_caja s 
+        JOIN usuarios u ON s.usuario_id = u.id 
+        WHERE s.sucursal_id = %s AND DATE(s.fecha_cierre) = %s AND s.estado = 'CERRADA'
+    """, (s_id, fecha_hoy))
+    detalle_cajeros = cur.fetchall()
+
+    for d in detalle_cajeros:
+        # Desglose tarjetas por turno
+        cur.execute("""
+            SELECT ct.nombre as tarjeta, SUM(vp.monto) as total 
+            FROM ventas_pagos vp
+            JOIN ventas v ON vp.venta_id = v.id
+            JOIN cat_tarjetas ct ON vp.id_tarjeta = ct.id 
+            WHERE v.sesion_caja_id = %s AND vp.metodo_pago = 'TARJETA' AND v.anulada = 0
+            GROUP BY ct.id
+        """, (d['id'],))
+        d['desglose_tarjetas'] = cur.fetchall()
+
+        # Egresos por turno
+        cur.execute("SELECT descripcion, monto FROM egresos WHERE sesion_caja_id = %s", (d['id'],))
+        d['lista_egresos'] = cur.fetchall()
     
-    # 3. Validar si hay turnos abiertos
-    cur.execute("SELECT COUNT(*) as c FROM sesiones_caja WHERE sucursal_id = %s AND DATE(fecha_apertura) = %s AND estado = 'ABIERTA'", (s_id, fecha_hoy))
-    abiertos = cur.fetchone()['c']
+    # 4. Validar si hay turnos aún abiertos (basado en fecha de apertura)
+    cur.execute("""
+        SELECT s.*, u.usuario 
+        FROM sesiones_caja s 
+        JOIN usuarios u ON s.usuario_id = u.id 
+        WHERE s.sucursal_id = %s AND s.estado = 'ABIERTA'
+    """, (s_id,))
+    abiertas = cur.fetchall()
+
+    # 5. Historial de cierres diarios
+    cur.execute("""
+        SELECT cd.*, u.usuario 
+        FROM cierres_diarios cd
+        JOIN usuarios u ON cd.usuario_id = u.id
+        WHERE cd.sucursal_id = %s 
+        ORDER BY cd.fecha_dia DESC LIMIT 10
+    """, (s_id,))
+    historial = cur.fetchall()
     
     cur.close()
-    return render_template('cierre_diario.html', res=res, fecha=fecha_hoy, abiertos=abiertos)
+    return render_template('cierre_diario.html', resumen=resumen, hoy=fecha_hoy, abiertas=abiertas, detalle_cajeros=detalle_cajeros, historial=historial)
 
 @app.route('/caja/ejecutar_cierre', methods=['POST'])
 @login_required
@@ -1344,50 +1386,83 @@ def ejecutar_cierre_diario():
     try:
         s_id, u_id = session['sucursal_id'], session['user_id']
         fecha_hoy = datetime.now().strftime('%Y-%m-%d')
-        
-        # 1. Procesar conteo físico GLOBAL
-        conteo = {}
-        saldo_fisico_total = 0.0
-        for den in DENOMINACIONES_FISICAS:
-            cant = int(request.form.get(f'den_{den:.2f}', 0))
+
+        # 1. Capturar Valores Reales del Formulario
+        real_tar = float(request.form.get('real_tar', 0) or 0)
+        real_tra = float(request.form.get('real_tra', 0) or 0)
+        obs_efe = request.form.get('obs_efe', '')
+        obs_tar = request.form.get('obs_tar', '')
+        obs_tra = request.form.get('obs_tra', '')
+        observaciones_gen = request.form.get('observaciones', '')
+
+        # 2. Procesar conteo físico de Efectivo (Denominaciones)
+        conteo_efe = {}
+        real_efe = 0.0
+        for den in [100.00, 50.00, 20.00, 10.00, 5.00, 1.00, 0.50, 0.25, 0.10, 0.05, 0.01]:
+            cant = int(request.form.get(f'den_{den:.2f}', 0) or 0)
             if cant > 0:
                 subt = float(den) * cant
-                conteo[den] = {'cantidad': cant, 'subtotal': subt}
-                saldo_fisico_total += subt
+                conteo_efe[den] = {'cantidad': cant, 'subtotal': subt}
+                real_efe += subt
 
-        # 2. Recalcular totales de turnos para auditoría
+        # 3. Recalcular Esperados de Cajeros para auditoría
         cur.execute("""
-            SELECT COUNT(*) as turnos, SUM(monto_ventas_efectivo) as efe, SUM(monto_ventas_tarjeta) as tar, 
-                   SUM(monto_ventas_transferencia) as tra, SUM(monto_egresos) as egr
-            FROM sesiones_caja 
-            WHERE sucursal_id = %s AND DATE(fecha_apertura) = %s AND estado = 'CERRADA'
+            SELECT COUNT(*) as turnos, 
+                   SUM(monto_ventas_efectivo) as efe, 
+                   SUM(monto_ventas_tarjeta) as tar,
+                   SUM(monto_ventas_transferencia) as tra, 
+                   SUM(monto_egresos) as egr,
+                   SUM(real_efectivo) as efe_esperado_auditoria
+            FROM sesiones_caja
+            WHERE sucursal_id = %s AND DATE(fecha_cierre) = %s AND estado = 'CERRADA'
         """, (s_id, fecha_hoy))
         r = cur.fetchone()
-        
+
         if not r or r['turnos'] == 0:
             flash('No hay turnos cerrados para consolidar hoy.', 'warning')
             return redirect(url_for('cierre_diario'))
 
-        # 3. Guardar el cierre diario consolidado
+        # 4. Calcular Diferencias para guardar
+        dif_efe = real_efe - (r['efe_esperado_auditoria'] or 0)
+        dif_tar = real_tar - (r['tar'] or 0)
+        dif_tra = real_tra - (r['tra'] or 0)
+
+        # 5. Guardar el cierre diario consolidado con AUDITORÍA COMPLETA
         cur.execute("""
-            INSERT INTO cierres_diarios (sucursal_id, usuario_id, fecha_dia, total_efectivo, total_tarjetas, total_transferencias, total_egresos, saldo_final_caja, cantidad_turnos)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (s_id, u_id, fecha_hoy, r['efe'], r['tar'], r['tra'], r['egr'], saldo_fisico_total, r['turnos']))
+            INSERT INTO cierres_diarios (
+                sucursal_id, usuario_id, fecha_dia, 
+                total_efectivo, total_tarjetas, total_transferencias, total_egresos,
+                real_efectivo, real_tarjeta, real_transferencia,
+                dif_efectivo, dif_tarjeta, dif_transferencia,
+                obs_efe, obs_tar, obs_tra, observaciones,
+                saldo_final_caja, cantidad_turnos
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            s_id, u_id, fecha_hoy, 
+            r['efe'], r['tar'], r['tra'], r['egr'],
+            real_efe, real_tar, real_tra,
+            dif_efe, dif_tar, dif_tra,
+            obs_efe, obs_tar, obs_tra, observaciones_gen,
+            (real_efe + real_tar + real_tra), r['turnos']
+        ))
         cierre_id = cur.lastrowid
 
-        # 4. Guardar detalle físico del cierre diario
-        for den, d_val in conteo.items():
-            cur.execute("""INSERT INTO cierre_diario_detalle_fisico (cierre_diario_id, denominacion, cantidad, subtotal) 
-                           VALUES (%s, %s, %s, %s)""", 
+        # 6. Guardar detalle físico (denominaciones de efectivo)
+        for den, d_val in conteo_efe.items():
+            cur.execute("""INSERT INTO cierre_diario_detalle_fisico (cierre_diario_id, denominacion, cantidad, subtotal)
+                           VALUES (%s, %s, %s, %s)""",
                         (cierre_id, den, d_val['cantidad'], d_val['subtotal']))
-        
-        mysql.connection.commit(); registrar_auditoria('CIERRE', f"Cierre diario consolidado ID {cierre_id} con saldo físico ${saldo_fisico_total:.2f}")
-        flash('Cierre diario consolidado con éxito.', 'success')
-    except Exception as e:
-        mysql.connection.rollback(); flash(f'Error al cerrar: {str(e)}', 'danger')
-    finally: cur.close()
-    return redirect(url_for('reportes'))
 
+        mysql.connection.commit()
+        registrar_auditoria('CIERRE_DIARIO', f"Cierre consolidado ID {cierre_id}. Diferencias: Efe {dif_efe:.2f}, Tar {dif_tar:.2f}, Tra {dif_tra:.2f}")
+        flash('Cierre diario consolidado y auditado con éxito.', 'success')
+    except Exception as e:
+        mysql.connection.rollback()
+        flash(f'Error al ejecutar el cierre diario: {str(e)}', 'danger')
+        print(f"Error Cierre Diario: {str(e)}")
+    finally:
+        cur.close()
+    return redirect(url_for('reportes'))
 # --- PROMOCIONES ---
 @app.route('/promociones')
 @login_required

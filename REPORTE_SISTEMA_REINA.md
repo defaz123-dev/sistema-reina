@@ -26,6 +26,8 @@ Para garantizar la máxima disponibilidad y rendimiento, el sistema opera bajo u
 - **Multisucursal**: Secuenciales, puntos de emisión e inventario independientes por local con sincronización basada en recetas.
 
 ## 5. Experiencia de Usuario (POS) y Promociones
+- **Ergonomía de Interfaz Avanzada**: Ampliación estratégica de las ventanas modales de gestión (clientes, usuarios, inventario, egresos, etc.) garantizando mayor comodidad visual. Implementación de protección contra pérdida de datos evitando cierres accidentales (backdrop estático).
+- **Accesibilidad del Dashboard**: Optimización del flujo de apertura de caja física directamente desde el panel principal, unificando la experiencia con el módulo POS.
 - **Atajos Globales de Teclado**: 
   - `Ctrl + I`: Retorno instantáneo al Dashboard desde cualquier pantalla.
   - `Ctrl + O`: Apertura directa del módulo de Nueva Orden (POS).
@@ -46,12 +48,20 @@ Para garantizar la máxima disponibilidad y rendimiento, el sistema opera bajo u
   - Los arqueos de caja y turnos ahora calculan el efectivo real recibido (monto entregado - cambio), eliminando descuadres por pagos combinados.
   - Desglose exacto de montos por tipo de tarjeta y referencias de transferencia en el reporte de cierre.
 
-## 7. Seguridad y Whitelabel
+## 7. Motor de Auditoría y Cierre Consolidado (NUEVO)
+- **Consolidación Diaria Inteligente**: Nuevo proceso de cierre de fin de día que agrupa todos los turnos cerrados, permitiendo una auditoría centralizada.
+- **Conteo Físico Multidivisa**: Interfaz optimizada para el ingreso de billetes y monedas con subtotales automáticos, idéntica a la experiencia de cierre de turno para mayor familiaridad del usuario.
+- **Validación de Vouchers y Bancos**: El administrador ahora ingresa el valor real físico de Tarjetas y Transferencias, permitiendo contrastar el dinero en mano/banco contra lo reportado por el sistema.
+- **Cálculo Automático de Diferencias**: El sistema detecta y resalta instantáneamente sobrantes o faltantes en cada método de pago (Efectivo, Tarjeta, Transferencia) tanto a nivel de turno individual como en el cierre general del día.
+- **Historial Permanente de Auditoría**: Almacenamiento persistente de valores reales, diferencias y observaciones específicas de cada cajero en la base de datos, eliminando la volatilidad de la información de cierre.
+- **Visibilidad Detallada de Turnos**: Tabla de resumen que permite inspeccionar con un solo clic las observaciones, desgloses de tarjetas y egresos de cada cajero que operó en el día.
+
+## 8. Seguridad y Whitelabel
 - **Whitelabel Dinámico**: Personalización total de nombre, colores e iconografía que se propaga a todo el sistema.
 - **Cifrado**: Protección AES para firmas y PBKDF2 para usuarios.
 - **Auditoría**: Trazabilidad completa de acciones críticas (Configuraciones, Cierres, Anulaciones).
 
 ---
-**Fecha de última actualización:** 15 de marzo de 2026  
-**Estado:** Versión v2.6 Liberada con Pagos Mixtos y Precisión Financiera.
+**Fecha de última actualización:** 21 de marzo de 2026  
+**Estado:** Versión v2.8 Liberada con Motor de Auditoría Consolidado y Sincronización Total.
 ---

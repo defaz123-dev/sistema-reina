@@ -86,7 +86,7 @@
 
 <!-- Modal Cliente -->
 <div class="modal fade" id="modalCliente" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
         <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
             <form action="{{ url_for('guardar_cliente') }}" method="POST" onsubmit="return validarAntesDeEnviar()">
                 <div class="modal-header text-white border-0" style="background-color: {{ config_empresa.color_tema }};">
@@ -187,12 +187,12 @@
         if (doc.length >= 10) {
             if (!validarIdentificacionSRI(doc, tipo)) {
                 errorDiv.classList.remove('d-none');
-                docInput.classList.add('border-danger');
+                docInput.classList.add('border', 'border-danger');
                 docInput.classList.remove('border-success');
             } else {
                 errorDiv.classList.add('d-none');
                 docInput.classList.remove('border-danger');
-                docInput.classList.add('border-success');
+                docInput.classList.add('border', 'border-success');
             }
         } else {
             errorDiv.classList.add('d-none');
