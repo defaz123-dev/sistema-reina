@@ -21,26 +21,44 @@ CORS(app) # Permitir que el Sistema Reina en la nube se conecte
 def get_pos_printer(strict=False):
     """
     Busca una impresora térmica.
-    Si strict=True (para el cajón), solo devuelve térmicas.
-    Si strict=False (para impresión), devuelve la predeterminada si no hay térmica.
+    Prioriza el modelo LR2000 Logic solicitado por el usuario.
     """
     try:
+        # PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS para locales y de red
         printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)
-        keywords = ["POS", "80mm", "58mm", "TICKET", "EPSON", "ZJIANG", "TERMIC"]
         
-        # 1. Buscar térmica por palabras clave
-        for (_, _, name, _) in printers:
-            if any(kw in name.upper() for kw in keywords):
+        all_printer_names = [p[2] for p in printers]
+        print(f"\n--- Escaneando impresoras ({len(all_printer_names)} encontradas) ---")
+        for name in all_printer_names:
+            print(f"  > {name}")
+        
+        # 1. Búsqueda prioritaria específica: LR2000 / Logic Controls
+        priority_keywords = ["LR2000", "LOGIC", "CONTROLS"]
+        for name in all_printer_names:
+            name_upper = name.upper()
+            if any(pk in name_upper for pk in priority_keywords):
+                print(f"[*] Impresora PRIORITARIA detectada: {name}")
+                return name, True
+        
+        # 2. Búsqueda general por palabras clave térmicas comunes
+        keywords = ["POS", "80mm", "58mm", "TICKET", "EPSON", "ZJIANG", "TERMIC", "USB-PRINTER", "GENERIC"]
+        for name in all_printer_names:
+            name_upper = name.upper()
+            if any(kw in name_upper for kw in keywords):
+                print(f"[+] Impresora térmica detectada por palabra clave: {name}")
                 return name, True
                 
-        # 2. Si no es estricto y no hay térmica, usar la predeterminada
+        # 3. Si no es estricto (impresión), usar la predeterminada del sistema
         if not strict:
             default_printer = win32print.GetDefaultPrinter()
             if default_printer:
+                print(f"[!] No se detectó térmica, usando predeterminada: {default_printer}")
                 return default_printer, True
 
+        print("[-] No se detectó ninguna impresora compatible.")
         return None, False
-    except Exception:
+    except Exception as e:
+        print(f"[ERROR] Error al enumerar impresoras: {e}")
         return None, False
 
 def open_cash_drawer(printer_name):
