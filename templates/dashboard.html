@@ -46,7 +46,48 @@
             </a>
         </div>
     {% endfor %}
+
+    <!-- ACCESO RÁPIDO A MÁQUINAS (SÓLO ADMIN) -->
+    {% if session['rol'] == 'ADMINISTRADOR' %}
+    <div class="col-6 col-md-3 col-lg-2">
+        <a href="{{ url_for('listar_maquinas') }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow main-card border-start border-info border-4">
+                <div class="card-body p-3 text-center">
+                    <div class="icon-box border-info text-info mb-3">
+                        <i class="fas fa-desktop"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Máquinas</h6>
+                    <p class="text-muted extra-small mb-0">Gestión HWID</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endif %}
 </div>
+
+{% if session['rol'] == 'ADMINISTRADOR' and not maquina_autorizada %}
+<div class="row mt-3 justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4 animate__animated animate__pulse animate__infinite" style="background: linear-gradient(135deg, #fff9db 0%, #fff3bf 100%); border-left: 5px solid #f08c00 !important;">
+            <div class="card-body p-3 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    <div class="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px; font-size: 1.5rem;">
+                        <i class="fas fa-desktop"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark">¡Terminal No Autorizado!</h6>
+                        <p class="mb-0 small text-muted">Esta computadora aún no está en la lista blanca. Registre esta máquina para permitir el acceso a sus cajeros.</p>
+                        <code class="extra-small text-muted">ID: {{ session.hwid_actual }}</code>
+                    </div>
+                </div>
+                <a href="{{ url_for('listar_maquinas') }}" class="btn btn-dark rounded-pill px-4 shadow-sm">
+                    <i class="fas fa-plus-circle me-1"></i> AUTORIZAR AHORA
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% if alerta_sri %}
 <div class="row mt-3 justify-content-center">

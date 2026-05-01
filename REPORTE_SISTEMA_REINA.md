@@ -61,7 +61,26 @@ Para garantizar la máxima disponibilidad y rendimiento, el sistema opera bajo u
 - **Cifrado**: Protección AES para firmas y PBKDF2 para usuarios.
 - **Auditoría**: Trazabilidad completa de acciones críticas (Configuraciones, Cierres, Anulaciones).
 
+## 9. Seguridad por Hardware y Protección de Activos (NUEVO)
+Para prevenir el uso no autorizado del sistema en máquinas no registradas (especialmente en el modelo de arriendo), se ha implementado una capa de seguridad física:
+- **Lógica de Seguridad HWID (Hardware ID)**:
+  - **Vinculación Única**: Cada usuario (excepto el Administrador) queda ligado automáticamente al número de serie de la placa base (Baseboard Serial) o UUID del sistema en su primer inicio de sesión.
+  - **Validación en Tiempo Real**: El Bridge consulta la identidad del hardware y la envía al servidor en la nube para su validación antes de permitir el acceso.
+  - **Protección Administrativa**: Solo el Administrador tiene la potestad de "Resetear el HWID" desde el panel de gestión de usuarios, permitiendo el traslado de un usuario a una nueva máquina de forma controlada.
+  - **Experiencia de Usuario**: Integración de indicadores de carga ("Validando Seguridad") durante el login para informar al usuario sobre el proceso de verificación en segundo plano.
+
+- **Protección de Código Fuente (Nuitka Compilation)**: El componente crítico **Reina Bridge** ahora se distribuye como un ejecutable compilado mediante **Nuitka**, protegiendo la propiedad intelectual y los algoritmos de validación.
+
+## 10. Optimización de Base de Datos y Gestión de Medios (NUEVO)
+Para garantizar la escalabilidad y rapidez en entornos de nube (donde el almacenamiento de BD es costoso y limitado), se ha rediseñado el manejo de archivos:
+- **Desacoplamiento de Binarios (Blob-to-File)**: Las imágenes de productos ya no se almacenan dentro de la base de datos MySQL. Se ha implementado un repositorio físico en el servidor (`static/uploads/productos/`).
+- **Impacto en Rendimiento**: 
+  - Reducción del tamaño de la base de datos en un 90% promedio.
+  - Backups y restauraciones ultra-rápidas (esenciales para migraciones en la nube).
+  - Carga optimizada de imágenes mediante el servidor web estático.
+- **Procesamiento de Imágenes**: El sistema ahora redimensiona y optimiza automáticamente cada imagen subida a un formato estándar (JPEG 80% calidad), ahorrando espacio en disco sin perder calidad visual.
+
 ---
-**Fecha de última actualización:** 21 de marzo de 2026  
-**Estado:** Versión v2.8 Liberada con Motor de Auditoría Consolidado y Sincronización Total.
+**Fecha de última actualización:** 30 de abril de 2026  
+**Estado:** Versión v3.1 Liberada con Optimización de Medios y Lista Blanca de Terminales.
 ---

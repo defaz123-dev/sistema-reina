@@ -3,6 +3,8 @@ import os
 import sys
 import threading
 import socket
+import subprocess
+import time
 from flask import Flask, jsonify
 from flask_cors import CORS
 import win32print
@@ -13,10 +15,47 @@ from PIL import Image, ImageDraw
 # Configuración
 APP_NAME = "Reina Bridge"
 PORT = 5001
-VERSION = "1.0.0"
+VERSION = "1.1.0" # Actualizado para HWID
 
 app = Flask(__name__)
 CORS(app) # Permitir que el Sistema Reina en la nube se conecte
+
+def get_hwid():
+    """Obtiene el número de serie de la placa base o el UUID del sistema."""
+    try:
+        # Intentar obtener el número de serie de la placa base
+        cmd = "wmic baseboard get serialnumber"
+        output = subprocess.check_output(cmd, shell=True).decode().split('\n')
+        serial = ""
+        for line in output:
+            line = line.strip()
+            if line and "SerialNumber" not in line:
+                serial = line
+                break
+        
+        # Si falla o es genérico, intentar UUID
+        if not serial or "Default" in serial or "None" in serial or "To be filled" in serial:
+            cmd = "wmic csproduct get uuid"
+            output = subprocess.check_output(cmd, shell=True).decode().split('\n')
+            for line in output:
+                line = line.strip()
+                if line and "UUID" not in line:
+                    serial = line
+                    break
+        return serial if serial else "UNKNOWN_HWID"
+    except Exception as e:
+        print(f"[ERROR] Error al obtener HWID: {e}")
+        return "ERROR_HWID"
+
+@app.route('/hwid', methods=['GET'])
+def hwid_route():
+    """Ruta para obtener el HWID con simulación de espera."""
+    print("[*] Petición de HWID recibida. Consultando seguridad...")
+    # Simulación de "espera un momento" para que el usuario perciba que hay una validación real
+    time.sleep(1.2)
+    serial = get_hwid()
+    print(f"[+] HWID entregado: {serial}")
+    return jsonify({"hwid": serial})
 
 def get_pos_printer(strict=False):
     """

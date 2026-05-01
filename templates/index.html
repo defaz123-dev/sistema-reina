@@ -72,7 +72,7 @@
             <!-- Formulario apilado verticalmente -->
             <div class="row justify-content-center">
                 <div class="col-12">
-                    <form action="/login" method="POST">
+                    <form action="/login" method="POST" id="loginForm">
                         <!-- Cédula -->
                         <div class="mb-2">
                             <label class="form-label fw-bold text-dark extra-small mb-1">CÉDULA DE IDENTIDAD (LOGIN)</label>
@@ -158,5 +158,35 @@ function togglePassword() {
         toggleIcon.classList.add('fa-eye');
     }
 }
+
+// Lógica de HWID y Login
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = this;
+    
+    // Mostrar loader nativo del Sistema Reina
+    if (typeof showLoading === 'function') showLoading();
+
+    // Intentar obtener HWID del Bridge local
+    fetch('http://localhost:5001/hwid')
+        .then(response => response.json())
+        .then(data => {
+            // Agregar HWID al formulario
+            let hwidInput = document.createElement('input');
+            hwidInput.type = 'hidden';
+            hwidInput.name = 'hwid';
+            hwidInput.value = data.hwid;
+            form.appendChild(hwidInput);
+            
+            // Proceder con el login (el submit activará el loader de nuevo si no se redirige rápido)
+            form.submit();
+        })
+        .catch(err => {
+            console.error('Error Bridge:', err);
+            if (typeof hideLoading === 'function') hideLoading();
+            
+            reinaAlert('Seguridad Crítica', 'No se detectó el <b>Reina Bridge</b> activo en esta computadora.<br><br>Es obligatorio para validar la autorización de esta máquina.', 'danger');
+        });
+});
 </script>
 {% endblock %}

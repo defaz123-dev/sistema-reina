@@ -41,17 +41,14 @@ def obtener_sesion_caja_activa(sucursal_id, usuario_id):
 
 from PIL import Image
 
-def procesar_imagen(file_storage, max_size=(500, 500), quality=70):
+def procesar_imagen(file_storage, max_size=(500, 500)):
     try:
         img = Image.open(file_storage)
         if img.mode in ("RGBA", "P"): img = img.convert("RGB")
         img.thumbnail(max_size, Image.Resampling.LANCZOS)
-        output = io.BytesIO()
-        img.save(output, format='JPEG', quality=quality, optimize=True)
-        return output.getvalue(), 'image/jpeg'
+        return img
     except:
-        file_storage.seek(0)
-        return file_storage.read(), file_storage.content_type
+        return None
 
 def calcular_modulo11(cadena):
     pivote = 2; suma = 0
@@ -186,10 +183,28 @@ def index():
 @app.route('/login', methods=['POST'])
 def login():
     c, p, s_id = request.form['usuario'].strip(), request.form['password'], int(request.form['sucursal'])
+    hwid = request.form.get('hwid') # Capturar el HWID enviado desde el frontend
+    
     cur = mysql.connection.cursor()
     cur.execute("SELECT u.*, r.nombre as rol_nombre FROM usuarios u JOIN roles r ON u.rol_id = r.id WHERE u.cedula=%s", (c,))
     user = cur.fetchone()
     if user and user['activo'] and check_password_hash(user['password'], p):
+        # VALIDACIÓN DE HWID (Lista Blanca de Terminales)
+        if user['rol_nombre'] != 'ADMINISTRADOR':
+            if not hwid:
+                cur.close()
+                flash('El Bridge no está activo. Es obligatorio para validar esta máquina.', 'danger')
+                return redirect(url_for('index'))
+            
+            # Verificar si esta máquina está autorizada para la sucursal o globalmente
+            cur.execute("SELECT * FROM maquinas_autorizadas WHERE hwid = %s", (hwid,))
+            maquina = cur.fetchone()
+            
+            if not maquina:
+                cur.close()
+                flash('Acceso denegado: Esta computadora no está autorizada para operar el sistema.', 'danger')
+                return redirect(url_for('index'))
+
         cur.execute("SELECT nombre, establecimiento, punto_emision FROM sucursales WHERE id=%s", (s_id,))
         suc = cur.fetchone()
         
@@ -208,7 +223,8 @@ def login():
             'rol_id': user['rol_id'],
             'sucursal_id': s_id, 'sucursal_nombre': suc['nombre'],
             'establecimiento': suc['establecimiento'], 'punto_emision': suc['punto_emision'],
-            'user_menus': user_menus # Guardamos los menús autorizados
+            'user_menus': user_menus,
+            'hwid_actual': hwid # Guardamos el HWID actual en la sesión
         })
         registrar_auditoria('LOGIN', f"Inició sesión en {suc['nombre']}")
         return redirect(url_for('dashboard'))
@@ -305,7 +321,14 @@ def dashboard():
     cur = mysql.connection.cursor()
     ultimo_movimiento = None
     alerta_sri = False
+    maquina_autorizada = True
+    hwid_actual = session.get('hwid_actual')
     
+    if hwid_actual:
+        cur.execute("SELECT * FROM maquinas_autorizadas WHERE hwid = %s", (hwid_actual,))
+        if not cur.fetchone():
+            maquina_autorizada = False
+
     if session.get('rol') == 'ADMINISTRADOR':
         cur.execute("""
             SELECT k.tipo_movimiento, k.fecha, i.nombre as insumo, k.cantidad_entrada, k.cantidad_salida 
@@ -324,7 +347,49 @@ def dashboard():
             alerta_sri = True
 
     cur.close()
-    return render_template('dashboard.html', ultimo_movimiento=ultimo_movimiento, alerta_sri=alerta_sri)
+    return render_template('dashboard.html', ultimo_movimiento=ultimo_movimiento, alerta_sri=alerta_sri, maquina_autorizada=maquina_autorizada)
+
+# --- GESTIÓN DE MÁQUINAS ---
+@app.route('/maquinas')
+@login_required
+@admin_required
+def listar_maquinas():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT m.*, s.nombre as sucursal_nombre FROM maquinas_autorizadas m LEFT JOIN sucursales s ON m.sucursal_id = s.id")
+    maquinas = cur.fetchall()
+    cur.execute("SELECT * FROM sucursales")
+    sucursales = cur.fetchall()
+    cur.close()
+    return render_template('maquinas.html', maquinas=maquinas, sucursales=sucursales)
+
+@app.route('/maquinas/autorizar', methods=['POST'])
+@login_required
+@admin_required
+def autorizar_maquina():
+    d = request.form
+    hwid, nom, s_id = d['hwid'], d['nombre_terminal'].upper(), d['sucursal_id']
+    cur = mysql.connection.cursor()
+    try:
+        cur.execute("INSERT INTO maquinas_autorizadas (hwid, nombre_terminal, sucursal_id) VALUES (%s, %s, %s)", (hwid, nom, s_id))
+        mysql.connection.commit()
+        flash(f'Máquina "{nom}" autorizada correctamente.', 'success')
+        registrar_auditoria('CONFIG', f"Autorizó nueva máquina: {nom} ({hwid})")
+    except Exception as e:
+        flash(f'Error al autorizar: {str(e)}', 'danger')
+    finally:
+        cur.close()
+    return redirect(url_for('listar_maquinas'))
+
+@app.route('/maquinas/eliminar/<int:id>')
+@login_required
+@admin_required
+def eliminar_maquina(id):
+    cur = mysql.connection.cursor()
+    cur.execute("DELETE FROM maquinas_autorizadas WHERE id = %s", (id,))
+    mysql.connection.commit(); cur.close()
+    flash('Máquina eliminada de la lista blanca.', 'info')
+    registrar_auditoria('CONFIG', f"Eliminó máquina ID: {id}")
+    return redirect(url_for('listar_maquinas'))
 
 # --- CLIENTES ---
 @app.route('/clientes')
@@ -426,30 +491,35 @@ def productos():
 def guardar_producto():
     d = request.form; img_file = request.files.get('imagen'); cur = mysql.connection.cursor(); u_id = session['user_id']
     cod, nom = d['codigo'].upper(), d['nombre'].upper(); p_base = d.get('precio_1', 0)
-    if img_file and img_file.filename:
-        ib, mt = procesar_imagen(img_file)
-        if d.get('id'): 
-            cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, imagen=%s, mimetype=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, p_base, d['categoria_id'], ib, mt, u_id, d['id']))
-            registrar_auditoria('PRODUCTO', f"Actualizó producto e imagen: {nom} ({cod})")
-            p_id = d['id']
-        else: 
-            cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, imagen, mimetype, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (cod, nom, p_base, d['categoria_id'], ib, mt, u_id, u_id))
-            p_id = cur.lastrowid
-            registrar_auditoria('PRODUCTO', f"Creó producto e imagen: {nom} ({cod})")
-    else:
-        if d.get('id'): 
-            cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, p_base, d['categoria_id'], u_id, d['id']))
-            registrar_auditoria('PRODUCTO', f"Actualizó producto: {nom} ({cod})")
-            p_id = d['id']
-        else: 
-            cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (cod, nom, p_base, d['categoria_id'], u_id, u_id))
-            p_id = cur.lastrowid
-            registrar_auditoria('PRODUCTO', f"Creó producto: {nom} ({cod})")
+    p_id = d.get('id')
     
+    # 1. Guardar o actualizar datos básicos (excepto imagen)
+    if p_id:
+        cur.execute("UPDATE productos SET codigo=%s, nombre=%s, precio=%s, categoria_id=%s, usuario_modificacion_id=%s WHERE id=%s", (cod, nom, p_base, d['categoria_id'], u_id, p_id))
+        registrar_auditoria('PRODUCTO', f"Actualizó producto: {nom} ({cod})")
+    else:
+        cur.execute("INSERT INTO productos (codigo, nombre, precio, categoria_id, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s)", (cod, nom, p_base, d['categoria_id'], u_id, u_id))
+        p_id = cur.lastrowid
+        registrar_auditoria('PRODUCTO', f"Creó producto: {nom} ({cod})")
+
+    # 2. Manejo de Imagen en Sistema de Archivos
+    if img_file and img_file.filename:
+        img = procesar_imagen(img_file)
+        if img:
+            filename = f"prod_{p_id}.jpg"
+            upload_path = os.path.join('static/uploads/productos', filename)
+            # Asegurar que el directorio existe
+            os.makedirs(os.path.dirname(upload_path), exist_ok=True)
+            img.save(upload_path, "JPEG", quality=80, optimize=True)
+            
+            # Actualizar DB con el nombre del archivo
+            cur.execute("UPDATE productos SET imagen=%s WHERE id=%s", (filename, p_id))
+
     cur.execute("SELECT id FROM plataformas"); plats = cur.fetchall()
     for plat in plats:
         f_n = f"precio_{plat['id']}"
         if f_n in d: cur.execute("INSERT INTO producto_precios (producto_id, plataforma_id, precio) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE precio=%s", (p_id, plat['id'], d[f_n], d[f_n]))
+    
     mysql.connection.commit(); cur.close(); return redirect(url_for('productos'))
 
 @app.route('/productos/receta/<int:producto_id>')
@@ -739,6 +809,18 @@ def editar_usuario():
         if "1062" in str(e): flash('Error: Esa identificación ya está siendo usada por otro usuario', 'danger')
         else: flash(str(e), 'danger')
     cur.close(); return redirect(url_for('usuarios'))
+
+@app.route('/usuarios/reset_hwid/<int:id>')
+@login_required
+@admin_required
+def reset_hwid(id):
+    cur = mysql.connection.cursor()
+    cur.execute("UPDATE usuarios SET hwid = NULL WHERE id = %s", (id,))
+    mysql.connection.commit()
+    cur.close()
+    flash('HWID reseteado correctamente. El usuario podrá loguearse en una nueva máquina.', 'success')
+    registrar_auditoria('USUARIO', f"Reseteó HWID del usuario ID: {id}")
+    return redirect(url_for('usuarios'))
 
 # --- SUCURSALES ---
 @app.route('/sucursales')
@@ -2232,8 +2314,10 @@ def ver_auditoria():
 
 @app.route('/producto/imagen/<int:id>')
 def producto_imagen(id):
-    cur = mysql.connection.cursor(); cur.execute("SELECT imagen, mimetype FROM productos WHERE id=%s", (id,)); p = cur.fetchone(); cur.close()
-    if p and p['imagen']: return Response(p['imagen'], mimetype=p['mimetype'] or 'image/jpeg')
+    cur = mysql.connection.cursor(); cur.execute("SELECT imagen FROM productos WHERE id=%s", (id,)); p = cur.fetchone(); cur.close()
+    if p and p['imagen']:
+        # Servir el archivo desde el repositorio
+        return redirect(url_for('static', filename='uploads/productos/' + p['imagen']))
     return redirect(url_for('static', filename='img/default.png'))
 
 import threading

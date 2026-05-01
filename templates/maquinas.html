@@ -1,0 +1,142 @@
+{% extends "layout.html" %}
+{% block title %}Gestión de Terminales Autorizados - {{ config_empresa.nombre_comercial }}{% endblock %}
+
+{% block container_class %}container-fluid px-4{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}" style="color: {{ config_empresa.color_tema }} !important;">
+            {{ config_empresa.nombre_comercial|upper }}
+        </a>
+        <div class="ms-auto">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm rounded-pill px-3 text-white fw-bold shadow-sm" style="background-color: {{ config_empresa.color_tema }};">
+                <i class="fas fa-home me-1"></i> INICIO
+            </a>
+        </div>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="brand-logo"><i class="fas fa-desktop me-2"></i>Terminales Autorizados (Lista Blanca)</h2>
+    <div class="d-flex gap-2">
+        {% if session.hwid_actual %}
+        <button class="btn btn-reina rounded-pill px-4 shadow-sm" 
+                data-bs-toggle="modal" 
+                data-bs-target="#modalAutorizar">
+            <i class="fas fa-plus-circle me-2"></i>Autorizar esta PC
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="alert alert-info border-0 shadow-sm rounded-4 mb-4">
+    <i class="fas fa-info-circle me-2"></i> 
+    Las máquinas en esta lista pueden ser operadas por <b>cualquier usuario</b>. Esto permite que el personal rote entre locales sin restricciones, siempre que usen una computadora autorizada de la empresa.
+</div>
+
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="tablaMaquinas">
+                <thead class="table-light">
+                    <tr class="small text-muted text-uppercase">
+                        <th>Nombre del Terminal</th>
+                        <th>Sucursal Asignada</th>
+                        <th>ID Hardware (HWID)</th>
+                        <th>Fecha Registro</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in maquinas %}
+                    <tr {% if m.hwid == session.hwid_actual %}class="table-success"{% endif %}>
+                        <td>
+                            <div class="fw-bold text-dark">
+                                <i class="fas fa-pc-tower me-2 text-primary"></i> {{ m.nombre_terminal }}
+                                {% if m.hwid == session.hwid_actual %}
+                                <span class="badge bg-success ms-2"><i class="fas fa-check-circle"></i> ESTA PC</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td><span class="badge bg-light text-dark border">{{ m.sucursal_nombre or 'GLOBAL' }}</span></td>
+                        <td><code class="small text-muted">{{ m.hwid }}</code></td>
+                        <td class="small">{{ m.fecha_registro.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="text-center">
+                            <button class="btn btn-outline-danger border-0" 
+                                    onclick="eliminarMaquina({{ m.id }}, '{{ m.nombre_terminal }}')"
+                                    title="Quitar Autorización">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Autorizar -->
+<div class="modal fade" id="modalAutorizar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4">
+            <form action="{{ url_for('autorizar_maquina') }}" method="POST">
+                <div class="modal-header text-white border-0" style="background-color: {{ config_empresa.color_tema }};">
+                    <h5 class="fw-bold mb-0">Autorizar Computadora Actual</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="small text-muted mb-4">Esta acción registrará la identidad única de esta máquina para permitir el acceso a los usuarios.</p>
+                    
+                    <div class="mb-3">
+                        <label class="extra-small fw-bold text-muted text-uppercase">ID Hardware Detectado</label>
+                        <input type="text" name="hwid" class="form-control bg-light border-0 fw-bold" value="{{ session.hwid_actual }}" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="extra-small fw-bold text-muted text-uppercase">Nombre del Terminal</label>
+                        <input type="text" name="nombre_terminal" class="form-control bg-light border-0" placeholder="Ej: CAJA 1 - LOCAL NORTE" required autofocus>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="extra-small fw-bold text-muted text-uppercase">Sucursal a la que pertenece</label>
+                        <select name="sucursal_id" class="form-select bg-light border-0" required>
+                            <option value="" disabled selected>-- SELECCIONE --</option>
+                            {% for s in sucursales %}
+                            <option value="{{ s.id }}">{{ s.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-4 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-reina rounded-pill px-4">Confirmar Autorización</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    function eliminarMaquina(id, nombre) {
+        reinaConfirm('Eliminar Autorización', `¿Está seguro de quitar la autorización a la máquina <b>${nombre}</b>?<br><br>Ningún usuario podrá entrar desde esa PC hasta que sea autorizada nuevamente.`)
+        .then(ok => {
+            if (ok) {
+                showLoading();
+                window.location.href = `/maquinas/eliminar/${id}`;
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        $('#tablaMaquinas').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" }
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}
