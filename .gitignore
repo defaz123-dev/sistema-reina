@@ -2,5 +2,10 @@ venv/
 __pycache__/
 .idea/
 *.pyc
+*.log
 backup_*.tar.gz
 backup_*.zip
+bridge/build/
+bridge/reina_bridge.dist/
+bridge/reina_bridge.onefile-build/
+bridge/dist_nuitka/
