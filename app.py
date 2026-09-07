@@ -369,6 +369,10 @@ def listar_maquinas():
 def autorizar_maquina():
     d = request.form
     hwid, nom, s_id = d['hwid'], d['nombre_terminal'].upper(), d['sucursal_id']
+    if hwid == 'ERROR_HWID':
+        flash('No se puede autorizar esta máquina porque el Bridge no pudo obtener una identificación única (HWID).', 'danger')
+        return redirect(url_for('listar_maquinas'))
+        
     cur = mysql.connection.cursor()
     try:
         cur.execute("INSERT INTO maquinas_autorizadas (hwid, nombre_terminal, sucursal_id) VALUES (%s, %s, %s)", (hwid, nom, s_id))
