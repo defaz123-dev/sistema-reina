@@ -211,7 +211,7 @@ CREATE TABLE `recetas` (
 DROP TABLE IF EXISTS `maquinas_autorizadas`;
 CREATE TABLE `maquinas_autorizadas` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `hwid` varchar(255) NOT NULL,
+  `hwid` varchar(191) NOT NULL,
   `nombre_terminal` varchar(100) NOT NULL,
   `sucursal_id` int(11) DEFAULT NULL,
   `fecha_registro` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -494,8 +494,8 @@ CREATE TABLE `promociones` (
   `nombre` varchar(100) NOT NULL,
   `tipo` enum('DESCUENTO','PRECIO_FIJO','2X1') NOT NULL,
   `valor` decimal(10,2) NOT NULL,
-  `fecha_inicio` date DEFAULT NULL,
-  `fecha_fin` date DEFAULT NULL,
+  `fecha_inicio` datetime DEFAULT NULL,
+  `fecha_fin` datetime DEFAULT NULL,
   `activo` tinyint(1) DEFAULT 1,
   `usuario_creacion_id` int(11) DEFAULT NULL,
   `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp(),
