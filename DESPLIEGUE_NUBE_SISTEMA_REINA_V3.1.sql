@@ -1,11 +1,11 @@
 -- =========================================================
--- SCRIPT ÚNICO DE DESPLIEGUE - SISTEMA REINA V3.1 (ENTERPRISE PRO PLUS)
+-- SCRIPT ÃNICO DE DESPLIEGUE - SISTEMA REINA V3.1 (ENTERPRISE PRO PLUS)
 -- Generado el: 30 de abril de 2026
 -- =========================================================
 
 SET FOREIGN_KEY_CHECKS=0;
 
--- 1. CREACIÓN DE ESTRUCTURAS --
+-- 1. CREACIÃN DE ESTRUCTURAS --
 
 DROP TABLE IF EXISTS `categorias`;
 CREATE TABLE `categorias` (
@@ -602,7 +602,7 @@ INSERT INTO `roles` (`id`, `nombre`) VALUES (2, 'CAJERO');
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (1, 'Nueva Orden', 'pos', 'fas fa-cash-register', 'OPERATIVO', 1);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (2, 'Egresos', 'listar_egresos', 'fas fa-hand-holding-usd', 'OPERATIVO', 2);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (3, 'Turno Caja', 'sesion_caja', 'fas fa-lock', 'OPERATIVO', 3);
-INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (4, 'Cierre Día', 'cierre_diario', 'fas fa-calendar-check', 'OPERATIVO', 4);
+INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (4, 'Cierre DÃ­a', 'cierre_diario', 'fas fa-calendar-check', 'OPERATIVO', 4);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (5, 'Ventas', 'historial_ventas', 'fas fa-receipt', 'OPERATIVO', 5);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (6, 'Clientes', 'clientes', 'fas fa-address-book', 'OPERATIVO', 6);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (7, 'Compras', 'compras', 'fas fa-shopping-cart', 'ABASTECIMIENTO', 7);
@@ -611,9 +611,9 @@ INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUE
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (10, 'Inventario', 'inventario', 'fas fa-boxes', 'ADMINISTRATIVO', 10);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (11, 'Producto', 'productos', 'fas fa-hamburger', 'ADMINISTRATIVO', 11);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (12, 'Sucursales', 'sucursales', 'fas fa-store', 'ADMINISTRATIVO', 12);
-INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (13, 'Categorías', 'categorias', 'fas fa-list', 'ADMINISTRATIVO', 13);
+INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (13, 'CategorÃ­as', 'categorias', 'fas fa-list', 'ADMINISTRATIVO', 13);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (14, 'Empresa', 'configuracion_empresa', 'fas fa-building', 'ADMINISTRATIVO', 14);
-INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (15, 'Auditoría', 'ver_auditoria', 'fas fa-history', 'ADMINISTRATIVO', 15);
+INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (15, 'AuditorÃ­a', 'ver_auditoria', 'fas fa-history', 'ADMINISTRATIVO', 15);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (16, 'Reportes', 'reportes', 'fas fa-chart-pie', 'ADMINISTRATIVO', 16);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (17, 'Anulaciones', 'listar_anulaciones', 'fas fa-ban', 'OPERATIVO', 17);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (18, 'Kardex', 'kardex_movimientos', 'fas fa-exchange-alt', 'ADMINISTRATIVO', 18);
@@ -621,7 +621,7 @@ INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUE
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (20, 'Tarjetas/Plat.', 'tarjetas_plataformas', 'fas fa-credit-card', 'ADMINISTRATIVO', 20);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (21, 'Abrir Caja', 'sesion_caja', 'fas fa-unlock-alt', 'OPERATIVO', 0);
 INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (22, 'Roles', 'listar_roles', 'fas fa-user-tag', 'SISTEMA', 100);
-INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (23, 'Máquinas', 'listar_maquinas', 'fas fa-desktop', 'ADMINISTRATIVO', 21);
+INSERT INTO `menus` (`id`, `nombre`, `url`, `icono`, `categoria`, `orden`) VALUES (23, 'MÃ¡quinas', 'listar_maquinas', 'fas fa-desktop', 'ADMINISTRATIVO', 21);
 
 -- Datos para rol_menus
 INSERT INTO `rol_menus` (`id`, `rol_id`, `menu_id`) VALUES (1, 1, 1);
