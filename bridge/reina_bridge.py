@@ -21,7 +21,8 @@ app = Flask(__name__)
 CORS(app) # Permitir que el Sistema Reina en la nube se conecte
 
 def get_hwid():
-    """Obtiene el número de serie de la placa base o el UUID del sistema."""
+    """Obtiene el número de serie de la placa base, UUID del sistema o Dirección MAC."""
+    import uuid
     try:
         # Intentar obtener el número de serie de la placa base
         cmd = "wmic baseboard get serialnumber"
@@ -42,10 +43,22 @@ def get_hwid():
                 if line and "UUID" not in line:
                     serial = line
                     break
-        return serial if serial else "UNKNOWN_HWID"
+                    
+        if serial and serial != "UNKNOWN_HWID":
+            return serial
     except Exception as e:
-        print(f"[ERROR] Error al obtener HWID: {e}")
-        return "ERROR_HWID"
+        print(f"[WARNING] WMIC falló o no está disponible: {e}")
+        
+    # FALLBACK SEGURO: Si WMIC falla (ej. Windows 11), usar la dirección MAC física
+    try:
+        mac = uuid.getnode()
+        if mac:
+            # Retornar la MAC en mayúsculas como HWID alternativo
+            return format(mac, 'x').upper()
+    except Exception as e:
+        print(f"[ERROR] Error fatal al obtener MAC como HWID: {e}")
+        
+    return "ERROR_HWID"
 
 @app.route('/hwid', methods=['GET'])
 def hwid_route():
