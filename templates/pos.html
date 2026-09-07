@@ -1,4 +1,4 @@
-{% extends "layout.html" %}
+﻿{% extends "layout.html" %}
 
 {% block title %}POS Profesional - Sistema Reina{% endblock %}
 
@@ -883,7 +883,7 @@ function setConsumidorFinal() {
 
 function agregarAlCarrito(p) {
     // ORIGINAL LOGIC
-
+    if (p.stock_disponible == 999) return reinaAlert('Falta Receta', 'Este producto no tiene ingredientes asociados.', 'warning');
     if (p.stock_disponible <= 0) return reinaAlert('Sin Stock', 'No hay ingredientes.', 'danger');
     
     const platId = document.getElementById('ventaPlataforma').value;
