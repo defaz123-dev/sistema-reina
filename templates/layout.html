@@ -425,7 +425,7 @@
     // --- VALIDACIÓN SRI GLOBAL (JS) ---
     function validarIdentificacionSRI(numero, tipo_id) {
         numero = numero.trim();
-        if (tipo_id == "4") return numero === "9999999999"; // Consumidor Final
+        if (tipo_id == "4") return numero === "9999999999" || numero === "9999999999999"; // Consumidor Final
         if (tipo_id == "3") return numero.length > 5; // Pasaporte (flexible)
         if (!/^\d+$/.test(numero)) return false;
 
