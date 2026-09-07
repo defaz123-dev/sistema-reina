@@ -124,9 +124,9 @@
                                 <div class="img-container">
                                     {% if p.tiene_foto %}
                                     {% if p.imagen %}
-                                        <img src="{{ url_for('static', filename='uploads/productos/' + p.imagen) }}" class="product-img" onerror="this.src='{{ url_for('static', filename='img/default.png') }}'">
+                                        <img src="{{ url_for('static', filename='uploads/productos/' + p.imagen) }}" class="product-img" onerror="this.outerHTML='<i class=\'fas fa-hamburger product-icon-placeholder\'></i>'">
                                     {% else %}
-                                        <img src="{{ url_for('static', filename='img/default.png') }}" class="product-img">
+                                        <i class="fas fa-hamburger product-icon-placeholder"></i>
                                     {% endif %}
                                     {% else %}
                                     <i class="fas fa-hamburger product-icon-placeholder"></i>
