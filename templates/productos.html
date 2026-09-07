@@ -214,6 +214,7 @@
         document.getElementById('prod_cod').value = '';
         document.getElementById('prod_nom').value = '';
         document.getElementById('prod_cat').value = '';
+        document.getElementById('prod_img').required = true;
         document.getElementById('modalProductoTitle').innerText = 'Nuevo Producto';
         
         // Limpiar todos los campos de precio por plataforma
@@ -227,6 +228,7 @@
         document.getElementById('prod_cod').value = btn.getAttribute('data-codigo');
         document.getElementById('prod_nom').value = btn.getAttribute('data-nombre');
         document.getElementById('prod_cat').value = btn.getAttribute('data-cat-id');
+        document.getElementById('prod_img').required = false;
         document.getElementById('modalProductoTitle').innerText = 'Editar Producto';
 
         // Cargar precios por plataforma desde el JSON
