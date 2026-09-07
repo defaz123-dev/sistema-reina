@@ -696,3 +696,70 @@ INSERT INTO `productos` (`id`, `codigo`, `nombre`, `precio`, `precios_json`, `ca
 
 SET FOREIGN_KEY_CHECKS=1;
 -- FIN DEL SCRIPT --
+
+
+-- TABLAS FALTANTES RECUPERADAS DE LA NUBE --
+
+CREATE TABLE IF NOT EXISTS `tipos_comprobantes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `clientes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cedula_ruc` varchar(13) COLLATE utf8mb4_general_ci NOT NULL,
+  `tipo_identificacion_id` int(11) DEFAULT NULL,
+  `tipo_documento` enum('CEDULA','RUC') COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `nombres` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `apellidos` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `direccion` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `telefono` varchar(20) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `email` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `usuario_creacion_id` int(11) DEFAULT NULL,
+  `fecha_creacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `usuario_modificacion_id` int(11) DEFAULT NULL,
+  `fecha_modificacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `cedula_ruc` (`cedula_ruc`),
+  KEY `tipo_identificacion_id` (`tipo_identificacion_id`),
+  CONSTRAINT `clientes_ibfk_1` FOREIGN KEY (`tipo_identificacion_id`) REFERENCES `tipos_identificacion` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `ajustes_inventario` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `insumo_id` int(11) DEFAULT NULL,
+  `cantidad` decimal(10,2) DEFAULT NULL,
+  `tipo` enum('INGRESO','EGRESO') COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `motivo` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `usuario_id` int(11) DEFAULT NULL,
+  `fecha` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `usuario_creacion_id` int(11) DEFAULT NULL,
+  `fecha_creacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `usuario_modificacion_id` int(11) DEFAULT NULL,
+  `fecha_modificacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `insumo_id` (`insumo_id`),
+  KEY `usuario_id` (`usuario_id`),
+  CONSTRAINT `ajustes_inventario_ibfk_1` FOREIGN KEY (`insumo_id`) REFERENCES `insumos` (`id`),
+  CONSTRAINT `ajustes_inventario_ibfk_2` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `proveedores` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `ruc` varchar(13) COLLATE utf8mb4_general_ci NOT NULL,
+  `razon_social` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `nombre_comercial` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `direccion` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `telefono` varchar(20) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `email` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `tipo_comprobante_id` int(11) DEFAULT NULL,
+  `usuario_creacion_id` int(11) DEFAULT NULL,
+  `fecha_creacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `usuario_modificacion_id` int(11) DEFAULT NULL,
+  `fecha_modificacion` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ruc` (`ruc`),
+  KEY `tipo_comprobante_id` (`tipo_comprobante_id`),
+  CONSTRAINT `proveedores_ibfk_1` FOREIGN KEY (`tipo_comprobante_id`) REFERENCES `tipos_comprobantes` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
