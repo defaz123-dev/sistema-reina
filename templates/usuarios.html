@@ -101,7 +101,7 @@
                     
                     <div class="mb-3">
                         <label class="extra-small fw-bold text-muted text-uppercase">Tipo de Identificación</label>
-                        <select name="tipo_identificacion_id" id="user_tipo_id" class="form-select form-select-sm bg-light border-0" required>
+                        <select name="tipo_identificacion_id" id="user_tipo_id" class="form-select form-select-sm bg-light border-0" required onchange="validarCedulaUsuarioRealTime()">
                             <option value="" disabled selected>-- SELECCIONE --</option>
                             {% for t in tipos_id %}
                             <option value="{{ t.id }}">{{ t.nombre }}</option>

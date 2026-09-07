@@ -420,7 +420,7 @@
             <div class="modal-body p-4">
                 <div class="mb-3">
                     <label class="small fw-bold text-muted">Tipo de Identificación</label>
-                    <select id="new_tipo_id" class="form-select bg-light border-0" required>
+                    <select id="new_tipo_id" class="form-select bg-light border-0" required onchange="validarCedulaEnTiempoReal()">
                         <option value="" disabled selected>-- SELECCIONE TIPO --</option>
                         {% for t in tipos_id %}
                         <option value="{{ t.id }}">{{ t.nombre }}</option>
