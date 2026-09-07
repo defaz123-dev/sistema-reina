@@ -1,4 +1,4 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
 
 {% block title %}POS Profesional - Sistema Reina{% endblock %}
 
@@ -123,7 +123,11 @@
                                 
                                 <div class="img-container">
                                     {% if p.tiene_foto %}
-                                    <img src="{{ url_for('producto_imagen', id=p.id) }}" class="product-img">
+                                    {% if p.imagen %}
+                                        <img src="{{ url_for('static', filename='uploads/productos/' + p.imagen) }}" class="product-img" onerror="this.src='{{ url_for('static', filename='img/default.png') }}'">
+                                    {% else %}
+                                        <img src="{{ url_for('static', filename='img/default.png') }}" class="product-img">
+                                    {% endif %}
                                     {% else %}
                                     <i class="fas fa-hamburger product-icon-placeholder"></i>
                                     {% endif %}

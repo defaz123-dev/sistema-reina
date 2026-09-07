@@ -1681,7 +1681,7 @@ def pos():
         cur.execute("SELECT plataforma_id, valor_especifico FROM promocion_plataformas WHERE promocion_id = %s", (p['id'],))
         p['plataformas_json'] = {str(r['plataforma_id']): float(r['valor_especifico']) if r['valor_especifico'] else float(p['valor']) for r in cur.fetchall()}
 
-    query_prods = """SELECT p.id, p.codigo, p.nombre, p.precio, p.categoria_id, IF(p.imagen IS NOT NULL, 1, 0) as tiene_foto,
+    query_prods = """SELECT p.id, p.codigo, p.nombre, p.precio, p.categoria_id, p.imagen, IF(p.imagen IS NOT NULL, 1, 0) as tiene_foto,
                (SELECT MIN(FLOOR(i.stock_actual / r.cantidad_requerida)) FROM recetas r JOIN insumos i ON r.insumo_id = i.id WHERE r.producto_id = p.id AND i.sucursal_id = %s) as stock_disponible
                FROM productos p"""
     cur.execute(query_prods, (session['sucursal_id'],))

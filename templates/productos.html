@@ -54,10 +54,17 @@
                     {% for p in productos %}
                     <tr>
                         <td>
-                            <img src="{{ url_for('producto_imagen', id=p.id) }}" 
-                                 class="rounded-3 shadow-sm" 
-                                 style="width: 50px; height: 50px; object-fit: cover;"
-                                 onerror="this.src='{{ url_for('static', filename='img/default.png') }}'">
+                            {% if p.imagen %}
+                                <img src="{{ url_for('static', filename='uploads/productos/' + p.imagen) }}" 
+                                     class="rounded-3 shadow-sm" 
+                                     style="width: 50px; height: 50px; object-fit: cover;" 
+                                     alt="Imagen Producto"
+                                     onerror="this.src='{{ url_for('static', filename='img/default.png') }}'">
+                            {% else %}
+                                <div class="rounded-3 shadow-sm bg-light d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                    <i class="fas fa-image text-muted" style="opacity: 0.2;"></i>
+                                </div>
+                            {% endif %}
                         </td>
                         <td class="fw-bold">{{ p.codigo }}</td>
                         <td>{{ p.nombre }}</td>
