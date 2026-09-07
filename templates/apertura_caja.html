@@ -119,12 +119,18 @@ function calcularTotalApertura() {
 }
 
 // Prevenir el envío si el total es 0 (opcional, dependiendo de si permites abrir con 0)
-document.getElementById('formApertura').onsubmit = function(e) {
+document.getElementById('formApertura').onsubmit = async function(e) {
     const total = parseFloat(document.getElementById('labelTotalApertura').textContent.replace('$ ', ''));
     if(total === 0) {
-        // Podrías pedir confirmación si abren con $0
-        return confirm('¿Está seguro de que desea abrir la caja con $0.00?');
+        e.preventDefault(); // Detenemos el envío normal
+        const confirmado = await reinaConfirm('Atención', '¿Está seguro de que desea abrir la caja con $0.00?');
+        if (confirmado) {
+            showLoading(); // Mostramos animación de carga
+            HTMLFormElement.prototype.submit.call(this); // Enviamos el formulario real
+        }
+        return false;
     }
+    showLoading();
     return true;
 };
 </script>
