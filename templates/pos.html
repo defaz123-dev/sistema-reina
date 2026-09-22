@@ -581,22 +581,10 @@ function cleanupModals() {
 }
 
 function validarIdEcuador(numero, tipo) {
-    if (tipo == "4" || tipo == "3") return true; 
-    if (!/^\d+$/.test(numero)) return false;
-    if (tipo == "1" && numero.length !== 10) return false;
-    if (tipo == "2" && numero.length !== 13) return false;
-    const cedula = numero.substring(0, 10);
-    const provincia = parseInt(cedula.substring(0, 2));
-    if (provincia < 1 || provincia > 24) return false;
-    if (parseInt(cedula[2]) >= 6) return true;
-    let suma = 0;
-    for (let i = 0; i < 9; i++) {
-        let res = parseInt(cedula[i]) * ((i % 2 === 0) ? 2 : 1);
-        suma += (res > 9) ? res - 9 : res;
+    if (typeof validarIdentificacionSRI === 'function') {
+        return validarIdentificacionSRI(numero, tipo);
     }
-    let val = 10 - (suma % 10);
-    if (val === 10) val = 0;
-    return val === parseInt(cedula[9]);
+    return true;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -773,6 +761,7 @@ function buscarCliente() {
                 document.getElementById('new_cedula').value = term;
                 document.getElementById('new_tipo_id').value = (term.length === 13) ? "2" : "1";
                 modalClienteInstance.show();
+                validarCedulaEnTiempoReal();
             }
         });
     } else {
@@ -833,8 +822,21 @@ function validarCedulaEnTiempoReal() {
         return;
     }
 
+    if (!tipo) {
+        errorDiv.textContent = 'Seleccione primero el tipo de identificación.';
+        errorDiv.style.display = 'block';
+        input.classList.remove('is-valid');
+        input.classList.add('is-invalid');
+        return;
+    }
+
     const esValido = validarIdEcuador(numero, tipo);
     if (!esValido) {
+        if ((tipo == "1" && numero.length < 10) || (tipo == "2" && numero.length < 13)) {
+            errorDiv.textContent = (tipo == "1") ? 'La cédula debe tener 10 dígitos.' : 'El RUC debe tener 13 dígitos.';
+        } else {
+            errorDiv.textContent = 'Identificación no válida según las reglas del SRI.';
+        }
         errorDiv.style.display = 'block';
         input.classList.add('is-invalid');
         input.classList.remove('is-valid');
@@ -850,32 +852,54 @@ async function guardarClienteRapido() {
     const doc = document.getElementById('new_cedula').value.trim();
     const nom = document.getElementById('new_nombres').value.trim().toUpperCase();
     const ape = document.getElementById('new_apellidos').value.trim().toUpperCase();
-    if (!doc || !nom || !ape) return reinaAlert('Aviso', 'Faltan datos', 'warning');
-    if (!validarIdEcuador(doc, tipo)) return reinaAlert('Error', 'Identificación no válida', 'danger');
+    if (!tipo) return reinaAlert('Aviso', 'Seleccione el tipo de identificación', 'warning');
+    if (!doc || !nom || !ape) return reinaAlert('Aviso', 'Faltan datos obligatorios (documento, nombres, apellidos)', 'warning');
+    if (!validarIdEcuador(doc, tipo)) return reinaAlert('Error', 'La identificación no es válida para el tipo seleccionado (SRI).', 'danger');
     
     showLoading();
-    const res = await fetch('/clientes/guardar_json', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            cedula_ruc: doc, tipo_identificacion_id: tipo, nombres: nom, apellidos: ape,
-            direccion: document.getElementById('new_direccion').value.toUpperCase(),
-            telefono: document.getElementById('new_telefono').value,
-            email: document.getElementById('new_email').value.toUpperCase()
-        })
-    });
-    const data = await res.json();
-    hideLoading();
+    try {
+        const res = await fetch('/clientes/guardar_json', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                cedula_ruc: doc, tipo_identificacion_id: tipo, nombres: nom, apellidos: ape,
+                direccion: document.getElementById('new_direccion').value.toUpperCase(),
+                telefono: document.getElementById('new_telefono').value,
+                email: document.getElementById('new_email').value.toUpperCase()
+            })
+        });
 
-    if(data.success) {
-        document.getElementById('clienteId').value = data.id;
-        document.getElementById('clienteNombre').textContent = `${nom} ${ape}`;
-        document.getElementById('clienteCedula').value = doc;
-        modalClienteInstance.hide();
-        cleanupModals();
-        setTimeout(() => { reinaAlert('¡Éxito!', `Cliente registrado y seleccionado.`); }, 300);
-    } else {
-        reinaAlert('Error', data.message || 'No se pudo guardar el cliente', 'danger');
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            hideLoading();
+            if (res.status === 401 || res.redirected) {
+                return reinaAlert('Sesión Expirada', 'Su sesión ha caducado. Por favor recargue la página e inicie sesión.', 'warning');
+            }
+            return reinaAlert('Error', `Error del servidor (${res.status}).`, 'danger');
+        }
+
+        const data = await res.json();
+        hideLoading();
+
+        if (data.success) {
+            document.getElementById('clienteId').value = data.id;
+            document.getElementById('clienteNombre').textContent = `${nom} ${ape}`;
+            document.getElementById('clienteCedula').value = doc;
+            modalClienteInstance.hide();
+            cleanupModals();
+            setTimeout(() => { reinaAlert('¡Éxito!', `Cliente registrado y seleccionado.`); }, 300);
+        } else if (data.cliente_existente && data.cliente) {
+            // El cliente ya existía en la base de datos: NO se sobrescriben sus datos, se selecciona directamente
+            seleccionarCliente(data.cliente);
+            modalClienteInstance.hide();
+            cleanupModals();
+            reinaAlert('Cliente Ya Registrado', data.message, 'info');
+        } else {
+            reinaAlert('Error', data.message || 'No se pudo guardar el cliente', 'danger');
+        }
+    } catch (err) {
+        hideLoading();
+        reinaAlert('Error', 'Fallo de comunicación: ' + err.message, 'danger');
     }
 }
 
@@ -1150,6 +1174,16 @@ async function confirmarOrden() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
         });
+        
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            hideLoading();
+            if (res.status === 401 || res.redirected) {
+                return reinaAlert('Sesión Expirada', 'Su sesión ha caducado. Por favor recargue la página e inicie sesión nuevamente.', 'warning');
+            }
+            return reinaAlert('Error del Servidor', `El servidor devolvió un error inesperado (Código ${res.status}). Intente nuevamente.`, 'danger');
+        }
+
         const data = await res.json();
         
         if (data.success) {

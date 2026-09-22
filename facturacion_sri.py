@@ -144,10 +144,17 @@ def procesar_factura_electronica(venta_id, mysql):
                    t.codigo_sri as tipo_id_sri
             FROM ventas v 
             JOIN clientes c ON v.cliente_id = c.id
-            JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id
+            LEFT JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id
             WHERE v.id = %s
         """, (venta_id,))
         venta = cur.fetchone()
+        if not venta: raise Exception(f"Venta ID {venta_id} no encontrada.")
+        
+        if not venta.get('tipo_id_sri'):
+            doc = str(venta['cedula_ruc']).strip()
+            if doc in ['9999999999', '9999999999999']: venta['tipo_id_sri'] = '07'
+            elif len(doc) == 13: venta['tipo_id_sri'] = '04'
+            else: venta['tipo_id_sri'] = '05'
         
         cur.execute("SELECT * FROM empresa LIMIT 1")
         empresa = cur.fetchone()
@@ -369,11 +376,16 @@ def anular_factura_sri(venta_id, motivo, mysql, usuario_id):
                    t.codigo_sri as tipo_id_sri
             FROM ventas v 
             JOIN clientes c ON v.cliente_id = c.id
-            JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id
+            LEFT JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id
             WHERE v.id = %s
         """, (venta_id,))
         venta = cur.fetchone()
         if not venta: raise Exception("Factura no encontrada.")
+        if not venta.get('tipo_id_sri'):
+            doc = str(venta['cedula_ruc']).strip()
+            if doc in ['9999999999', '9999999999999']: venta['tipo_id_sri'] = '07'
+            elif len(doc) == 13: venta['tipo_id_sri'] = '04'
+            else: venta['tipo_id_sri'] = '05'
         if not venta['autorizado_sri']: raise Exception("Solo se pueden anular facturas autorizadas.")
         
         cur.execute("SELECT * FROM empresa LIMIT 1")

@@ -75,7 +75,8 @@ def registrar_auditoria(accion, detalle):
     except: pass
 
 def identificar_tipo_doc(doc):
-    if doc == "9999999999": return 4
+    doc = str(doc).strip()
+    if doc in ["9999999999", "9999999999999"]: return 4
     return 2 if len(doc) == 13 else 1
 
 def validar_ruc_sri(identificacion, tipo_id=None):
@@ -93,10 +94,14 @@ def validar_ruc_sri(identificacion, tipo_id=None):
         tipo_id = int(tipo_id)
         if tipo_id == 1 and l != 10: return False # Cédula debe ser 10
         if tipo_id == 2 and l != 13: return False # RUC debe ser 13
-        if tipo_id == 4: return identificacion == "9999999999" # Consumidor Final
+        if tipo_id == 4: return identificacion in ["9999999999", "9999999999999"] # Consumidor Final
         if tipo_id == 3: return True # Pasaporte no tiene regla fija numérica estricta aquí
     
     if l not in [10, 13]: return False
+
+    # Consumidor final válido
+    if identificacion in ["9999999999", "9999999999999"]:
+        return True
 
     # Los dos primeros dígitos corresponden a la provincia (01 a 24) o 30
     prov = int(identificacion[0:2])
@@ -129,6 +134,7 @@ def validar_ruc_sri(identificacion, tipo_id=None):
         if resultado != verificador: return False
     elif tercer_digito == 9:
         # Sociedades Privadas / Extranjeros (Módulo 11)
+        if l == 10: return False # RUC sociedad privada siempre es 13
         coeficientes = [4, 3, 2, 7, 6, 5, 4, 3, 2]
         verificador = int(identificacion[9])
         suma = 0
@@ -140,9 +146,13 @@ def validar_ruc_sri(identificacion, tipo_id=None):
     else:
         return False
 
-    # Si es RUC (13 dígitos), los últimos 3 deben ser 001
-    if l == 13 and identificacion[10:13] != "001":
-        return False
+    # Si es RUC (13 dígitos), los últimos 3 dígitos corresponden al establecimiento (>= 001)
+    if l == 13:
+        try:
+            estab = int(identificacion[10:13])
+            if estab < 1: return False
+        except:
+            return False
 
     return True
 
@@ -150,7 +160,10 @@ def validar_ruc_sri(identificacion, tipo_id=None):
 def login_required(f):
     @wraps(f)
     def dec(*args, **kwargs):
-        if 'user_id' not in session: return redirect(url_for('index'))
+        if 'user_id' not in session:
+            if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', '') or request.path.startswith('/pos/venta') or request.path.endswith('_json'):
+                return jsonify({'success': False, 'message': 'Su sesión ha expirado o no ha iniciado sesión. Por favor recargue la página para ingresar.', 'session_expired': True}), 401
+            return redirect(url_for('index'))
         return f(*args, **kwargs)
     return dec
 
@@ -158,6 +171,8 @@ def admin_required(f):
     @wraps(f)
     def dec(*args, **kwargs):
         if session.get('rol') != 'ADMINISTRADOR':
+            if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                return jsonify({'success': False, 'message': 'Acceso denegado. Se requieren permisos de administrador.'}), 403
             flash('Acceso denegado', 'danger'); return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return dec
@@ -249,11 +264,53 @@ def listar_roles():
 @login_required
 @admin_required
 def guardar_rol():
-    d = request.form; cur = mysql.connection.cursor()
-    nom = d['nombre'].upper().strip()
-    if d.get('id'): cur.execute("UPDATE roles SET nombre=%s WHERE id=%s", (nom, d['id']))
-    else: cur.execute("INSERT INTO roles (nombre) VALUES (%s)", (nom,))
-    mysql.connection.commit(); cur.close(); flash('Rol guardado', 'success')
+    cur = None
+    try:
+        d = request.form
+        nom = d.get('nombre', '').upper().strip()
+        rol_id = d.get('id', '').strip()
+        
+        if not nom:
+            flash('El nombre del rol es obligatorio.', 'warning')
+            return redirect(url_for('listar_roles'))
+            
+        if len(nom) > 20:
+            flash('El nombre del rol no puede superar los 20 caracteres.', 'warning')
+            return redirect(url_for('listar_roles'))
+            
+        cur = mysql.connection.cursor()
+        
+        # Validar si ya existe otro rol con ese nombre
+        if rol_id:
+            cur.execute("SELECT id FROM roles WHERE nombre = %s AND id != %s", (nom, rol_id))
+        else:
+            cur.execute("SELECT id FROM roles WHERE nombre = %s", (nom,))
+            
+        if cur.fetchone():
+            flash(f'El rol "{nom}" ya existe. Ingrese un nombre diferente.', 'danger')
+            return redirect(url_for('listar_roles'))
+
+        if rol_id:
+            cur.execute("UPDATE roles SET nombre=%s WHERE id=%s", (nom, rol_id))
+            registrar_auditoria('ROLES', f"Actualizó rol ID: {rol_id} a {nom}")
+        else:
+            cur.execute("INSERT INTO roles (nombre) VALUES (%s)", (nom,))
+            registrar_auditoria('ROLES', f"Creó nuevo rol: {nom}")
+            
+        mysql.connection.commit()
+        flash('Rol guardado exitosamente.', 'success')
+    except Exception as e:
+        if mysql.connection:
+            try: mysql.connection.rollback()
+            except: pass
+        if "1062" in str(e):
+            flash(f'Error: Ya existe un rol con ese nombre.', 'danger')
+        else:
+            flash(f'Error al guardar el rol: {str(e)}', 'danger')
+    finally:
+        if cur:
+            try: cur.close()
+            except: pass
     return redirect(url_for('listar_roles'))
 
 @app.route('/roles/permisos/<int:rol_id>')
@@ -287,13 +344,36 @@ def guardar_permisos():
 @login_required
 @admin_required
 def guardar_menu():
-    d = request.form; cur = mysql.connection.cursor()
-    nom, url, ico, cat, ord = d['nombre'], d['url'], d['icono'], d['categoria'].upper(), d.get('orden', 0)
-    if d.get('id'):
-        cur.execute("UPDATE menus SET nombre=%s, url=%s, icono=%s, categoria=%s, orden=%s WHERE id=%s", (nom, url, ico, cat, ord, d['id']))
-    else:
-        cur.execute("INSERT INTO menus (nombre, url, icono, categoria, orden) VALUES (%s, %s, %s, %s, %s)", (nom, url, ico, cat, ord))
-    mysql.connection.commit(); cur.close(); flash('Menú guardado correctamente', 'success')
+    cur = None
+    try:
+        d = request.form
+        nom = d.get('nombre', '').strip()
+        url = d.get('url', '').strip()
+        ico = d.get('icono', 'fa-circle').strip()
+        cat = d.get('categoria', 'OPERATIVO').upper().strip()
+        ord = int(d.get('orden', 0) or 0)
+        menu_id = d.get('id', '').strip()
+        
+        if not nom or not url:
+            flash('Nombre y URL del menú son obligatorios.', 'warning')
+            return redirect(url_for('listar_roles'))
+            
+        cur = mysql.connection.cursor()
+        if menu_id:
+            cur.execute("UPDATE menus SET nombre=%s, url=%s, icono=%s, categoria=%s, orden=%s WHERE id=%s", (nom, url, ico, cat, ord, menu_id))
+        else:
+            cur.execute("INSERT INTO menus (nombre, url, icono, categoria, orden) VALUES (%s, %s, %s, %s, %s)", (nom, url, ico, cat, ord))
+        mysql.connection.commit()
+        flash('Menú guardado correctamente', 'success')
+    except Exception as e:
+        if mysql.connection:
+            try: mysql.connection.rollback()
+            except: pass
+        flash(f'Error al guardar menú: {str(e)}', 'danger')
+    finally:
+        if cur:
+            try: cur.close()
+            except: pass
     return redirect(url_for('listar_roles'))
 
 @app.route('/menus/eliminar/<int:id>')
@@ -400,14 +480,27 @@ def eliminar_maquina(id):
 @app.route('/clientes')
 @login_required
 def clientes():
-    cur = mysql.connection.cursor(); cur.execute("SELECT c.*, t.nombre as tipo_id_nombre FROM clientes c JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id")
-    c = cur.fetchall(); cur.execute("SELECT * FROM tipos_identificacion"); t = cur.fetchall(); cur.close()
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT c.*, t.nombre as tipo_id_nombre FROM clientes c LEFT JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id ORDER BY c.id DESC")
+    c = cur.fetchall()
+    cur.execute("SELECT * FROM tipos_identificacion")
+    t = cur.fetchall()
+    cur.close()
     return render_template('clientes.html', clientes=c, tipos_id=t)
 
 @app.route('/clientes/buscar/<string:cedula>')
 @login_required
 def buscar_cliente(cedula):
-    cur = mysql.connection.cursor(); cur.execute("SELECT c.*, t.nombre as tipo_id_nombre FROM clientes c JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id WHERE c.cedula_ruc=%s", (cedula,))
+    cedula = cedula.strip()
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        SELECT c.*, t.nombre as tipo_id_nombre 
+        FROM clientes c 
+        LEFT JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id 
+        WHERE c.cedula_ruc = %s 
+           OR (c.id = 1 AND %s IN ('9999999999', '9999999999999') AND c.cedula_ruc IN ('9999999999', '9999999999999'))
+        LIMIT 1
+    """, (cedula, cedula))
     c = cur.fetchone(); cur.close()
     return jsonify({'success': True, 'cliente': c}) if c else jsonify({'success': False, 'tipo_identificado_id': identificar_tipo_doc(cedula)})
 
@@ -420,7 +513,7 @@ def buscar_cliente_nombre(nombre):
     cur.execute("""
         SELECT c.*, t.nombre as tipo_id_nombre 
         FROM clientes c 
-        JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id 
+        LEFT JOIN tipos_identificacion t ON c.tipo_identificacion_id = t.id 
         WHERE CONCAT(c.nombres, ' ', c.apellidos) LIKE %s 
            OR CONCAT(c.apellidos, ' ', c.nombres) LIKE %s 
            OR c.cedula_ruc LIKE %s 
@@ -432,50 +525,123 @@ def buscar_cliente_nombre(nombre):
 @app.route('/clientes/guardar', methods=['POST'])
 @login_required
 def guardar_cliente():
-    d = request.form; cur = mysql.connection.cursor(); u_id = session['user_id']
-    ruc_ced = d['cedula_ruc'].strip()
-
-    # VALIDACIÓN SRI (Excepto Consumidor Final)
-    if ruc_ced != "9999999999" and not validar_ruc_sri(ruc_ced):
-        flash('La identificación ingresada no es válida según el algoritmo del SRI', 'danger')
-        return redirect(url_for('clientes'))
-
-    t_id = d.get('tipo_identificacion_id') or identificar_tipo_doc(ruc_ced)
-    nom, ape, dir = d['nombres'].upper(), d['apellidos'].upper(), d['direccion'].upper()
+    cur = None
     try:
-        if d.get('id'): 
-            cur.execute("UPDATE clientes SET cedula_ruc=%s, tipo_identificacion_id=%s, nombres=%s, apellidos=%s, direccion=%s, telefono=%s, email=%s, usuario_modificacion_id=%s WHERE id=%s", (ruc_ced, t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, d['id']))
+        d = request.form
+        u_id = session.get('user_id')
+        ruc_ced = d.get('cedula_ruc', '').strip()
+        t_id = d.get('tipo_identificacion_id') or identificar_tipo_doc(ruc_ced)
+        nom = d.get('nombres', '').upper().strip()
+        ape = d.get('apellidos', '').upper().strip()
+        dir = d.get('direccion', '').upper().strip()
+        tel = d.get('telefono', '').strip()
+        eml = d.get('email', '').upper().strip()
+        cli_id = d.get('id', '').strip()
+
+        if not ruc_ced or not nom or not ape:
+            flash('Identificación, nombres y apellidos son obligatorios.', 'warning')
+            return redirect(url_for('clientes'))
+
+        # VALIDACIÓN SRI (Excepto Consumidor Final)
+        if ruc_ced not in ["9999999999", "9999999999999"] and not validar_ruc_sri(ruc_ced, t_id):
+            flash('La identificación ingresada no es válida según el algoritmo del SRI para el tipo seleccionado.', 'danger')
+            return redirect(url_for('clientes'))
+
+        cur = mysql.connection.cursor()
+
+        # VALIDACIÓN DE DUPLICADOS: No permitir la misma cédula o RUC a otro cliente
+        if cli_id:
+            cur.execute("SELECT id, nombres, apellidos FROM clientes WHERE cedula_ruc=%s AND id != %s", (ruc_ced, cli_id))
+        else:
+            cur.execute("SELECT id, nombres, apellidos FROM clientes WHERE cedula_ruc=%s", (ruc_ced,))
+            
+        existente = cur.fetchone()
+        if existente:
+            flash(f'No se puede guardar: La cédula/RUC {ruc_ced} ya está registrada para el cliente {existente["nombres"]} {existente["apellidos"]}.', 'danger')
+            return redirect(url_for('clientes'))
+
+        if cli_id:
+            cur.execute("UPDATE clientes SET cedula_ruc=%s, tipo_identificacion_id=%s, nombres=%s, apellidos=%s, direccion=%s, telefono=%s, email=%s, usuario_modificacion_id=%s WHERE id=%s", 
+                        (ruc_ced, t_id, nom, ape, dir, tel, eml, u_id, cli_id))
             registrar_auditoria('CLIENTE', f"Actualizó cliente: {nom} {ape} ({ruc_ced})")
-        else: 
-            cur.execute("INSERT INTO clientes (cedula_ruc, tipo_identificacion_id, nombres, apellidos, direccion, telefono, email, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (ruc_ced, t_id, nom, ape, dir, d['telefono'], d['email'].upper(), u_id, u_id))
+        else:
+            cur.execute("INSERT INTO clientes (cedula_ruc, tipo_identificacion_id, nombres, apellidos, direccion, telefono, email, usuario_creacion_id, usuario_modificacion_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", 
+                        (ruc_ced, t_id, nom, ape, dir, tel, eml, u_id, u_id))
             registrar_auditoria('CLIENTE', f"Creó nuevo cliente: {nom} {ape} ({ruc_ced})")
-        mysql.connection.commit(); cur.close(); flash('Cliente guardado', 'success')
+        
+        mysql.connection.commit()
+        flash('Cliente guardado exitosamente.', 'success')
     except Exception as e:
-        if "1062" in str(e): flash('Error: Ya existe un cliente con esa identificación', 'danger')
-        else: flash(f'Error al guardar: {str(e)}', 'danger')
-        cur.close()
+        if mysql.connection:
+            try: mysql.connection.rollback()
+            except: pass
+        if "1062" in str(e):
+            flash('Error: Ya existe un cliente con esa identificación.', 'danger')
+        else:
+            flash(f'Error al guardar cliente: {str(e)}', 'danger')
+    finally:
+        if cur:
+            try: cur.close()
+            except: pass
     return redirect(url_for('clientes'))
 
 @app.route('/clientes/guardar_json', methods=['POST'])
 @login_required
 def guardar_cliente_json():
-    data = request.get_json(); cur = mysql.connection.cursor(); u_id = session['user_id']
+    cur = None
     try:
-        ruc_ced = data['cedula_ruc'].strip()
-        # VALIDACIÓN SRI (Excepto Consumidor Final)
-        if ruc_ced != "9999999999" and not validar_ruc_sri(ruc_ced):
-            return jsonify({'success': False, 'message': 'La identificación no es válida (Algoritmo SRI)'})
-
-        nom, ape, dir = data['nombres'].upper(), data['apellidos'].upper(), data.get('direccion','').upper()
-        tel, eml = data.get('telefono','').upper(), data.get('email','').upper()
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Datos incompletos.'})
+        u_id = session.get('user_id')
+        ruc_ced = data.get('cedula_ruc', '').strip()
         t_id = data.get('tipo_identificacion_id') or identificar_tipo_doc(ruc_ced)
+
+        # VALIDACIÓN SRI (Excepto Consumidor Final)
+        if ruc_ced not in ["9999999999", "9999999999999"] and not validar_ruc_sri(ruc_ced, t_id):
+            return jsonify({'success': False, 'message': 'La identificación no es válida para el tipo seleccionado (Algoritmo SRI).'})
+
+        nom = data.get('nombres', '').upper().strip()
+        ape = data.get('apellidos', '').upper().strip()
+        dir = data.get('direccion','').upper().strip()
+        tel = data.get('telefono','').strip()
+        eml = data.get('email','').upper().strip()
+
+        if not ruc_ced or not nom or not ape:
+            return jsonify({'success': False, 'message': 'Identificación, nombres y apellidos son requeridos.'})
+
+        cur = mysql.connection.cursor()
+        
+        # VALIDACIÓN DE CLIENTE EXISTENTE: Al facturar o registrar pedidos NO se debe actualizar ni sobrescribir
+        cur.execute("SELECT id, nombres, apellidos, cedula_ruc FROM clientes WHERE cedula_ruc=%s", (ruc_ced,))
+        existente = cur.fetchone()
+        if existente:
+            # El cliente ya existe. No se modifica la información en BD.
+            return jsonify({
+                'success': False,
+                'cliente_existente': True,
+                'cliente': existente,
+                'id': existente['id'],
+                'message': f'La identificación {ruc_ced} ya pertenece a {existente["nombres"]} {existente["apellidos"]}. No se permite modificar sus datos desde el pedido.'
+            })
+
+        # Si no existe, insertar nuevo cliente
         cur.execute("""INSERT INTO clientes (cedula_ruc, tipo_identificacion_id, nombres, apellidos, direccion, telefono, email, usuario_creacion_id, usuario_modificacion_id) 
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE nombres=%s, apellidos=%s, direccion=%s, email=%s""", 
-                    (ruc_ced, t_id, nom, ape, dir, tel, eml, u_id, u_id, nom, ape, dir, eml))
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
+                    (ruc_ced, t_id, nom, ape, dir, tel, eml, u_id, u_id))
+        mysql.connection.commit()
+        c_id = cur.lastrowid
         registrar_auditoria('CLIENTE', f"Registro rápido de cliente: {nom} {ape} ({ruc_ced})")
-        mysql.connection.commit(); cur.execute("SELECT id FROM clientes WHERE cedula_ruc=%s", (ruc_ced,)); c_id = cur.fetchone()['id']; cur.close()
         return jsonify({'success': True, 'id': c_id})
-    except Exception as e: return jsonify({'success': False, 'message': str(e)})
+    except Exception as e:
+        if mysql.connection:
+            try: mysql.connection.rollback()
+            except: pass
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        if cur:
+            try: cur.close()
+            except: pass
 
 # --- PRODUCTOS ---
 @app.route('/productos')
@@ -1709,9 +1875,19 @@ def pos():
 @app.route('/pos/venta', methods=['POST'])
 @login_required
 def procesar_venta_v2():
-    data = request.get_json(); cur = mysql.connection.cursor(); u_id = session['user_id']
+    cur = None
     try:
-        c_id, s_id, plat_id = data.get('cliente_id'), session['sucursal_id'], data.get('plataforma_id')
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Datos de venta no recibidos o formato inválido.'})
+            
+        u_id = session.get('user_id')
+        s_id = session.get('sucursal_id')
+        if not u_id or not s_id:
+            return jsonify({'success': False, 'message': 'Sesión inválida o sucursal no asignada. Por favor recargue la página.'})
+
+        cur = mysql.connection.cursor()
+        c_id, plat_id = data.get('cliente_id'), data.get('plataforma_id')
         total_venta = float(data.get('total', 0))
         pagos = data.get('pagos', []) # lista de dicts: [{'metodo': 'EFECTIVO', 'monto': 10.00, 'id_tarjeta': None, 'referencia': ''}, ...]
 
@@ -1818,14 +1994,24 @@ def procesar_venta_v2():
         
         mysql.connection.commit(); registrar_auditoria('VENTA', f"Venta ID: {v_id} registrada con pagos mixtos. Total: {total_venta}")
 
-        import facturacion_sri
-        autorizada = facturacion_sri.procesar_factura_electronica(v_id, mysql)
-        if autorizada:
-            enviar_comprobante_email(v_id)
+        try:
+            import facturacion_sri
+            autorizada = facturacion_sri.procesar_factura_electronica(v_id, mysql)
+            if autorizada:
+                enviar_comprobante_email(v_id)
+        except Exception as e_sri:
+            print(f"[SRI LOG] Novedad en emisión inmediata venta #{v_id}: {e_sri}")
         
         return jsonify({'success': True, 'venta_id': v_id, 'cambio': cambio_total})
-    except Exception as e: mysql.connection.rollback(); return jsonify({'success': False, 'message': str(e)})
-    finally: cur.close()
+    except Exception as e:
+        if mysql.connection:
+            try: mysql.connection.rollback()
+            except: pass
+        return jsonify({'success': False, 'message': f'No se pudo procesar la venta: {str(e)}'})
+    finally:
+        if cur:
+            try: cur.close()
+            except: pass
 
 # --- VENTAS ---
 @app.route('/ventas')
