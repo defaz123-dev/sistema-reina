@@ -189,6 +189,27 @@ def inject_empresa():
         return dict(config_empresa=e, cat_tarjetas=tarjetas) if e else dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938', 'icono_espera': 'fa-crown'}, cat_tarjetas=tarjetas)
     except: return dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938', 'icono_espera': 'fa-crown'}, cat_tarjetas=[])
 
+# --- MANEJADORES GLOBALES DE ERROR ---
+@app.errorhandler(500)
+def error_500_handler(e):
+    print(f"[ERROR 500 INTERNO] Ruta: {request.path} - Detalle: {e}")
+    traceback.print_exc()
+    try:
+        mysql.connection.rollback()
+    except:
+        pass
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', '') or request.path.startswith('/pos/venta') or request.path.endswith('_json'):
+        return jsonify({'success': False, 'message': 'Ocurrió un error en el servidor. La operación no pudo completarse.'}), 500
+    flash('Ocurrió un error inesperado al procesar la solicitud. Por favor intente nuevamente.', 'danger')
+    return redirect(url_for('dashboard')) if 'user_id' in session else redirect(url_for('index'))
+
+@app.errorhandler(404)
+def error_404_handler(e):
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+        return jsonify({'success': False, 'message': 'El recurso solicitado no fue encontrado.'}), 404
+    flash('La página solicitada no existe o no se encuentra disponible.', 'warning')
+    return redirect(url_for('dashboard')) if 'user_id' in session else redirect(url_for('index'))
+
 # --- RUTAS BASE ---
 @app.route('/')
 def index():
