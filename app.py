@@ -841,17 +841,6 @@ def compras():
     cur = mysql.connection.cursor(); cur.execute("SELECT c.*, p.razon_social, s.nombre as sucursal_nombre FROM compras c JOIN proveedores p ON c.proveedor_id = p.id JOIN sucursales s ON c.sucursal_id = s.id ORDER BY c.fecha DESC")
     vs = cur.fetchall(); cur.close(); return render_template('compras.html', compras=vs)
 
-@app.route('/limpiar_db_compras')
-def limpiar_db_compras():
-    cur = mysql.connection.cursor()
-    cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
-    cur.execute("TRUNCATE TABLE detalles_compras;")
-    cur.execute("TRUNCATE TABLE compras;")
-    cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
-    mysql.connection.commit()
-    cur.close()
-    return "LISTO"
-
 @app.route('/compras/nueva')
 @login_required
 @admin_required
