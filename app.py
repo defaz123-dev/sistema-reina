@@ -210,6 +210,14 @@ def error_404_handler(e):
     flash('La página solicitada no existe o no se encuentra disponible.', 'warning')
     return redirect(url_for('dashboard')) if 'user_id' in session else redirect(url_for('index'))
 
+@app.errorhandler(405)
+def error_405_handler(e):
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+        return jsonify({'success': False, 'message': 'Método no permitido para esta ruta.'}), 405
+    flash('Acción inválida. Por seguridad la operación fue cancelada.', 'warning')
+    referrer = request.referrer or (url_for('dashboard') if 'user_id' in session else url_for('index'))
+    return redirect(referrer)
+
 # --- RUTAS BASE ---
 @app.route('/')
 def index():
