@@ -838,7 +838,7 @@ def kardex_movimientos():
 @login_required
 @admin_required
 def compras():
-    cur = mysql.connection.cursor(); cur.execute("SELECT c.*, p.razon_social, s.nombre as sucursal_nombre FROM compras c JOIN proveedores p ON c.proveedor_id = p.id JOIN sucursales s ON c.sucursal_id = s.id ORDER BY c.fecha DESC")
+    cur = mysql.connection.cursor(); cur.execute("SELECT c.*, p.razon_social, s.nombre as sucursal_nombre FROM compras c LEFT JOIN proveedores p ON c.proveedor_id = p.id LEFT JOIN sucursales s ON c.sucursal_id = s.id ORDER BY c.fecha DESC")
     vs = cur.fetchall(); cur.close(); return render_template('compras.html', compras=vs)
 
 @app.route('/compras/nueva')
@@ -924,9 +924,11 @@ def editar_compra(id):
 def verificar_clave_acceso(clave):
     exclude_id = request.args.get('exclude_id')
     cur = mysql.connection.cursor()
-    if exclude_id: cur.execute("SELECT COUNT(*) as c FROM compras WHERE clave_acceso=%s AND id!=%s", (clave, exclude_id))
-    else: cur.execute("SELECT COUNT(*) as c FROM compras WHERE clave_acceso=%s", (clave,))
-    r = cur.fetchone(); cur.close(); return jsonify({'existe': r['c'] > 0})
+    if exclude_id: cur.execute("SELECT id FROM compras WHERE clave_acceso=%s AND id!=%s", (clave, exclude_id))
+    else: cur.execute("SELECT id FROM compras WHERE clave_acceso=%s", (clave,))
+    r = cur.fetchone(); cur.close(); 
+    if r: print("DUPLICATE FOUND IN ID:", r['id'])
+    return jsonify({'existe': r is not None, 'id': r['id'] if r else None})
 
 @app.route('/compras/consultar_sri/<string:clave>')
 @login_required
