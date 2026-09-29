@@ -316,7 +316,7 @@ def consultar_comprobante_sri(clave):
     estado, num_aut, xml_str, msj = solicitar_autorizacion_sri(clave, ambiente)
     
     if estado != 'AUTORIZADO':
-        return None
+        raise Exception(msj)
 
     try:
         root = etree.fromstring(xml_str.encode('utf-8'))
@@ -638,7 +638,18 @@ def solicitar_autorizacion_sri(clave, ambiente):
                 num = aut.xpath(".//*[local-name()='numeroAutorizacion']/text()")
                 comprobante = aut.xpath(".//*[local-name()='comprobante']/text()")
                 return 'AUTORIZADO', num[0], comprobante[0], 'OK'
-        msgs = root.xpath("//*[local-name()='mensaje']/*[local-name()='mensaje']/text()")
-        err = " | ".join(msgs) if msgs else "No autorizado"
-        return 'RECHAZADO', None, None, err
+        errores = []
+        nodos_mensaje = root.xpath("//*[local-name()='mensajes']/*[local-name()='mensaje']")
+        for m in nodos_mensaje:
+            txt = m.xpath("./*[local-name()='mensaje']/text()")
+            info = m.xpath("./*[local-name()='informacionAdicional']/text()")
+            msg_str = (txt[0] if txt else "") + (" - " + info[0] if info else "")
+            if msg_str: errores.append(msg_str)
+        err = " | ".join(errores) if errores else "No autorizado"
+        
+        # Try to get the general state if it exists outside of the message array
+        estado_general = root.xpath("//*[local-name()='estado']/text()")
+        estado_str = estado_general[0] if estado_general else "RECHAZADA"
+        
+        return estado_str, None, None, f"{estado_str}: {err}"
     except Exception as e: return 'ERROR', None, None, str(e)
