@@ -96,11 +96,11 @@
 
                         <!-- Sucursal -->
                         <div class="mb-3">
-                            <label class="form-label fw-bold text-dark extra-small mb-1">PUNTO DE TRABAJO</label>
+                            <label class="form-label fw-bold text-dark extra-small mb-1">PUNTO DE TRABAJO (SUCURSAL) <span class="text-danger">*</span></label>
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text login-icon-box"><i class="fas fa-store"></i></span>
-                                <select name="sucursal" class="form-select fw-bold" required>
-                                    <option value="" disabled selected>Seleccione local...</option>
+                                <select name="sucursal" id="sucursalSelect" class="form-select fw-bold" required>
+                                    <option value="" disabled selected>-- SELECCIONE LOCAL OBLIGATORIO --</option>
                                     {% for s in sucursales %}
                                     <option value="{{ s['id'] }}">{{ s['nombre'] }}</option>
                                     {% endfor %}
@@ -109,7 +109,7 @@
                         </div>
 
                         <!-- Botón -->
-                        <button type="submit" class="btn btn-reina w-100 btn-login rounded-pill">
+                        <button type="submit" class="btn btn-reina w-100 btn-login rounded-pill shadow-sm">
                             <i class="fas fa-sign-in-alt me-2"></i> INICIAR SESIÓN
                         </button>
                     </form>
@@ -135,14 +135,6 @@ document.addEventListener('DOMContentLoaded', function() {
             bsAlert.close();
         });
     }, 3000);
-
-    // Soporte para Enter en el formulario
-    const loginForm = document.querySelector('form');
-    loginForm.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            loginForm.submit();
-        }
-    });
 });
 
 function togglePassword() {
@@ -159,11 +151,51 @@ function togglePassword() {
     }
 }
 
-// Lógica de HWID y Login
+// Lógica de HWID, Validación Estricta y Login
 document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const form = this;
-    
+
+    const usuarioInput = form.querySelector('input[name="usuario"]');
+    const passwordInput = form.querySelector('input[name="password"]');
+    const sucursalSelect = form.querySelector('select[name="sucursal"]');
+
+    if (!usuarioInput || !usuarioInput.value.trim()) {
+        if (typeof reinaAlert === 'function') {
+            reinaAlert('Campo Obligatorio', 'Por favor ingrese su cédula de identidad.', 'warning');
+        } else {
+            alert('Por favor ingrese su cédula de identidad.');
+        }
+        if (usuarioInput) usuarioInput.focus();
+        return;
+    }
+
+    if (!passwordInput || !passwordInput.value) {
+        if (typeof reinaAlert === 'function') {
+            reinaAlert('Campo Obligatorio', 'Por favor ingrese su contraseña.', 'warning');
+        } else {
+            alert('Por favor ingrese su contraseña.');
+        }
+        if (passwordInput) passwordInput.focus();
+        return;
+    }
+
+    if (!sucursalSelect || !sucursalSelect.value || sucursalSelect.value.trim() === '') {
+        if (typeof reinaAlert === 'function') {
+            reinaAlert('Punto de Trabajo Requerido', 'Debe seleccionar obligatoriamente una sucursal para ingresar al sistema.', 'warning');
+        } else {
+            alert('Debe seleccionar obligatoriamente una sucursal para ingresar al sistema.');
+        }
+        if (sucursalSelect) {
+            sucursalSelect.classList.add('is-invalid');
+            sucursalSelect.focus();
+            sucursalSelect.addEventListener('change', function() {
+                if (this.value) this.classList.remove('is-invalid');
+            }, { once: true });
+        }
+        return;
+    }
+
     // Mostrar loader nativo del Sistema Reina
     if (typeof showLoading === 'function') showLoading();
 
@@ -171,6 +203,9 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     fetch('http://localhost:5001/hwid')
         .then(response => response.json())
         .then(data => {
+            let oldHwid = form.querySelector('input[name="hwid"]');
+            if (oldHwid) oldHwid.remove();
+
             // Agregar HWID al formulario
             let hwidInput = document.createElement('input');
             hwidInput.type = 'hidden';
@@ -178,8 +213,8 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
             hwidInput.value = data.hwid;
             form.appendChild(hwidInput);
             
-            // Proceder con el login (el submit activará el loader de nuevo si no se redirige rápido)
-            form.submit();
+            // Proceder con el submit nativo
+            HTMLFormElement.prototype.submit.call(form);
         })
         .catch(err => {
             console.error('Error Bridge:', err);

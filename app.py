@@ -2,6 +2,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
 from flask_mysqldb import MySQL
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.exceptions import HTTPException, BadRequest
 from functools import wraps
 from datetime import datetime
 import os
@@ -190,6 +191,48 @@ def inject_empresa():
     except: return dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938', 'icono_espera': 'fa-crown'}, cat_tarjetas=[])
 
 # --- MANEJADORES GLOBALES DE ERROR ---
+def get_safe_error_redirect():
+    ref = request.referrer
+    if ref and not any(action in ref for action in ['/login', '/guardar', '/eliminar', '/actualizar', '/anular', '/descargar', '/procesar']):
+        return redirect(ref)
+    return redirect(url_for('dashboard')) if 'user_id' in session else redirect(url_for('index'))
+
+@app.errorhandler(400)
+def error_400_handler(e):
+    print(f"[ERROR 400 BAD REQUEST] Ruta: {request.path} - Detalle: {e}")
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', '') or request.path.startswith('/pos/venta') or request.path.endswith('_json'):
+        return jsonify({'success': False, 'message': 'Solicitud inválida o faltan parámetros requeridos.'}), 400
+    flash('Solicitud incompleta o faltan parámetros obligatorios. Por favor verifique.', 'warning')
+    return get_safe_error_redirect()
+
+@app.errorhandler(401)
+def error_401_handler(e):
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', '') or request.path.startswith('/pos/venta') or request.path.endswith('_json'):
+        return jsonify({'success': False, 'message': 'Su sesión no es válida o ha expirado.', 'session_expired': True}), 401
+    flash('Su sesión ha expirado o no ha iniciado sesión.', 'warning')
+    return redirect(url_for('index'))
+
+@app.errorhandler(403)
+def error_403_handler(e):
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+        return jsonify({'success': False, 'message': 'Acceso no autorizado a este recurso.'}), 403
+    flash('Acceso denegado: No tiene permisos suficientes para realizar esta acción.', 'danger')
+    return get_safe_error_redirect()
+
+@app.errorhandler(404)
+def error_404_handler(e):
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+        return jsonify({'success': False, 'message': 'El recurso solicitado no fue encontrado.'}), 404
+    flash('La página solicitada no existe o no se encuentra disponible.', 'warning')
+    return get_safe_error_redirect()
+
+@app.errorhandler(405)
+def error_405_handler(e):
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+        return jsonify({'success': False, 'message': 'Método no permitido para esta ruta.'}), 405
+    flash('Acción no permitida para esta sección.', 'warning')
+    return get_safe_error_redirect()
+
 @app.errorhandler(500)
 def error_500_handler(e):
     print(f"[ERROR 500 INTERNO] Ruta: {request.path} - Detalle: {e}")
@@ -201,22 +244,22 @@ def error_500_handler(e):
     if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', '') or request.path.startswith('/pos/venta') or request.path.endswith('_json'):
         return jsonify({'success': False, 'message': 'Ocurrió un error en el servidor. La operación no pudo completarse.'}), 500
     flash('Ocurrió un error inesperado al procesar la solicitud. Por favor intente nuevamente.', 'danger')
-    return redirect(url_for('dashboard')) if 'user_id' in session else redirect(url_for('index'))
+    return get_safe_error_redirect()
 
-@app.errorhandler(404)
-def error_404_handler(e):
-    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-        return jsonify({'success': False, 'message': 'El recurso solicitado no fue encontrado.'}), 404
-    flash('La página solicitada no existe o no se encuentra disponible.', 'warning')
-    return redirect(url_for('dashboard')) if 'user_id' in session else redirect(url_for('index'))
-
-@app.errorhandler(405)
-def error_405_handler(e):
-    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-        return jsonify({'success': False, 'message': 'Método no permitido para esta ruta.'}), 405
-    flash('Acción inválida. Por seguridad la operación fue cancelada.', 'warning')
-    referrer = request.referrer or (url_for('dashboard') if 'user_id' in session else url_for('index'))
-    return redirect(referrer)
+@app.errorhandler(Exception)
+def unhandled_exception_handler(e):
+    if isinstance(e, HTTPException):
+        return e
+    print(f"[ERROR INTERNO NO CONTROLADO] Ruta: {request.path} - Detalle: {e}")
+    traceback.print_exc()
+    try:
+        mysql.connection.rollback()
+    except:
+        pass
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', '') or request.path.startswith('/pos/venta') or request.path.endswith('_json'):
+        return jsonify({'success': False, 'message': 'Ocurrió un error inesperado en el servidor.'}), 500
+    flash('Ocurrió un error inesperado. El sistema protegió su sesión para evitar fallos.', 'danger')
+    return get_safe_error_redirect()
 
 # --- RUTAS BASE ---
 @app.route('/')
@@ -227,7 +270,24 @@ def index():
 
 @app.route('/login', methods=['POST'])
 def login():
-    c, p, s_id = request.form['usuario'].strip(), request.form['password'], int(request.form['sucursal'])
+    c = request.form.get('usuario', '').strip()
+    p = request.form.get('password', '')
+    sucursal_raw = request.form.get('sucursal', '').strip()
+
+    if not c or not p:
+        flash('Debe ingresar su cédula y contraseña para iniciar sesión.', 'warning')
+        return redirect(url_for('index'))
+
+    if not sucursal_raw:
+        flash('Debe seleccionar obligatoriamente una sucursal o punto de trabajo.', 'warning')
+        return redirect(url_for('index'))
+
+    try:
+        s_id = int(sucursal_raw)
+    except (ValueError, TypeError):
+        flash('La sucursal seleccionada no es válida.', 'warning')
+        return redirect(url_for('index'))
+
     hwid = request.form.get('hwid') # Capturar el HWID enviado desde el frontend
     
     cur = mysql.connection.cursor()
@@ -252,6 +312,10 @@ def login():
 
         cur.execute("SELECT nombre, establecimiento, punto_emision FROM sucursales WHERE id=%s", (s_id,))
         suc = cur.fetchone()
+        if not suc:
+            cur.close()
+            flash('La sucursal seleccionada no existe o se encuentra inactiva.', 'danger')
+            return redirect(url_for('index'))
         
         # CARGAR MENÚS AUTORIZADOS PARA EL ROL
         cur.execute("""
