@@ -21,6 +21,14 @@ app.config['MYSQL_PORT'] = int(os.environ.get('MYSQL_PORT', 3306))
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 app.config['MYSQL_CHARSET'] = 'utf8mb4'
 
+# Soporte SSL para bases en la nube (TiDB Cloud / Aiven)
+if os.environ.get('MYSQL_HOST', 'localhost') not in ('localhost', '127.0.0.1'):
+    ssl_opts = {}
+    ca_file = os.environ.get('MYSQL_SSL_CA', '/etc/ssl/certs/ca-certificates.crt')
+    if os.path.exists(ca_file):
+        ssl_opts['ca'] = ca_file
+    app.config['MYSQL_CUSTOM_OPTIONS'] = {'ssl': ssl_opts}
+
 mysql = MySQL(app)
 
 @app.before_request
