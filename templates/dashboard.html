@@ -29,18 +29,25 @@
     {% for m in session['user_menus'] %}
         <div class="col-6 col-md-3 col-lg-2">
             {% set menu_url = 'listar_promociones' if m.url == 'promociones' else m.url %}
-            {% if m.nombre|upper == 'ABRIR CAJA' %}
+            {% set req_terminal = (m.url in ['pos', 'sesion_caja'] or m.nombre|upper == 'ABRIR CAJA') %}
+            {% if not maquina_autorizada and (m.nombre|upper == 'ABRIR CAJA' or m.url == 'pos') %}
+            <a href="javascript:void(0)" onclick="avisarTerminalBloqueada()" class="text-decoration-none">
+            {% elif m.nombre|upper == 'ABRIR CAJA' %}
             <a href="javascript:void(0)" onclick="abrirCajaLocal()" class="text-decoration-none">
             {% else %}
             <a href="{{ url_for(menu_url) }}" class="text-decoration-none">
             {% endif %}
                 <div class="card h-100 border-0 shadow main-card {{ 'bg-dark' if m.nombre == 'Reportes' else '' }}">
                     <div class="card-body p-3 text-center">
-                        <div class="icon-box {{ 'border-success text-success' if m.categoria == 'OPERATIVO' else 'border-primary text-primary' if m.categoria == 'ABASTECIMIENTO' else 'border-info text-info' }} mb-3">
+                        <div class="icon-box {{ 'border-warning text-warning' if (not maquina_autorizada and req_terminal) else 'border-success text-success' if m.categoria == 'OPERATIVO' else 'border-primary text-primary' if m.categoria == 'ABASTECIMIENTO' else 'border-info text-info' }} mb-3">
                             <i class="{{ m.icono }}"></i>
                         </div>
                         <h6 class="fw-bold {{ 'text-white' if m.nombre == 'Reportes' else 'text-dark' }} mb-1">{{ m.nombre }}</h6>
+                        {% if not maquina_autorizada and req_terminal %}
+                        <p class="text-danger fw-bold extra-small mb-0"><i class="fas fa-lock me-1"></i>Sin Autorizar</p>
+                        {% else %}
                         <p class="{{ 'text-white-50' if m.nombre == 'Reportes' else 'text-muted' }} extra-small mb-0">Entrar</p>
+                        {% endif %}
                     </div>
                 </div>
             </a>
@@ -154,4 +161,24 @@
     .border-danger { border-color: #e74c3c !important; }
     .border-info { border-color: #17a2b8 !important; }
 </style>
+
+<script>
+async function avisarTerminalBloqueada() {
+    {% if session.get('rol') == 'ADMINISTRADOR' %}
+    const ir = await reinaConfirm(
+        'Terminal No Autorizada',
+        'Esta computadora no está registrada en la lista blanca de terminales.<br><br>No es posible abrir turnos de caja ni facturar hasta habilitarla.<br><br><b>¿Desea ir al módulo de Máquinas para autorizar esta terminal ahora?</b>'
+    );
+    if (ir) {
+        window.location.href = "{{ url_for('listar_maquinas') }}";
+    }
+    {% else %}
+    reinaAlert(
+        'Terminal No Autorizada',
+        'Esta computadora no se encuentra habilitada para abrir caja ni facturar. Solicite al Administrador que autorice esta terminal.',
+        'danger'
+    );
+    {% endif %}
+}
+</script>
 {% endblock %}

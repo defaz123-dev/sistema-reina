@@ -50,6 +50,19 @@ def obtener_sesion_caja_activa(sucursal_id, usuario_id):
         return s['id'] if s else None
     except: return None
 
+def es_terminal_autorizada():
+    hwid_actual = session.get('hwid_actual')
+    if not hwid_actual or hwid_actual == 'ERROR_HWID':
+        return False
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT id FROM maquinas_autorizadas WHERE hwid = %s", (hwid_actual,))
+        autorizada = cur.fetchone() is not None
+        cur.close()
+        return autorizada
+    except:
+        return False
+
 from PIL import Image
 
 def procesar_imagen(file_storage, max_size=(500, 500)):
@@ -527,10 +540,12 @@ def dashboard():
         """, (session['rol_id'],))
         session['user_menus'] = cur.fetchall()
     
-    if hwid_actual:
+    if hwid_actual and hwid_actual != 'ERROR_HWID':
         cur.execute("SELECT * FROM maquinas_autorizadas WHERE hwid = %s", (hwid_actual,))
         if not cur.fetchone():
             maquina_autorizada = False
+    else:
+        maquina_autorizada = False
 
     if session.get('rol') == 'ADMINISTRADOR':
         cur.execute("""
@@ -1534,13 +1549,18 @@ def sesion_caja():
         return render_template('cierre_turno.html', sesion=sesion_abierta, v_efectivo=v_efectivo, v_tarjeta=v_tarjeta, v_trans=v_trans, total_jornada=total_jornada, desglose_tarjetas=desglose_tarjetas, detalles_egresos=detalles_egresos, salidas=total_salidas, esperado=monto_esperado_efectivo)
     
     cur.close()
-    return render_template('apertura_caja.html')
+    maquina_autorizada = es_terminal_autorizada()
+    return render_template('apertura_caja.html', maquina_autorizada=maquina_autorizada)
 
 DENOMINACIONES_FISICAS = [100.00, 50.00, 20.00, 10.00, 5.00, 1.00, 0.50, 0.25, 0.10, 0.05, 0.01]
 
 @app.route('/caja/abrir', methods=['POST'])
 @login_required
 def abrir_caja():
+    if not es_terminal_autorizada():
+        flash('Operación bloqueada: Esta terminal no está autorizada para abrir turnos de caja. Debe autorizar esta computadora primero.', 'danger')
+        return redirect(url_for('sesion_caja'))
+
     s_id, u_id = session['sucursal_id'], session['user_id']
     cur = mysql.connection.cursor()
 
@@ -1949,6 +1969,10 @@ def guardar_productos_promo():
 @app.route('/pos')
 @login_required
 def pos():
+    if not es_terminal_autorizada():
+        flash('Operación bloqueada: Esta computadora no está autorizada para operar el Punto de Venta ni turnos de caja.', 'danger')
+        return redirect(url_for('sesion_caja'))
+
     sesion_id = obtener_sesion_caja_activa(session['sucursal_id'], session['user_id'])
     if not sesion_id:
         flash('Debe abrir un turno de caja antes de poder realizar ventas.', 'warning')

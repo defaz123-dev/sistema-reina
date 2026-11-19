@@ -28,6 +28,25 @@
                 <p class="text-muted small">Realice el conteo físico inicial para habilitar las ventas.</p>
             </div>
             <div class="card-body p-4 bg-white">
+                {% if not maquina_autorizada %}
+                <div class="alert border-0 shadow-sm rounded-4 p-3 mb-4 d-flex flex-column flex-md-row align-items-center justify-content-between" style="background: linear-gradient(135deg, #fff9db 0%, #fff3bf 100%); border-left: 5px solid #f08c00 !important;">
+                    <div class="d-flex align-items-center mb-2 mb-md-0">
+                        <div class="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center me-3 flex-shrink-0" style="width: 48px; height: 48px; font-size: 1.4rem;">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-1 text-dark">¡Terminal No Autorizada para Turno de Caja!</h6>
+                            <p class="mb-0 small text-muted">Esta computadora no está registrada en la lista blanca de terminales. Para abrir un turno de caja o facturar, primero debe habilitar y autorizar esta máquina.</p>
+                        </div>
+                    </div>
+                    {% if session.get('rol') == 'ADMINISTRADOR' %}
+                    <a href="{{ url_for('listar_maquinas') }}" class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm ms-md-3 flex-shrink-0">
+                        <i class="fas fa-desktop me-2"></i> AUTORIZAR TERMINAL
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <form action="{{ url_for('abrir_caja') }}" method="POST" id="formApertura">
                     <div class="row g-4">
                         <!-- COLUMNA IZQUIERDA: DENOMINACIONES -->
@@ -40,7 +59,7 @@
                                     <div class="input-group mb-2 shadow-xs rounded-2 border">
                                         <span class="input-group-text border-0 bg-light fw-bold text-dark" style="width: 60px;">{{ "%.0f"|format(b) }}</span>
                                         <input type="number" name="den_{{ "%.2f"|format(b) }}" class="form-control border-0 text-center den-input fw-bold" 
-                                               style="font-size: 1.1rem;" data-valor="{{ b }}" min="0" placeholder="0" oninput="calcularTotalApertura()">
+                                               style="font-size: 1.1rem;" data-valor="{{ b }}" min="0" placeholder="0" oninput="calcularTotalApertura()" {{ 'disabled' if not maquina_autorizada else '' }}>
                                         <span class="input-group-text border-0 bg-white text-success extra-small fw-bold subtotal-den" style="width: 85px;">$ 0.00</span>
                                     </div>
                                     {% endfor %}
@@ -52,7 +71,7 @@
                                     <div class="input-group mb-2 shadow-xs rounded-2 border">
                                         <span class="input-group-text border-0 bg-light fw-bold text-dark" style="width: 60px;">{{ "%.2f"|format(m)|replace('0.', '.') }}</span>
                                         <input type="number" name="den_{{ "%.2f"|format(m) }}" class="form-control border-0 text-center den-input fw-bold" 
-                                               style="font-size: 1.1rem;" data-valor="{{ m }}" min="0" placeholder="0" oninput="calcularTotalApertura()">
+                                               style="font-size: 1.1rem;" data-valor="{{ m }}" min="0" placeholder="0" oninput="calcularTotalApertura()" {{ 'disabled' if not maquina_autorizada else '' }}>
                                         <span class="input-group-text border-0 bg-white text-warning extra-small fw-bold subtotal-den" style="width: 85px;">$ 0.00</span>
                                     </div>
                                     {% endfor %}
@@ -71,9 +90,20 @@
                                 </div>
                                 
                                 <div class="d-grid gap-2">
+                                    {% if maquina_autorizada %}
                                     <button type="submit" class="btn btn-reina rounded-pill fw-bold shadow-sm py-2">
                                         <i class="fas fa-check-circle me-2"></i> CONFIRMAR APERTURA
                                     </button>
+                                    {% else %}
+                                    <button type="button" class="btn btn-secondary rounded-pill fw-bold shadow-sm py-2" disabled style="cursor: not-allowed; opacity: 0.75;">
+                                        <i class="fas fa-lock me-2"></i> TERMINAL NO AUTORIZADA
+                                    </button>
+                                    {% if session.get('rol') == 'ADMINISTRADOR' %}
+                                    <a href="{{ url_for('listar_maquinas') }}" class="btn btn-warning text-dark rounded-pill fw-bold shadow-sm py-2">
+                                        <i class="fas fa-plus-circle me-2"></i> HABILITAR / AUTORIZAR TERMINAL
+                                    </a>
+                                    {% endif %}
+                                    {% endif %}
                                     <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary rounded-pill fw-bold py-2 small">
                                         <i class="fas fa-times me-2"></i> CANCELAR OPERACIÓN
                                     </a>
