@@ -6,7 +6,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #f0f2f5 0%, #e2e8f0 100%);
+    background: radial-gradient(circle at top right, color-mix(in srgb, var(--reina-green) 14%, #eef2f6), #e2e8f0 70%);
     height: 100vh;
     overflow: hidden;
     margin: 0;
@@ -25,48 +25,122 @@
         margin: 0 !important;
     }
     .login-card {
-        border-radius: 20px !important;
-        border: none !important;
-        box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important;
+        border-radius: 22px !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.1), 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+        border-top: 5px solid var(--reina-green) !important;
         border-bottom: 4px solid var(--reina-green) !important;
         background: #ffffff;
         width: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+    .brand-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--reina-green) 10%, #ffffff);
+        border: 2px solid color-mix(in srgb, var(--reina-green) 22%, transparent);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 6px 16px color-mix(in srgb, var(--reina-green) 15%, transparent);
     }
     .brand-title {
-        font-size: 1.8rem;
+        font-size: 1.65rem;
         font-weight: 900;
         color: var(--reina-green);
-        letter-spacing: -1px;
-        line-height: 1.1;
+        letter-spacing: -0.5px;
+        line-height: 1.15;
+    }
+    .login-field-group {
+        border: 1.5px solid #dce1e7;
+        border-radius: 12px;
+        background: #f8fafc;
+        transition: all 0.2s ease;
+        overflow: hidden;
+    }
+    .login-field-group:focus-within {
+        border-color: var(--reina-green);
+        background: #ffffff;
+        box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--reina-green) 14%, transparent);
     }
     .login-icon-box {
-        background-color: #f8f9fa;
-        border: 1px solid #adb5bd;
-        color: #6c757d;
-        padding: 0.4rem 0.8rem;
+        background-color: transparent !important;
+        border: none !important;
+        color: var(--reina-green) !important;
+        padding: 0.55rem 0.75rem 0.55rem 0.9rem !important;
+        font-size: 0.95rem;
+    }
+    .login-field-group .form-control,
+    .login-field-group .form-select {
+        border: none !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        padding: 0.6rem 0.75rem 0.6rem 0.2rem !important;
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: #1e293b !important;
+    }
+    .login-eye-btn {
+        background-color: transparent !important;
+        border: none !important;
+        color: #64748b !important;
+        padding: 0 0.9rem !important;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+    .login-eye-btn:hover {
+        color: var(--reina-green) !important;
     }
     .btn-login {
         height: 48px;
-        font-size: 1rem;
-        letter-spacing: 1px;
+        font-size: 0.95rem;
+        letter-spacing: 0.8px;
         text-transform: uppercase;
-        font-weight: bold;
-        box-shadow: 0 4px 12px rgba(0, 137, 56, 0.15);
+        font-weight: 800;
+        box-shadow: 0 8px 20px color-mix(in srgb, var(--reina-green) 28%, transparent);
+        transition: all 0.25s ease;
     }
-    .form-control, .form-select {
-        padding: 0.5rem 0.75rem;
+    .btn-login:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px color-mix(in srgb, var(--reina-green) 36%, transparent);
     }
-    .extra-small { font-size: 0.7rem; }
+    .extra-small { font-size: 0.72rem; letter-spacing: 0.3px; }
+    .bridge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 50px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        background: #f1f5f9;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+    }
+    .bridge-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #94a3b8;
+    }
 </style>
 
 <div class="row justify-content-center w-100 m-0">
     <div class="col-sm-10 col-md-6 col-lg-5 col-xl-4 px-3">
-        <div class="card p-4 login-card">
-            <!-- Título arriba -->
-            <div class="text-center mb-3">
-                <div class="mb-1"><i class="fas fa-crown text-warning fa-2x"></i></div>
-                <h1 class="brand-title mb-0">{{ config_empresa.nombre_comercial }}</h1>
-                <div class="badge bg-success rounded-pill px-3 py-1 mt-1 shadow-sm" style="font-size: 0.7rem;">SISTEMA INTEGRAL V2.0</div>
+        <div class="card p-4 px-md-4 py-md-4 login-card">
+            <!-- Encabezado corporativo dinámico según configuración de Empresa -->
+            <div class="text-center mb-4">
+                <div class="brand-avatar mb-2">
+                    <i class="fas {{ config_empresa.icono_espera or 'fa-crown' }} fa-2x" style="color: var(--reina-green);"></i>
+                </div>
+                <h1 class="brand-title mb-1">{{ config_empresa.nombre_comercial }}</h1>
+                <div class="d-flex align-items-center justify-content-center gap-2 mt-1">
+                    <span class="badge bg-success rounded-pill px-3 py-1 shadow-sm" style="font-size: 0.68rem; letter-spacing: 0.5px;">
+                        <i class="fas fa-shield-alt me-1"></i> ACCESO CORPORATIVO
+                    </span>
+                </div>
             </div>
 
             <!-- Formulario apilado verticalmente -->
@@ -74,32 +148,32 @@
                 <div class="col-12">
                     <form action="/login" method="POST" id="loginForm">
                         <!-- Cédula -->
-                        <div class="mb-2">
-                            <label class="form-label fw-bold text-dark extra-small mb-1">CÉDULA DE IDENTIDAD (LOGIN)</label>
-                            <div class="input-group input-group-sm">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary extra-small mb-1">CÉDULA DE IDENTIDAD</label>
+                            <div class="input-group login-field-group">
                                 <span class="input-group-text login-icon-box"><i class="fas fa-id-card"></i></span>
-                                <input type="text" name="usuario" class="form-control" placeholder="Ingrese su cédula" required autofocus>
+                                <input type="text" name="usuario" class="form-control" placeholder="Ingrese su número de cédula" required autofocus>
                             </div>
                         </div>
 
                         <!-- Password -->
-                        <div class="mb-2">
-                            <label class="form-label fw-bold text-dark extra-small mb-1">CONTRASEÑA SEGURA</label>
-                            <div class="input-group input-group-sm">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary extra-small mb-1">CONTRASEÑA SEGURA</label>
+                            <div class="input-group login-field-group">
                                 <span class="input-group-text login-icon-box"><i class="fas fa-lock"></i></span>
-                                <input type="password" name="password" id="passwordField" class="form-control border-end-0" placeholder="••••••••" required>
-                                <span class="input-group-text bg-white text-muted" style="cursor: pointer;" onclick="togglePassword()">
+                                <input type="password" name="password" id="passwordField" class="form-control" placeholder="••••••••" required>
+                                <span class="input-group-text login-eye-btn" onclick="togglePassword()" title="Mostrar / Ocultar contraseña">
                                     <i class="fas fa-eye-slash" id="toggleIcon"></i>
                                 </span>
                             </div>
                         </div>
 
                         <!-- Sucursal -->
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-dark extra-small mb-1">PUNTO DE TRABAJO (SUCURSAL) <span class="text-danger">*</span></label>
-                            <div class="input-group input-group-sm">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-secondary extra-small mb-1">PUNTO DE TRABAJO (SUCURSAL) <span class="text-danger">*</span></label>
+                            <div class="input-group login-field-group">
                                 <span class="input-group-text login-icon-box"><i class="fas fa-store"></i></span>
-                                <select name="sucursal" id="sucursalSelect" class="form-select fw-bold" required>
+                                <select name="sucursal" id="sucursalSelect" class="form-select" required>
                                     <option value="" disabled selected>-- SELECCIONE LOCAL OBLIGATORIO --</option>
                                     {% for s in sucursales %}
                                     <option value="{{ s['id'] }}">{{ s['nombre'] }}</option>
@@ -109,16 +183,24 @@
                         </div>
 
                         <!-- Botón -->
-                        <button type="submit" class="btn btn-reina w-100 btn-login rounded-pill shadow-sm">
+                        <button type="submit" class="btn btn-reina w-100 btn-login rounded-pill">
                             <i class="fas fa-sign-in-alt me-2"></i> INICIAR SESIÓN
                         </button>
                     </form>
                 </div>
             </div>
+
+            <!-- Indicador discreto de estado del Bridge -->
+            <div class="text-center mt-3 pt-2 border-top">
+                <div class="bridge-pill" id="bridgeStatusPill">
+                    <span class="bridge-dot" id="bridgeStatusDot"></span>
+                    <span id="bridgeStatusText">Verificando Reina Bridge...</span>
+                </div>
+            </div>
         </div>
         
         <div class="text-center mt-3">
-            <p class="text-muted extra-small fw-bold mb-0">&copy; 2026 {{ config_empresa.nombre_comercial }} - SEGURIDAD INTEGRAL</p>
+            <p class="text-muted extra-small fw-bold mb-0">&copy; 2026 {{ config_empresa.nombre_comercial }} &bull; SEGURIDAD INTEGRAL</p>
         </div>
     </div>
 </div>
@@ -126,7 +208,7 @@
 
 {% block scripts %}
 <script>
-// Auto-cerrar alertas después de 3 segundos
+// Auto-cerrar alertas después de 3 segundos y verificar estado del Bridge
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         let alerts = document.querySelectorAll('.alert');
@@ -135,6 +217,32 @@ document.addEventListener('DOMContentLoaded', function() {
             bsAlert.close();
         });
     }, 3000);
+
+    // Chequeo silencioso de estado del Reina Bridge para el indicador visual
+    const dot = document.getElementById('bridgeStatusDot');
+    const txt = document.getElementById('bridgeStatusText');
+    const pill = document.getElementById('bridgeStatusPill');
+    fetch('http://localhost:5001/hwid')
+        .then(r => r.json())
+        .then(data => {
+            if (dot && txt && pill) {
+                dot.style.background = '#10b981';
+                dot.style.boxShadow = '0 0 6px rgba(16, 185, 129, 0.6)';
+                txt.textContent = 'Reina Bridge Activo';
+                txt.style.color = '#0f172a';
+                pill.style.background = '#ecfdf5';
+                pill.style.borderColor = '#a7f3d0';
+            }
+        })
+        .catch(() => {
+            if (dot && txt && pill) {
+                dot.style.background = '#f59e0b';
+                txt.textContent = 'Reina Bridge No Detectado';
+                txt.style.color = '#92400e';
+                pill.style.background = '#fffbeb';
+                pill.style.borderColor = '#fde68a';
+            }
+        });
 });
 
 function togglePassword() {
