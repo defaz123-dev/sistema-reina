@@ -35,6 +35,7 @@ mysql = MySQL(app)
 def configurar_zona_horaria():
     try:
         cur = mysql.connection.cursor()
+        cur.execute("SET NAMES utf8mb4;")
         cur.execute("SET time_zone = '-05:00';")
         cur.close()
     except: pass
@@ -505,6 +506,16 @@ def dashboard():
     alerta_sri = False
     maquina_autorizada = True
     hwid_actual = session.get('hwid_actual')
+
+    # Sincronizar menús autorizados del rol desde la BD para reflejar nombres y permisos al instante
+    if session.get('rol_id'):
+        cur.execute("""
+            SELECT m.* FROM menus m 
+            JOIN rol_menus rm ON m.id = rm.menu_id 
+            WHERE rm.rol_id = %s 
+            ORDER BY m.categoria, m.orden
+        """, (session['rol_id'],))
+        session['user_menus'] = cur.fetchall()
     
     if hwid_actual:
         cur.execute("SELECT * FROM maquinas_autorizadas WHERE hwid = %s", (hwid_actual,))
