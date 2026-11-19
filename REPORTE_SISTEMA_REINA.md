@@ -5,7 +5,12 @@ Este documento detalla la evolución final y la arquitectura de despliegue en la
 ## 1. Arquitectura de Nube (Multi-Cloud)
 Para garantizar la máxima disponibilidad y rendimiento, el sistema opera bajo una arquitectura distribuida:
 - **Servidor de Aplicación**: [Render.com](https://render.com) (Plataforma PaaS para el motor Flask).
-- **Base de Datos**: [Aiven.io](https://aiven.io) (Managed MySQL de alto rendimiento).
+- **Base de Datos**: [TiDB Cloud Serverless](https://tidbcloud.com) (Clúster MySQL distribuido de alta disponibilidad sobre AWS `us-west-2` Oregon con cifrado TLS/SSL nativo).
+  - **Host**: `gateway01.us-west-2.prod.aws.tidbcloud.com`
+  - **Puerto**: `4000`
+  - **Base de Datos**: `sistema_reina` (Codificación `utf8mb4_general_ci`)
+  - **Usuario**: `3hfdganH2BJoYox.root`
+  - **Seguridad**: Conexión cifrada TLS/SSL obligatoria (`/etc/ssl/certs/ca-certificates.crt`)
 - **Servicio de Mensajería**: [Brevo.com (Bravo)](https://brevo.com) (API de correo profesional para el envío de facturas).
 
 ## 2. Facturación Electrónica SRI (Motor Robusto)
@@ -81,6 +86,6 @@ Para garantizar la escalabilidad y rapidez en entornos de nube (donde el almacen
 - **Procesamiento de Imágenes**: El sistema ahora redimensiona y optimiza automáticamente cada imagen subida a un formato estándar (JPEG 80% calidad), ahorrando espacio en disco sin perder calidad visual.
 
 ---
-**Fecha de última actualización:** 30 de abril de 2026  
-**Estado:** Versión v3.1 Liberada con Optimización de Medios y Lista Blanca de Terminales.
+**Fecha de última actualización:** 19 de noviembre de 2026  
+**Estado:** Versión v3.2 Liberada con Migración a TiDB Cloud Serverless, Optimización de Medios y Lista Blanca de Terminales.
 ---

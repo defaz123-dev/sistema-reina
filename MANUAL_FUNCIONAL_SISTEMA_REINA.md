@@ -72,6 +72,15 @@ Personalización total del ecosistema.
 - **Gestión de Canales y Tarjetas**: Administración centralizada de plataformas de delivery y tipos de tarjetas aceptadas.
 - **Seguridad SRI**: Gestión de firma electrónica (.p12), contraseña y ambiente (Pruebas/Producción).
 
+## 10. INFRAESTRUCTURA Y CONEXIÓN A BASE DE DATOS (TiDB CLOUD SERVERLESS)
+El sistema utiliza un clúster distribuido compatible con MySQL 8.0 en **TiDB Cloud Serverless** (AWS `us-west-2` Oregon) conectado con **Render**:
+- **Host (`MYSQL_HOST`)**: `gateway01.us-west-2.prod.aws.tidbcloud.com`
+- **Puerto (`MYSQL_PORT`)**: `4000`
+- **Usuario (`MYSQL_USER`)**: `3hfdganH2BJoYox.root`
+- **Base de Datos (`MYSQL_DB`)**: `sistema_reina`
+- **Codificación y Zona Horaria**: `utf8mb4` (`utf8mb4_general_ci`) con zona horaria automática `-05:00` (Ecuador).
+- **Seguridad de Transporte**: Cifrado TLS/SSL obligatorio gestionado automáticamente por el conector de Python (`MYSQL_CUSTOM_OPTIONS`).
+
 ---
-**Documento actualizado al:** 30 de abril de 2026  
-**Versión del Sistema:** v3.1 Enterprise Pro Plus
+**Documento actualizado al:** 19 de noviembre de 2026  
+**Versión del Sistema:** v3.2 Enterprise Pro Plus

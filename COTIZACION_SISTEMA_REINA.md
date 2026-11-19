@@ -21,20 +21,20 @@ Propuesta integral para la implementación del **Sistema Reina (Versión Enterpr
 
 ### Infraestructura Multi-Cloud de Clase Mundial:
 *   **Application Server (Render):** Procesamiento de alto rendimiento para el motor Flask.
-*   **Managed Database (Aiven):** Clúster seguro y redundante de base de datos MySQL.
-*   **Delivery API (Bravo):** Garantía del 100% en la entrega de facturas mediante protocolos HTTPS.
+*   **Managed Database (TiDB Cloud Serverless):** Clúster seguro, distribuido y redundante de base de datos MySQL en AWS (`gateway01.us-west-2.prod.aws.tidbcloud.com:4000`) con conexión TLS/SSL cifrada.
+*   **Delivery API (Brevo):** Garantía del 100% en la entrega de facturas mediante protocolos HTTPS.
 
 ---
 
-## 2. INVERSIÓN (ACTUALIZADA V2.7)
+## 2. INVERSIÓN (ACTUALIZADA V3.2)
 
 ### OPCIÓN A: PROPIEDAD TOTAL (LICENCIA PERPETUA)
 *Ideal para el control absoluto del ecosistema tecnológico.*
 
 | Concepto | Detalle | Total |
 | :--- | :--- | :---: |
-| **Licencia ENTERPRISE v2.7** | Motor SRI + Pagos Mixtos + Atajos + Canales | $ 2,800.00 |
-| **Configuración Cloud** | Setup de Infraestructura Render, Aiven y Bravo API | $ 500.00 |
+| **Licencia ENTERPRISE v3.2** | Motor SRI + Pagos Mixtos + Atajos + Canales | $ 2,800.00 |
+| **Configuración Cloud** | Setup de Infraestructura Render, TiDB Cloud y Brevo API | $ 500.00 |
 | **Capacitación y Auditoría** | Formación en gestión de costos y control de roles | $ 200.00 |
 | **TOTAL INVERSIÓN INICIAL** | | **$ 3,500.00** |
 | *Cloud Maintenance* | *Soporte VIP y Actualizaciones del SRI* | *$ 600.00/año* |

@@ -228,10 +228,20 @@ def error_403_handler(e):
     flash('Acceso denegado: No tiene permisos suficientes para realizar esta acción.', 'danger')
     return get_safe_error_redirect()
 
+@app.route('/favicon.ico')
+def favicon():
+    return Response('', status=204)
+
 @app.errorhandler(404)
 def error_404_handler(e):
-    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-        return jsonify({'success': False, 'message': 'El recurso solicitado no fue encontrado.'}), 404
+    # Ignorar peticiones en segundo plano del navegador (favicon, imágenes, mapas CSS/JS, archivos estáticos)
+    if (request.path.startswith('/static/') or 
+        request.path.endswith(('.ico', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.css', '.js', '.map', '.woff', '.woff2', '.ttf')) or
+        request.headers.get('Sec-Fetch-Dest') not in (None, 'document') or
+        'text/html' not in request.headers.get('Accept', '')):
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+            return jsonify({'success': False, 'message': 'El recurso solicitado no fue encontrado.'}), 404
+        return Response('', status=404)
     flash('La página solicitada no existe o no se encuentra disponible.', 'warning')
     return get_safe_error_redirect()
 
