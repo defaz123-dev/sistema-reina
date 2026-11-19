@@ -89,7 +89,7 @@
                                 <span class="input-group-text login-icon-box"><i class="fas fa-lock"></i></span>
                                 <input type="password" name="password" id="passwordField" class="form-control border-end-0" placeholder="••••••••" required>
                                 <span class="input-group-text bg-white text-muted" style="cursor: pointer;" onclick="togglePassword()">
-                                    <i class="fas fa-eye" id="toggleIcon"></i>
+                                    <i class="fas fa-eye-slash" id="toggleIcon"></i>
                                 </span>
                             </div>
                         </div>
@@ -142,12 +142,12 @@ function togglePassword() {
     const toggleIcon = document.getElementById('toggleIcon');
     if (passwordField.type === 'password') {
         passwordField.type = 'text';
-        toggleIcon.classList.remove('fa-eye');
-        toggleIcon.classList.add('fa-eye-slash');
-    } else {
-        passwordField.type = 'password';
         toggleIcon.classList.remove('fa-eye-slash');
         toggleIcon.classList.add('fa-eye');
+    } else {
+        passwordField.type = 'password';
+        toggleIcon.classList.remove('fa-eye');
+        toggleIcon.classList.add('fa-eye-slash');
     }
 }
 
