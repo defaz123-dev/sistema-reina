@@ -68,6 +68,32 @@
                             {% endfor %}
                         </div>
                     </div>
+
+                    <!-- Imagen de Fondo Parametrizable para el Login -->
+                    <div class="col-12 mt-3">
+                        <div class="p-3 bg-light rounded-3 border d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                {% set fondo_actual = (empresa.imagen_fondo if empresa and empresa.imagen_fondo else 'fondo_default.jpg') %}
+                                <div class="position-relative rounded-3 overflow-hidden shadow-sm border" style="width: 110px; height: 64px; flex-shrink: 0; background: #1e293b;">
+                                    <img id="previewFondoLogin" src="{{ url_for('static', filename='uploads/fondos/' ~ fondo_actual) }}" alt="Fondo Login" style="width: 100%; height: 100%; object-fit: cover; filter: blur(1px);">
+                                    <div class="position-absolute top-0 start-0 w-100 h-100" style="background: linear-gradient(135deg, {{ empresa.color_tema if empresa and empresa.color_tema else '#008938' }}99, transparent 60%, {{ empresa.color_tema if empresa and empresa.color_tema else '#008938' }}cc);"></div>
+                                </div>
+                                <div>
+                                    <label class="small fw-bold text-dark mb-1 d-block"><i class="fas fa-image me-1 text-success"></i> Imagen de Fondo (Pantalla de Login)</label>
+                                    <p class="text-muted mb-0" style="font-size: 0.75rem;">Se guarda en <code>static/uploads/fondos/</code> y se aplica automáticamente con el efecto difuminado y el color del tema.</p>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+                                <input type="file" name="fondo_file" id="inputFondoFile" class="form-control form-control-sm bg-white" accept="image/*" style="max-width: 260px;" onchange="previsualizarFondo(this)">
+                                {% if empresa and empresa.imagen_fondo and empresa.imagen_fondo != 'fondo_default.jpg' %}
+                                <div class="form-check ms-sm-2">
+                                    <input class="form-check-input" type="checkbox" name="restaurar_fondo_default" value="1" id="chkResetFondo">
+                                    <label class="form-check-label extra-small fw-bold text-danger" for="chkResetFondo">Restaurar original</label>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -188,4 +214,17 @@
         cursor: pointer;
     }
 </style>
+
+<script>
+function previsualizarFondo(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.getElementById('previewFondoLogin');
+            if (img) img.src = e.target.result;
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
 {% endblock %}

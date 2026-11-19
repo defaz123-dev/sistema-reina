@@ -204,13 +204,30 @@ def admin_required(f):
 def inject_empresa():
     try:
         cur = mysql.connection.cursor()
-        cur.execute("SELECT nombre_comercial, color_tema, icono_espera FROM empresa LIMIT 1")
+        cur.execute("SELECT id, nombre_comercial, color_tema, icono_espera, imagen_fondo FROM empresa LIMIT 1")
         e = cur.fetchone()
         cur.execute("SELECT * FROM cat_tarjetas WHERE activo = 1 ORDER BY nombre")
         tarjetas = cur.fetchall()
+        if e:
+            fondo_nombre = e.get('imagen_fondo') or 'fondo_default.jpg'
+            fondo_dir = os.path.join('static', 'uploads', 'fondos')
+            fondo_path = os.path.join(fondo_dir, fondo_nombre)
+            if not os.path.exists(fondo_path) and fondo_nombre != 'fondo_default.jpg':
+                try:
+                    cur.execute("SELECT imagen_fondo_b64 FROM empresa WHERE id = %s", (e['id'],))
+                    row_b64 = cur.fetchone()
+                    if row_b64 and row_b64.get('imagen_fondo_b64'):
+                        os.makedirs(fondo_dir, exist_ok=True)
+                        with open(fondo_path, 'wb') as f:
+                            f.write(base64.b64decode(row_b64['imagen_fondo_b64']))
+                    else:
+                        fondo_nombre = 'fondo_default.jpg'
+                except Exception:
+                    fondo_nombre = 'fondo_default.jpg'
+            e['imagen_fondo'] = fondo_nombre
         cur.close()
-        return dict(config_empresa=e, cat_tarjetas=tarjetas) if e else dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938', 'icono_espera': 'fa-crown'}, cat_tarjetas=tarjetas)
-    except: return dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938', 'icono_espera': 'fa-crown'}, cat_tarjetas=[])
+        return dict(config_empresa=e, cat_tarjetas=tarjetas) if e else dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938', 'icono_espera': 'fa-crown', 'imagen_fondo': 'fondo_default.jpg'}, cat_tarjetas=tarjetas)
+    except: return dict(config_empresa={'nombre_comercial': 'SISTEMA REINA', 'color_tema': '#008938', 'icono_espera': 'fa-crown', 'imagen_fondo': 'fondo_default.jpg'}, cat_tarjetas=[])
 
 # --- MANEJADORES GLOBALES DE ERROR ---
 def get_safe_error_redirect():
@@ -1194,6 +1211,35 @@ def guardar_empresa():
     if f_file and f_file.filename:
         if not os.path.exists('certs'): os.makedirs('certs')
         f_file.save(os.path.join('certs', 'firma.p12'))
+
+    # Manejo de Imagen de Fondo del Login (Carpeta específica static/uploads/fondos)
+    fondo_file = request.files.get('fondo_file')
+    nuevo_fondo_nombre = None
+    nuevo_fondo_b64 = None
+    fondo_dir = os.path.join('static', 'uploads', 'fondos')
+    os.makedirs(fondo_dir, exist_ok=True)
+
+    if d.get('restaurar_fondo_default') == '1':
+        nuevo_fondo_nombre = 'fondo_default.jpg'
+        nuevo_fondo_b64 = None
+    elif fondo_file and fondo_file.filename:
+        try:
+            img_bg = Image.open(fondo_file)
+            if img_bg.mode in ("RGBA", "P"):
+                img_bg = img_bg.convert("RGB")
+            img_bg.thumbnail((1920, 1080), Image.Resampling.LANCZOS)
+            nuevo_fondo_nombre = f"fondo_login_{int(datetime.now().timestamp())}.jpg"
+            ruta_destino = os.path.join(fondo_dir, nuevo_fondo_nombre)
+            # Limpiar fondos personalizados anteriores para no acumular archivos innecesarios
+            for old_f in os.listdir(fondo_dir):
+                if old_f.startswith('fondo_login_') and old_f.endswith('.jpg'):
+                    try: os.remove(os.path.join(fondo_dir, old_f))
+                    except: pass
+            img_bg.save(ruta_destino, "JPEG", quality=85)
+            with open(ruta_destino, "rb") as bf:
+                nuevo_fondo_b64 = base64.b64encode(bf.read()).decode('utf-8')
+        except Exception as e_img:
+            flash(f'No se pudo procesar la imagen de fondo: {str(e_img)}', 'warning')
     
     # Manejo de Contraseña de Firma (Opcional)
     f_pass = d.get('firma_password', '')
@@ -1212,10 +1258,12 @@ def guardar_empresa():
             cur.execute("""UPDATE empresa SET ruc=%s, razon_social=%s, nombre_comercial=%s, direccion_matriz=%s, iva_porcentaje=%s, ambiente=%s, color_tema=%s, obligado_contabilidad=%s, icono_espera=%s, 
                            email_host=%s, email_port=%s, email_user=%s, email_pass=%s, email_use_tls=%s, email_envio_automatico=%s, usuario_modificacion_id=%s WHERE id=%s""", 
                         (ruc, razon, nom, dir, iva, d['ambiente'], color, d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, d['id']))
+        if nuevo_fondo_nombre:
+            cur.execute("UPDATE empresa SET imagen_fondo=%s, imagen_fondo_b64=%s WHERE id=%s", (nuevo_fondo_nombre, nuevo_fondo_b64, d['id']))
     else: 
-        cur.execute("""INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, firma_password, obligado_contabilidad, icono_espera, email_host, email_port, email_user, email_pass, email_use_tls, email_envio_automatico, usuario_creacion_id, usuario_modificacion_id) 
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
-                    (ruc, razon, nom, dir, iva, d['ambiente'], color, cifrar_password(f_pass), d.get('obligado_contabilidad','NO'), icono, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, u_id))
+        cur.execute("""INSERT INTO empresa (ruc, razon_social, nombre_comercial, direccion_matriz, iva_porcentaje, ambiente, color_tema, firma_password, obligado_contabilidad, icono_espera, imagen_fondo, imagen_fondo_b64, email_host, email_port, email_user, email_pass, email_use_tls, email_envio_automatico, usuario_creacion_id, usuario_modificacion_id) 
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", 
+                    (ruc, razon, nom, dir, iva, d['ambiente'], color, cifrar_password(f_pass), d.get('obligado_contabilidad','NO'), icono, nuevo_fondo_nombre or 'fondo_default.jpg', nuevo_fondo_b64, e_host, e_port, e_user, e_pass, e_tls, e_auto, u_id, u_id))
     
     mysql.connection.commit(); cur.close(); flash('Configuración actualizada correctamente', 'success')
     registrar_auditoria('CONFIG', f"Actualizó configuración general de la empresa: {nom}")

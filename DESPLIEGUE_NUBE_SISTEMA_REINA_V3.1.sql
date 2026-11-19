@@ -114,6 +114,8 @@ CREATE TABLE `empresa` (
   `usuario_modificacion_id` int(11) DEFAULT NULL,
   `fecha_modificacion` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `icono_espera` varchar(50) DEFAULT 'fa-crown',
+  `imagen_fondo` varchar(255) DEFAULT 'fondo_default.jpg',
+  `imagen_fondo_b64` longtext DEFAULT NULL,
   `email_host` varchar(100) DEFAULT NULL,
   `email_port` int(11) DEFAULT NULL,
   `email_user` varchar(100) DEFAULT NULL,

@@ -6,13 +6,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: radial-gradient(circle at top right, color-mix(in srgb, var(--reina-green) 14%, #eef2f6), #e2e8f0 70%);
+    background: #0a2e1c;
     height: 100vh;
     overflow: hidden;
     margin: 0;
+    position: relative;
 {% endblock %}
 
 {% block content %}
+{% set fondo_img = (config_empresa.imagen_fondo if config_empresa and config_empresa.imagen_fondo else 'fondo_default.jpg') %}
 <style>
     /* Ajuste específico para que el contenedor de esta página ocupe todo el alto sin scroll */
     .container.py-4 { 
@@ -23,11 +25,56 @@
         max-width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
+        position: relative;
+        z-index: 5;
     }
+
+    /* CAPA 1: Imagen de fondo parametrizable con efecto desenfoque (Blur) */
+    .login-bg-photo {
+        position: fixed;
+        inset: -25px;
+        background-image: url("{{ url_for('static', filename='uploads/fondos/' ~ fondo_img) }}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        filter: blur(7px) brightness(0.92);
+        transform: scale(1.04);
+        z-index: 1;
+        pointer-events: none;
+    }
+
+    /* CAPA 2: Viñeta con el color del tema configurado en Empresa */
+    .login-bg-overlay {
+        position: fixed;
+        inset: 0;
+        background: 
+            radial-gradient(circle at 50% 48%, rgba(0, 0, 0, 0.18) 0%, color-mix(in srgb, var(--reina-green) 58%, rgba(4, 28, 16, 0.72)) 58%, color-mix(in srgb, var(--reina-green) 88%, #031d10) 100%),
+            linear-gradient(90deg, color-mix(in srgb, var(--reina-green) 78%, #042213) 0%, transparent 28%, transparent 72%, color-mix(in srgb, var(--reina-green) 82%, #042213) 100%);
+        z-index: 2;
+        pointer-events: none;
+    }
+
+    /* CAPA 3: Ilustraciones lineales decorativas (Doodles de sánduches, coronas y hojas en los bordes) */
+    .login-bg-doodles {
+        position: fixed;
+        inset: 0;
+        z-index: 3;
+        pointer-events: none;
+        overflow: hidden;
+    }
+    .doodle-svg {
+        position: absolute;
+        stroke: rgba(255, 255, 255, 0.24);
+        fill: none;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
     .login-card {
         border-radius: 22px !important;
-        border: 1px solid rgba(0, 0, 0, 0.05) !important;
-        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.1), 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.42), 0 8px 20px rgba(0, 0, 0, 0.2) !important;
         border-top: 5px solid var(--reina-green) !important;
         border-bottom: 4px solid var(--reina-green) !important;
         background: #ffffff;
@@ -127,7 +174,84 @@
     }
 </style>
 
-<div class="row justify-content-center w-100 m-0">
+<!-- CAPAS DE FONDO ESTILO CORPORATIVO REINA -->
+<div class="login-bg-photo"></div>
+<div class="login-bg-overlay"></div>
+<div class="login-bg-doodles">
+    <!-- Sánduche Superior Izquierdo -->
+    <svg class="doodle-svg" style="top: 4%; left: 1.5%; width: 140px; height: 100px; transform: rotate(-18deg);" viewBox="0 0 120 80">
+        <path d="M15,42 C15,20 105,20 105,42 Z" />
+        <path d="M35,26 L45,34 M58,24 L68,33 M80,27 L88,35" />
+        <path d="M12,46 Q25,52 38,45 T64,46 T90,45 T108,47" />
+        <path d="M15,52 L105,52 C102,65 18,65 15,52 Z" />
+    </svg>
+    <!-- Hoja Superior Izquierda -->
+    <svg class="doodle-svg" style="top: 2%; left: 13%; width: 65px; height: 65px; transform: rotate(25deg);" viewBox="0 0 60 60">
+        <path d="M10,50 C10,20 45,10 50,10 C50,15 40,50 10,50 Z" />
+        <path d="M10,50 L45,15 M22,38 L18,26 M32,28 L28,18" />
+    </svg>
+    <!-- Corona Inferior Izquierda Media -->
+    <svg class="doodle-svg" style="bottom: 24%; left: 5.5%; width: 85px; height: 70px; transform: rotate(12deg);" viewBox="0 0 80 65">
+        <path d="M12,48 L6,20 L26,34 L40,14 L54,34 L74,20 L68,48 Z" />
+        <path d="M12,54 L68,54" />
+        <circle cx="6" cy="15" r="3" />
+        <circle cx="40" cy="9" r="3" />
+        <circle cx="74" cy="15" r="3" />
+    </svg>
+    <!-- Sánduche Inferior Izquierdo -->
+    <svg class="doodle-svg" style="bottom: 3%; left: -1%; width: 145px; height: 100px; transform: rotate(14deg);" viewBox="0 0 120 80">
+        <path d="M15,42 C15,20 105,20 105,42 Z" />
+        <path d="M35,26 L45,34 M58,24 L68,33 M80,27 L88,35" />
+        <path d="M12,46 Q25,52 38,45 T64,46 T90,45 T108,47" />
+        <path d="M15,52 L105,52 C102,65 18,65 15,52 Z" />
+    </svg>
+    <!-- Hoja y Botella Inferior Izquierda -->
+    <svg class="doodle-svg" style="bottom: 4%; left: 11%; width: 60px; height: 60px; transform: rotate(-20deg);" viewBox="0 0 60 60">
+        <path d="M10,50 C10,20 45,10 50,10 C50,15 40,50 10,50 Z" />
+        <path d="M10,50 L45,15" />
+    </svg>
+    <svg class="doodle-svg" style="bottom: 2%; left: 17%; width: 55px; height: 80px; transform: rotate(35deg);" viewBox="0 0 50 80">
+        <path d="M20,10 L30,10 L28,25 C35,30 38,38 38,48 L38,70 C38,74 34,76 25,76 C16,76 12,74 12,70 L12,48 C12,38 15,30 22,25 Z" />
+    </svg>
+
+    <!-- Hoja Superior Derecha -->
+    <svg class="doodle-svg" style="top: 3%; right: 16%; width: 70px; height: 70px; transform: rotate(-30deg);" viewBox="0 0 60 60">
+        <path d="M10,50 C10,20 45,10 50,10 C50,15 40,50 10,50 Z" />
+        <path d="M10,50 L45,15 M24,36 L36,38 M32,26 L42,28" />
+    </svg>
+    <!-- Corona Superior Derecha -->
+    <svg class="doodle-svg" style="top: 6%; right: 3%; width: 95px; height: 75px; transform: rotate(16deg);" viewBox="0 0 80 65">
+        <path d="M12,48 L6,20 L26,34 L40,14 L54,34 L74,20 L68,48 Z" />
+        <path d="M12,54 L68,54" />
+        <circle cx="6" cy="15" r="3" />
+        <circle cx="40" cy="9" r="3" />
+        <circle cx="74" cy="15" r="3" />
+    </svg>
+    <!-- Sánduche Medio Derecho -->
+    <svg class="doodle-svg" style="top: 36%; right: 1%; width: 135px; height: 95px; transform: rotate(-22deg);" viewBox="0 0 120 80">
+        <path d="M15,42 C15,20 105,20 105,42 Z" />
+        <path d="M35,26 L45,34 M58,24 L68,33 M80,27 L88,35" />
+        <path d="M12,46 Q25,52 38,45 T64,46 T90,45 T108,47" />
+        <path d="M15,52 L105,52 C102,65 18,65 15,52 Z" />
+    </svg>
+    <!-- Corona Inferior Derecha -->
+    <svg class="doodle-svg" style="bottom: 20%; right: 16%; width: 85px; height: 70px; transform: rotate(-14deg);" viewBox="0 0 80 65">
+        <path d="M12,48 L6,20 L26,34 L40,14 L54,34 L74,20 L68,48 Z" />
+        <path d="M12,54 L68,54" />
+        <circle cx="6" cy="15" r="3" />
+        <circle cx="40" cy="9" r="3" />
+        <circle cx="74" cy="15" r="3" />
+    </svg>
+    <!-- Sánduche Inferior Derecho -->
+    <svg class="doodle-svg" style="bottom: 2%; right: 2%; width: 140px; height: 95px; transform: rotate(15deg);" viewBox="0 0 120 80">
+        <path d="M15,42 C15,20 105,20 105,42 Z" />
+        <path d="M35,26 L45,34 M58,24 L68,33 M80,27 L88,35" />
+        <path d="M12,46 Q25,52 38,45 T64,46 T90,45 T108,47" />
+        <path d="M15,52 L105,52 C102,65 18,65 15,52 Z" />
+    </svg>
+</div>
+
+<div class="row justify-content-center w-100 m-0" style="position: relative; z-index: 10;">
     <div class="col-sm-10 col-md-6 col-lg-5 col-xl-4 px-3">
         <div class="card p-4 px-md-4 py-md-4 login-card">
             <!-- Encabezado corporativo dinámico según configuración de Empresa -->
@@ -200,7 +324,7 @@
         </div>
         
         <div class="text-center mt-3">
-            <p class="text-muted extra-small fw-bold mb-0">&copy; 2026 {{ config_empresa.nombre_comercial }} &bull; SEGURIDAD INTEGRAL</p>
+            <p class="extra-small fw-bold mb-0" style="color: rgba(255, 255, 255, 0.92); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55); letter-spacing: 0.6px;">&copy; 2026 {{ config_empresa.nombre_comercial }} - SEGURIDAD INTEGRAL</p>
         </div>
     </div>
 </div>
